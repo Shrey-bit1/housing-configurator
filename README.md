@@ -10,7 +10,6 @@ A browser-based 3D flat / housing configurator built with **TypeScript + Three.j
 - **Placement & editing** — drag from the palette with a green/red validity ghost, snap to grid, collision-checked against everything on the floor; click to select, `R` to rotate 90°, drag to move, `Delete`/`Backspace` to remove.
 - **Multi-floor support** — stack multiple floors (each with its own grid and contents); switch the active floor via tabs, add/delete floors. Inactive floors render dimmed and non-interactive.
 - **Camera** — orbit/zoom (OrbitControls) with a **Reset View** button to return to the default axonometric angle.
-- **Bauhaus-inspired visual system** — flat colour palette, geometric sans-serif UI.
 
 ## Run locally
 
