@@ -1,0 +1,330 @@
+/* ============================================================
+   Bauhaus visual system
+   - geometric sans, flat solid fills, sharp rectangular edges
+   - black / off-white as structural chrome; room colours as accents
+   - no gradients, shadows, skeuomorphism, or border-radius
+   ============================================================ */
+:root {
+  --black: #141414;
+  --black-2: #1e1e1e;
+  --line: #000000;
+  --line-soft: #34322d;
+  --paper: #ede7da; /* off-white */
+  --paper-2: #d9d3c5;
+  --text: #f4f1ea;
+  --text-dim: #a8a399;
+  --accent: #d32f2f; /* Bauhaus red, used sparingly for interaction */
+  --canvas-bg: #e4e0d6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: var(--black);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ---- Sidebar ---- */
+#sidebar {
+  width: 272px;
+  flex: 0 0 272px;
+  background: var(--black);
+  border-right: 2px solid var(--line);
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  overflow-y: auto;
+}
+
+.panel-title {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--accent);
+}
+
+/* ---- Floors panel ---- */
+.floor-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.floor-tab {
+  padding: 9px 12px;
+  background: var(--black-2);
+  color: var(--text);
+  border: 1px solid var(--line-soft);
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.floor-tab:hover {
+  border-color: var(--accent);
+}
+
+.floor-tab.active {
+  background: var(--paper);
+  color: var(--black);
+  border-color: var(--paper);
+}
+
+.floor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+button.secondary {
+  flex: 1;
+  padding: 9px;
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--line-soft);
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: var(--paper);
+  color: var(--black);
+  border-color: var(--paper);
+}
+
+button.secondary.danger:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+button.secondary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ---- Palette ---- */
+.palette-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 11px;
+  background: var(--black-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 0;
+  cursor: grab;
+  user-select: none;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.palette-item:hover {
+  border-color: var(--accent);
+  background: #262626;
+}
+
+.palette-item:active {
+  cursor: grabbing;
+  background: #2e2e2e;
+}
+
+.palette-swatch {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 0;
+  background: var(--paper);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+}
+
+.palette-swatch svg {
+  display: block;
+}
+
+.palette-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.palette-label .name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.palette-label .desc {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ---- Grid controls ---- */
+.field-row {
+  display: flex;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.field label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.field input {
+  width: 100%;
+  padding: 8px;
+  background: var(--black-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 0;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+button.primary {
+  margin-top: 12px;
+  width: 100%;
+  padding: 11px;
+  background: var(--paper);
+  color: var(--black);
+  border: 2px solid var(--paper);
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+button.primary:hover {
+  background: transparent;
+  color: var(--paper);
+}
+
+.hint-text {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin: 10px 0 0;
+}
+
+/* ---- Viewport ---- */
+#viewport {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: var(--canvas-bg);
+}
+
+#scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Reset View button (top-right of viewport) ---- */
+#reset-view {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 9px 16px;
+  background: var(--black);
+  color: var(--text);
+  border: 2px solid var(--black);
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+#reset-view:hover {
+  background: var(--paper);
+  color: var(--black);
+}
+
+#hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background: var(--black);
+  border: none;
+  border-radius: 0;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+#hint kbd {
+  background: var(--paper);
+  color: var(--black);
+  border: none;
+  border-radius: 0;
+  padding: 1px 6px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
