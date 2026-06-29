@@ -22,11 +22,14 @@ export class Floor {
   readonly grid: Grid;
   readonly store: ModuleStore;
   readonly gridView: GridView;
+  /** Holds merged connector-cluster wall shells (Circulation / Outdoor). */
+  readonly clusterGroup = new THREE.Group();
 
   constructor(readonly id: number, cols: number, rows: number) {
     this.grid = new Grid(cols, rows);
     this.store = new ModuleStore(this.group, this.grid);
     this.gridView = new GridView(this.group, this.grid);
+    this.group.add(this.clusterGroup);
   }
 
   /**
@@ -43,21 +46,29 @@ export class Floor {
    * only ever lives on the active floor) is left alone.
    */
   setDimmed(dimmed: boolean): void {
-    for (const inst of this.store.instances.values()) {
-      inst.group.traverse((o) => {
-        const mat = (o as THREE.Mesh | THREE.LineSegments).material as
-          | THREE.MeshStandardMaterial
-          | THREE.LineBasicMaterial
-          | (THREE.Material & { color?: THREE.Color })
-          | undefined;
-        if (!mat || !("color" in mat) || !mat.color) return;
-        const base = (o as THREE.LineSegments).isLineSegments
-          ? EDGE_COLOR
-          : inst.def.color;
-        mat.color.set(base);
-        if (dimmed) mat.color.lerp(DIM_BG, DIM_AMOUNT);
-      });
-    }
+    // Per-instance rooms/modules: fall back to the room colour.
+    for (const inst of this.store.instances.values())
+      fade(inst.group, dimmed, inst.def.color);
+    // Merged connector-cluster walls: their materials carry their own baseColor.
+    fade(this.clusterGroup, dimmed, EDGE_COLOR);
     this.gridView.setDimmed(dimmed);
   }
+}
+
+/** Recolour every material under `root`, fading toward the background if dimmed.
+ *  A material's own `userData.baseColor` wins; outlines use the edge colour;
+ *  otherwise `fallback` (the room colour). */
+function fade(root: THREE.Object3D, dimmed: boolean, fallback: number): void {
+  root.traverse((o) => {
+    if (o.userData.noDim) return; // e.g. multi-colour voxel props (instanceColor)
+    const mat = (o as THREE.Mesh | THREE.LineSegments).material as
+      | (THREE.Material & { color?: THREE.Color })
+      | undefined;
+    if (!mat || !("color" in mat) || !mat.color) return;
+    const base =
+      mat.userData?.baseColor ??
+      ((o as THREE.LineSegments).isLineSegments ? EDGE_COLOR : fallback);
+    mat.color.set(base);
+    if (dimmed) mat.color.lerp(DIM_BG, DIM_AMOUNT);
+  });
 }

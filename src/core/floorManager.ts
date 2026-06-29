@@ -5,6 +5,8 @@ import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
 import type { DragDropController } from "../interaction/dragDrop";
 import type { SelectionController } from "../interaction/selection";
+import { markCutawayDirty } from "../scene/cutaway";
+import { rebuildClusterShells } from "../scene/clusterShells";
 
 /** Height (cells) assumed for a floor with no rooms yet, so spacing is stable. */
 const DEFAULT_FLOOR_CELLS = 4;
@@ -62,7 +64,11 @@ export class FloorManager {
 
   private createFloor(cols: number, rows: number): Floor {
     const floor = new Floor(this.nextId++, cols, rows);
-    floor.store.onChange = () => this.recomputeStack();
+    floor.store.onChange = () => {
+      this.recomputeStack();
+      rebuildClusterShells(floor, floor.grid); // connector clusters may have changed
+      markCutawayDirty(); // walls may have been added/removed/rebuilt
+    };
     this.scene.add(floor.group);
     this.floors.push(floor);
     return floor;

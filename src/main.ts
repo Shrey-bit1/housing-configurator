@@ -6,6 +6,9 @@ import { GhostPreview } from "./scene/ghostPreview";
 import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
 import { SelectionController } from "./interaction/selection";
+import { updateCutaway } from "./scene/cutaway";
+import { computeAdjacencyGraph } from "./core/adjacencyGraph";
+import { GraphView } from "./ui/graphView";
 import { buildPalette } from "./ui/palette";
 
 const DEFAULT_COLS = 16;
@@ -14,6 +17,9 @@ const DEFAULT_ROWS = 16;
 const canvas = document.getElementById("scene") as HTMLCanvasElement;
 const sidebar = document.getElementById("sidebar") as HTMLElement;
 const resetBtn = document.getElementById("reset-view") as HTMLButtonElement;
+const graphCanvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
+const viewToggle = document.getElementById("view-toggle") as HTMLButtonElement;
+const graphFloorLabel = document.getElementById("graph-floor-label") as HTMLElement;
 
 // ---- Scene ----
 const ctx = createScene(canvas);
@@ -102,6 +108,21 @@ renderSidebar();
 // ---- Camera reset ----
 resetBtn.addEventListener("click", () => ctx.resetView());
 
+// ---- Bubble-diagram (adjacency graph) view ----
+const graphView = new GraphView(
+  graphCanvas,
+  () => computeAdjacencyGraph(floors.active.store),
+  () => `Floor ${floors.activeIndexValue}`,
+  graphFloorLabel
+);
+viewToggle.addEventListener("click", () => {
+  graphView.toggle();
+  viewToggle.textContent = graphView.visible ? "3D View" : "Diagram";
+  // Hide the 3D-only chrome while in diagram mode.
+  resetBtn.style.display = graphView.visible ? "none" : "";
+  document.getElementById("hint")!.style.display = graphView.visible ? "none" : "";
+});
+
 // ---- Resize handling ----
 const resizeObserver = new ResizeObserver(() => ctx.handleResize());
 resizeObserver.observe(canvas);
@@ -110,7 +131,13 @@ window.addEventListener("resize", () => ctx.handleResize());
 // ---- Render loop ----
 function animate(): void {
   requestAnimationFrame(animate);
+  if (graphView.visible) {
+    // In diagram mode: skip the 3D render, drive the bubble diagram instead.
+    graphView.frame();
+    return;
+  }
   controls.update();
+  updateCutaway(scene, camera.position, controls.target);
   renderer.render(scene, camera);
 }
 animate();

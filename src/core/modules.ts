@@ -50,6 +50,12 @@ export interface ModuleDef {
   height: number;
   /** Scaffolding for future adjacency rules (rooms only). Currently unused. */
   connectionEdges?: ConnectionEdge[];
+  /**
+   * Connector cluster key (Circulation / Outdoor). Pieces sharing this key are
+   * chained into one merged shell when adjacent (see clusterShells.ts), instead
+   * of each getting its own walls. Undefined for normal rooms and furniture.
+   */
+  cluster?: string;
 }
 
 /** Room ceiling height in cells: 4 x 0.6 m = 2.4 m (spec: ~2.4–3.0 m). */
@@ -210,6 +216,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     cells: rect(1, 1),
     height: ROOM_HEIGHT,
     connectionEdges: OPEN_EDGES,
+    cluster: "circulation",
   },
   circulation_double: {
     type: "circulation_double",
@@ -224,6 +231,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     ],
     height: ROOM_HEIGHT,
     connectionEdges: OPEN_EDGES,
+    cluster: "circulation",
   },
   outdoor_single: {
     type: "outdoor_single",
@@ -235,6 +243,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     cells: rect(1, 1),
     height: ROOM_HEIGHT,
     connectionEdges: OPEN_EDGES,
+    cluster: "outdoor",
   },
   outdoor_double: {
     type: "outdoor_double",
@@ -249,6 +258,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     ],
     height: ROOM_HEIGHT,
     connectionEdges: OPEN_EDGES,
+    cluster: "outdoor",
   },
 };
 
