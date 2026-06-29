@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { CELL_SIZE, type Grid } from "./grid";
 import { Floor } from "./floor";
+import { MODULE_DEFS } from "./modules";
+import type { ProjectFile } from "./projectIO";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
 import type { DragDropController } from "../interaction/dragDrop";
@@ -142,5 +144,39 @@ export class FloorManager {
   /** Default grid size for new floors / reset (mirrors the app default). */
   get defaults(): { cols: number; rows: number } {
     return { cols: this.defaultCols, rows: this.defaultRows };
+  }
+
+  /**
+   * Replace the entire floor stack with a loaded project. Tears down all
+   * existing floors, rebuilds them in order, and re-places every saved instance
+   * through the SAME {@link ModuleStore.place} path manual placement uses — so a
+   * loaded design is byte-for-byte the same scene/occupancy/derived state (props,
+   * shells, clusters all rebuild via the store's `onChange`) as a hand-built one.
+   *
+   * Unknown types (e.g. a room type added in a newer app version) are skipped
+   * gracefully rather than crashing. Assumes `data` is already validated /
+   * normalized by {@link import("./projectIO").parseProject}.
+   */
+  loadProject(data: ProjectFile): void {
+    for (const f of [...this.floors]) this.disposeFloor(f);
+    this.floors.length = 0;
+    this.activeIndex = 0;
+
+    const floorsData = data.floors.length
+      ? data.floors
+      : [{ cols: this.defaultCols, rows: this.defaultRows, instances: [] }];
+
+    for (const fd of floorsData) {
+      const floor = this.createFloor(fd.cols, fd.rows);
+      for (const inst of fd.instances) {
+        if (!MODULE_DEFS[inst.type]) {
+          console.warn(`Skipping unknown module type "${inst.type}" while loading.`);
+          continue;
+        }
+        floor.store.place(inst.type, { cx: inst.cx, cz: inst.cz }, inst.rotation);
+      }
+    }
+
+    this.setActive(0);
   }
 }

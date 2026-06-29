@@ -13,6 +13,13 @@ import { GraphView } from "./ui/graphView";
 import { renderValidationPanel } from "./ui/validationPanel";
 import { applyRoomHighlights, clearRoomHighlights } from "./scene/highlight";
 import { buildPalette } from "./ui/palette";
+import { showToast } from "./ui/toast";
+import {
+  serializeProject,
+  parseProject,
+  ProjectParseError,
+  APP_PROJECT_VERSION,
+} from "./core/projectIO";
 import type { Floor } from "./core/floor";
 
 const DEFAULT_COLS = 16;
@@ -102,6 +109,12 @@ function renderSidebar(): void {
         floors.deleteFloor();
         renderSidebar();
       },
+      onExport() {
+        exportProject();
+      },
+      onImport() {
+        fileInput.click();
+      },
     },
     {
       floors: floors.floors.map((_, i) => ({ label: `Floor ${i}` })),
@@ -168,6 +181,133 @@ checkBtn.addEventListener("click", runCheck);
 floors.onLayoutChange = (f) => {
   if (f === validatedFloor) clearValidation();
 };
+
+// ---- Project save / load (export & import JSON) ----
+// Manual, client-side only. Export downloads a real .json; import replaces the
+// whole project (after a confirm) and rebuilds it through the normal placement
+// path, so a loaded design is identical to a hand-built one.
+
+function exportProject(): void {
+  const data = serializeProject(floors.floors);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `flat-project-${fileTimestamp()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Validate, confirm, then load — keeping the app's state intact on any failure. */
+function importProjectText(text: string): void {
+  let parsed;
+  try {
+    parsed = parseProject(text);
+  } catch (err) {
+    const msg =
+      err instanceof ProjectParseError
+        ? err.message
+        : "Could not read this file.";
+    showToast("error", `Import failed: ${msg}`);
+    return;
+  }
+
+  // Newer-than-app files: warn prominently and fold the replace confirm in, so
+  // the user makes one informed decision.
+  let confirmMsg = "This will replace your current layout. Continue?";
+  if (parsed.status === "newer")
+    confirmMsg =
+      `This file was created with a newer version (v${parsed.fileVersion}) of the app ` +
+      `than you're running (v${APP_PROJECT_VERSION}). Some elements may not load correctly.\n\n` +
+      `This will also replace your current layout. Continue?`;
+  if (!window.confirm(confirmMsg)) return;
+
+  try {
+    clearValidation();
+    selection.deselect();
+    floors.loadProject(parsed.data);
+    renderSidebar();
+  } catch (err) {
+    console.error(err);
+    showToast("error", "Import failed while loading — the file may be corrupt.");
+    return;
+  }
+
+  if (parsed.status === "older")
+    showToast(
+      "info",
+      `This file was made with an older version (v${parsed.fileVersion}) and has been loaded successfully.`
+    );
+  else if (parsed.status === "newer")
+    showToast(
+      "warn",
+      `Loaded a newer-version (v${parsed.fileVersion}) file on an older app (v${APP_PROJECT_VERSION}). Some elements may be missing.`
+    );
+  else showToast("info", "Project imported.");
+}
+
+function readAndImport(file: File): void {
+  const reader = new FileReader();
+  reader.onload = () => importProjectText(String(reader.result ?? ""));
+  reader.onerror = () => showToast("error", "Could not read that file.");
+  reader.readAsText(file);
+}
+
+function fileTimestamp(): string {
+  // App code (not a workflow script) — Date is fine here.
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+}
+
+// Hidden native file picker, driven by the sidebar's Import button.
+const fileInput = document.createElement("input");
+fileInput.type = "file";
+fileInput.accept = ".json,application/json";
+fileInput.style.display = "none";
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files?.[0];
+  if (file) readAndImport(file);
+  fileInput.value = ""; // allow re-importing the same file
+});
+document.body.appendChild(fileInput);
+
+// Drag-and-drop a .json onto the viewport. A depth counter keeps the highlight
+// stable as the pointer moves over child elements (each fires dragenter/leave).
+const viewport = document.getElementById("viewport") as HTMLElement;
+const dropOverlay = document.getElementById("drop-overlay") as HTMLElement;
+let dragDepth = 0;
+
+function showDrop(on: boolean): void {
+  dropOverlay.classList.toggle("active", on);
+}
+
+viewport.addEventListener("dragenter", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth++;
+  showDrop(true);
+});
+viewport.addEventListener("dragover", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+});
+viewport.addEventListener("dragleave", () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) showDrop(false);
+});
+viewport.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dragDepth = 0;
+  showDrop(false);
+  const file = e.dataTransfer?.files?.[0];
+  if (file) readAndImport(file);
+});
+
+function hasFiles(e: DragEvent): boolean {
+  return !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
+}
 
 // ---- Resize handling ----
 const resizeObserver = new ResizeObserver(() => ctx.handleResize());

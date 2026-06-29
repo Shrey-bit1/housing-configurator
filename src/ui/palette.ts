@@ -21,6 +21,10 @@ export interface PaletteCallbacks {
   onSwitchFloor: (index: number) => void;
   onAddFloor: () => void;
   onDeleteFloor: () => void;
+  /** Download the whole project as a .json file. */
+  onExport: () => void;
+  /** Open the native file picker to import a project .json. */
+  onImport: () => void;
 }
 
 /**
@@ -34,10 +38,41 @@ export function buildPalette(
   state: FloorState
 ): void {
   root.innerHTML = "";
+  root.appendChild(buildProjectPanel(cb));
   root.appendChild(buildFloorsPanel(cb, state));
   root.appendChild(buildSection("Rooms", ROOM_LIST, cb));
   root.appendChild(buildSection("Modules", MODULE_LIST, cb));
   root.appendChild(buildGridControls(state, cb));
+}
+
+function buildProjectPanel(cb: PaletteCallbacks): HTMLElement {
+  const section = document.createElement("div");
+  section.appendChild(heading("Project"));
+
+  const actions = document.createElement("div");
+  actions.className = "floor-actions";
+
+  const exportBtn = document.createElement("button");
+  exportBtn.type = "button";
+  exportBtn.className = "secondary";
+  exportBtn.textContent = "Export";
+  exportBtn.addEventListener("click", () => cb.onExport());
+  actions.appendChild(exportBtn);
+
+  const importBtn = document.createElement("button");
+  importBtn.type = "button";
+  importBtn.className = "secondary";
+  importBtn.textContent = "Import";
+  importBtn.addEventListener("click", () => cb.onImport());
+  actions.appendChild(importBtn);
+
+  section.appendChild(actions);
+
+  const note = document.createElement("p");
+  note.className = "hint-text";
+  note.textContent = "Save the whole project to a .json file, or import one (also drag a file onto the view).";
+  section.appendChild(note);
+  return section;
 }
 
 function buildFloorsPanel(cb: PaletteCallbacks, state: FloorState): HTMLElement {
