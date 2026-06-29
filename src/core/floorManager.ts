@@ -37,6 +37,9 @@ export class FloorManager {
   private activeIndex = 0;
   private nextId = 0;
   private deps!: FloorDeps;
+  /** Fired after any floor's contents change (place/move/rotate/delete/reconcile).
+   *  Used to invalidate a stale rules-validation report. */
+  onLayoutChange?: (floor: Floor) => void;
 
   constructor(
     private scene: THREE.Scene,
@@ -68,6 +71,7 @@ export class FloorManager {
       this.recomputeStack();
       rebuildClusterShells(floor, floor.grid); // connector clusters may have changed
       markCutawayDirty(); // walls may have been added/removed/rebuilt
+      this.onLayoutChange?.(floor);
     };
     this.scene.add(floor.group);
     this.floors.push(floor);

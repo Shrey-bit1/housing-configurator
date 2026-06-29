@@ -40,3 +40,14 @@ export function connectedComponents(cells: Cell[]): Cell[][] {
   }
   return components;
 }
+
+/**
+ * Stable id for a connector cluster node (Circulation / Outdoor), derived from
+ * its cluster key + the lexicographically-first cell of the component. Defined
+ * once so the adjacency graph and the 3D cluster shells label the same cluster
+ * identically — the rules-validation 3D highlight relies on that agreement.
+ */
+export function clusterNodeId(key: string, component: Cell[]): string {
+  const minCell = component.map((c) => `${c.cx},${c.cz}`).sort()[0];
+  return `cluster:${key}:${minCell}`;
+}

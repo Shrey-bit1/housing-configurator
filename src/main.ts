@@ -8,8 +8,12 @@ import { DragDropController } from "./interaction/dragDrop";
 import { SelectionController } from "./interaction/selection";
 import { updateCutaway } from "./scene/cutaway";
 import { computeAdjacencyGraph } from "./core/adjacencyGraph";
+import { validate } from "./core/rules";
 import { GraphView } from "./ui/graphView";
+import { renderValidationPanel } from "./ui/validationPanel";
+import { applyRoomHighlights, clearRoomHighlights } from "./scene/highlight";
 import { buildPalette } from "./ui/palette";
+import type { Floor } from "./core/floor";
 
 const DEFAULT_COLS = 16;
 const DEFAULT_ROWS = 16;
@@ -20,6 +24,8 @@ const resetBtn = document.getElementById("reset-view") as HTMLButtonElement;
 const graphCanvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
 const viewToggle = document.getElementById("view-toggle") as HTMLButtonElement;
 const graphFloorLabel = document.getElementById("graph-floor-label") as HTMLElement;
+const checkBtn = document.getElementById("check-layout") as HTMLButtonElement;
+const validationPanel = document.getElementById("validation-panel") as HTMLElement;
 
 // ---- Scene ----
 const ctx = createScene(canvas);
@@ -66,6 +72,7 @@ function renderSidebar(): void {
       onApplyGridSize(cols, rows) {
         const f = floors.active;
         selection.deselect();
+        clearValidation();
         f.grid.resize(cols, rows);
         f.gridView.rebuild();
         sizeGroundPlane(f.grid);
@@ -78,6 +85,7 @@ function renderSidebar(): void {
         renderSidebar();
       },
       onSwitchFloor(index) {
+        clearValidation();
         floors.setActive(index);
         renderSidebar();
       },
@@ -118,10 +126,48 @@ const graphView = new GraphView(
 viewToggle.addEventListener("click", () => {
   graphView.toggle();
   viewToggle.textContent = graphView.visible ? "3D View" : "Diagram";
-  // Hide the 3D-only chrome while in diagram mode.
+  // Hide the 3D-only chrome while in diagram mode (Check Layout stays available).
   resetBtn.style.display = graphView.visible ? "none" : "";
   document.getElementById("hint")!.style.display = graphView.visible ? "none" : "";
 });
+
+// ---- Layout rules validation (on-demand "Check Layout") ----
+// Advisory only: never blocks placement. Computed on click against the active
+// floor's adjacency graph; surfaced in the text panel, the bubble diagram, and
+// the 3D view. Cleared when that floor's layout changes or the floor switches.
+let validatedFloor: Floor | null = null;
+
+function clearValidation(): void {
+  validationPanel.style.display = "none";
+  validationPanel.replaceChildren();
+  graphView.clearHighlights();
+  if (validatedFloor) clearRoomHighlights(validatedFloor);
+  validatedFloor = null;
+}
+
+function runCheck(): void {
+  const floor = floors.active;
+  if (validatedFloor && validatedFloor !== floor) clearRoomHighlights(validatedFloor);
+  const graph = computeAdjacencyGraph(floor.store);
+  const violations = validate(graph);
+  renderValidationPanel(
+    validationPanel,
+    graph,
+    violations,
+    `Floor ${floors.activeIndexValue}`,
+    clearValidation
+  );
+  graphView.setHighlights(violations);
+  applyRoomHighlights(floor, violations);
+  validatedFloor = floor;
+}
+
+checkBtn.addEventListener("click", runCheck);
+// A stale report is worse than none: drop it as soon as the layout it described
+// changes, or the user switches away from the floor it was about.
+floors.onLayoutChange = (f) => {
+  if (f === validatedFloor) clearValidation();
+};
 
 // ---- Resize handling ----
 const resizeObserver = new ResizeObserver(() => ctx.handleResize());

@@ -1,4 +1,10 @@
 import type { AdjacencyGraph, GraphNode } from "../core/adjacencyGraph";
+import {
+  SEVERITY_COLORS,
+  worstSeverity,
+  type Severity,
+  type Violation,
+} from "../core/rules";
 
 /** Per-node layout state for the force-directed diagram. */
 interface NodePos {
@@ -6,6 +12,11 @@ interface NodePos {
   y: number;
   vx: number;
   vy: number;
+}
+
+/** Unordered node-id pair key, for matching highlighted adjacencies to edges. */
+function edgeKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
 const BG = "#e4e0d6"; // matches the 3D canvas background
@@ -32,6 +43,10 @@ export class GraphView {
   visible = false;
   private positions = new Map<string, NodePos>();
   private g: CanvasRenderingContext2D;
+  /** Validation overlay (set by Check Layout): node id → worst severity. */
+  private nodeHi = new Map<string, Severity>();
+  /** Validation overlay: offending adjacency key → severity. */
+  private edgeHi = new Map<string, Severity>();
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -44,6 +59,26 @@ export class GraphView {
 
   toggle(): void {
     this.visible ? this.hide() : this.show();
+  }
+
+  /** Install the validation overlay (worst severity per node, plus offending
+   *  adjacencies). Positions persist by id, so highlights sit on existing nodes. */
+  setHighlights(violations: Violation[]): void {
+    this.nodeHi.clear();
+    this.edgeHi.clear();
+    for (const v of violations) {
+      for (const id of v.nodeIds)
+        this.nodeHi.set(id, worstSeverity(this.nodeHi.get(id), v.severity));
+      if (v.edge) {
+        const k = edgeKey(v.edge[0], v.edge[1]);
+        this.edgeHi.set(k, worstSeverity(this.edgeHi.get(k), v.severity));
+      }
+    }
+  }
+
+  clearHighlights(): void {
+    this.nodeHi.clear();
+    this.edgeHi.clear();
   }
 
   show(): void {
@@ -181,16 +216,22 @@ export class GraphView {
       return;
     }
 
-    // Edges first (under nodes).
-    g.strokeStyle = LINE;
-    g.lineWidth = 2;
+    // Edges first (under nodes). A flagged adjacency is drawn thick + coloured.
     for (const e of graph.edges) {
       const a = this.positions.get(e.a);
       const b = this.positions.get(e.b);
       if (!a || !b) continue;
+      const sev = this.edgeHi.get(edgeKey(e.a, e.b));
       g.beginPath();
       g.moveTo(a.x, a.y);
       g.lineTo(b.x, b.y);
+      if (sev) {
+        g.strokeStyle = hex(SEVERITY_COLORS[sev]);
+        g.lineWidth = 5;
+      } else {
+        g.strokeStyle = LINE;
+        g.lineWidth = 2;
+      }
       g.stroke();
     }
 
@@ -200,12 +241,32 @@ export class GraphView {
     for (const node of graph.nodes) {
       const p = this.positions.get(node.id)!;
       const r = nodeRadius(node);
+
+      // Severity ring/glow underneath the node fill, when flagged.
+      const sev = this.nodeHi.get(node.id);
+      if (sev) {
+        const c = hex(SEVERITY_COLORS[sev]);
+        g.save();
+        g.shadowColor = c;
+        g.shadowBlur = 18;
+        g.beginPath();
+        g.arc(p.x, p.y, r + 6, 0, Math.PI * 2);
+        g.fillStyle = c;
+        g.fill();
+        g.restore();
+      }
+
       g.beginPath();
       g.arc(p.x, p.y, r, 0, Math.PI * 2);
       g.fillStyle = hex(node.color);
       g.fill();
-      g.lineWidth = 2.5;
-      g.strokeStyle = LINE;
+      if (sev) {
+        g.lineWidth = 4;
+        g.strokeStyle = hex(SEVERITY_COLORS[sev]);
+      } else {
+        g.lineWidth = 2.5;
+        g.strokeStyle = LINE;
+      }
       g.stroke();
 
       // Label below the node, dark text on the off-white canvas.

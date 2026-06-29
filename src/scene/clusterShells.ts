@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { CELL_SIZE, type Grid, type Cell } from "../core/grid";
 import { occupiedCells, ROOM_HEIGHT } from "../core/modules";
-import { connectedComponents } from "../core/cluster";
+import { connectedComponents, clusterNodeId } from "../core/cluster";
 import { buildBoundaryWalls } from "./moduleMesh";
 import type { Floor } from "../core/floor";
 
@@ -47,7 +47,7 @@ export function rebuildClusterShells(floor: Floor, grid: Grid): void {
   const centerX = (cx: number) => grid.gridToWorld(cx, 0).x;
   const centerZ = (cz: number) => grid.gridToWorld(0, cz).z;
 
-  for (const { color, cells } of byKey.values()) {
+  for (const [key, { color, cells }] of byKey) {
     // One merged shell per connected component (orthogonal adjacency only).
     for (const component of connectedComponents([...cells.values()])) {
       const material = new THREE.MeshStandardMaterial({
@@ -58,6 +58,9 @@ export function rebuildClusterShells(floor: Floor, grid: Grid): void {
       material.userData.baseColor = color; // so Floor.setDimmed fades it by its own colour
       const edgeMaterial = new THREE.LineBasicMaterial({ color: EDGE_COLOR });
 
+      // Same id the adjacency graph assigns this cluster, so rules-validation
+      // 3D highlighting can locate the right shell meshes.
+      const nodeId = clusterNodeId(key, component);
       for (const wall of buildBoundaryWalls(
         component,
         centerX,
@@ -65,8 +68,10 @@ export function rebuildClusterShells(floor: Floor, grid: Grid): void {
         FULL_H,
         material,
         edgeMaterial
-      ))
+      )) {
+        wall.userData.clusterNodeId = nodeId;
         group.add(wall);
+      }
     }
   }
 }
