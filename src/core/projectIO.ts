@@ -1,4 +1,5 @@
 import type { Floor } from "./floor";
+import { SIDES, type Side } from "./exteriorEdges";
 
 /**
  * Project save/load — serialize the whole design to a JSON file and back.
@@ -29,10 +30,19 @@ export interface InstanceData {
   rotation: number;
 }
 
+/** A ground-floor entrance: host cell + the exterior side it binds to. */
+export interface EntranceData {
+  cx: number;
+  cz: number;
+  side: Side;
+}
+
 export interface FloorData {
   cols: number;
   rows: number;
   instances: InstanceData[];
+  /** Entrances bound to exterior edges (floor 0 only, in practice). */
+  entrances: EntranceData[];
 }
 
 export interface ProjectFile {
@@ -70,6 +80,7 @@ export function serializeProject(floors: Floor[]): ProjectFile {
         cz: i.origin.cz,
         rotation: i.rotation,
       })),
+      entrances: f.entrances.map((e) => ({ cx: e.cell.cx, cz: e.cell.cz, side: e.side })),
     })),
   };
 }
@@ -153,13 +164,24 @@ function normalize(obj: Record<string, unknown>): ProjectFile {
 function normalizeFloor(raw: unknown): FloorData {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const instRaw = Array.isArray(o.instances) ? o.instances : [];
+  const entRaw = Array.isArray(o.entrances) ? o.entrances : [];
   return {
     cols: clampDim(num(o.cols, DEFAULT_DIM)),
     rows: clampDim(num(o.rows, DEFAULT_DIM)),
     instances: instRaw
       .map(normalizeInstance)
       .filter((i): i is InstanceData => i !== null),
+    entrances: entRaw
+      .map(normalizeEntrance)
+      .filter((e): e is EntranceData => e !== null),
   };
+}
+
+function normalizeEntrance(raw: unknown): EntranceData | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (!SIDES.includes(o.side as Side)) return null;
+  return { cx: Math.round(num(o.cx, 0)), cz: Math.round(num(o.cz, 0)), side: o.side as Side };
 }
 
 function normalizeInstance(raw: unknown): InstanceData | null {

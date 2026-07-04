@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { Grid, Cell } from "../core/grid";
+import type { ModuleStore } from "../core/store";
 import { occupiedCells, type ModuleDef } from "../core/modules";
 import { buildModuleMesh, setGhostValidity } from "./moduleMesh";
 
@@ -13,9 +14,14 @@ export class GhostPreview {
   private def: ModuleDef | null = null;
   private rotation = 0;
 
-  /** Parent container (the active floor's group) and grid — swapped by the
-   *  FloorManager when the active floor changes so the ghost previews on it. */
-  constructor(public parent: THREE.Object3D, public grid: Grid) {}
+  /** Parent container (the active floor's group), grid, and store — all swapped
+   *  by the FloorManager when the active floor changes so the ghost previews on
+   *  it (the store supplies cross-floor placement validity, e.g. for stairs). */
+  constructor(
+    public parent: THREE.Object3D,
+    public grid: Grid,
+    public store: ModuleStore
+  ) {}
 
   /** Begin previewing `def` at the given rotation. */
   begin(def: ModuleDef, rotation = 0): void {
@@ -53,7 +59,7 @@ export class GhostPreview {
     this.group.position.copy(world);
 
     const cells = occupiedCells(this.def, origin, this.rotation);
-    const valid = this.grid.canPlace(cells, excludeId);
+    const valid = this.store.canPlaceInstance(this.def, cells, excludeId);
     setGhostValidity(this.group, valid);
     return valid;
   }

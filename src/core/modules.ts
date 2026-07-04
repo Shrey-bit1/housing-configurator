@@ -7,8 +7,11 @@ import type { Cell } from "./grid";
  */
 export type ModuleType = string;
 
-/** Furniture (0.6 m cubes) vs. room presets (taller, room-sized footprints). */
-export type Category = "module" | "room";
+/**
+ * Furniture (0.6 m cubes) vs. room presets (taller, room-sized footprints) vs.
+ * stairs (a two-floor structural object — see {@link MODULE_DEFS.stair}).
+ */
+export type Category = "module" | "room" | "stair";
 
 /**
  * Connection-edge scaffolding (SECTION 1).
@@ -125,6 +128,25 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
       { cx: 1, cz: 0 },
       { cx: 0, cz: 1 },
     ],
+    height: 1,
+  },
+
+  // ----- Stairs (two-floor structural object) -----
+  // A 180° DOGLEG: two 1-cell-wide flights running side by side in opposite
+  // directions, with a full-width half-landing at the far end (the 180° turn).
+  // Footprint 2 cells wide (x) × 6 cells long (z) at rotation 0 = 1.2 m × 3.6 m,
+  // all on the grid: each flight run = 4.5 cells (2.7 m), landing = 1.5 cells
+  // (0.9 m). `height` is nominal — the actual rise is the floor-to-floor gap,
+  // applied at render time via scale.y (stairMesh + FloorManager). Neutral
+  // concrete grey; not a room. Geometry detail lives in stairMesh.ts.
+  stair: {
+    type: "stair",
+    name: "Stair (dogleg)",
+    description: "180° dogleg · 2×6 · to floor above",
+    category: "stair",
+    group: "Stairs",
+    color: 0x8a8a8a,
+    cells: rect(2, 6),
     height: 1,
   },
 
@@ -268,6 +290,9 @@ export const MODULE_LIST: ModuleDef[] = [
   MODULE_DEFS.domino,
   MODULE_DEFS.ltriomino,
 ];
+
+/** Stairs, in palette order (its own category — spans two floors). */
+export const STAIR_LIST: ModuleDef[] = [MODULE_DEFS.stair];
 
 /** Room presets, in palette order. */
 export const ROOM_LIST: ModuleDef[] = [

@@ -3,6 +3,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { CELL_SIZE, type Cell } from "../core/grid";
 import { rotatedCells, type ModuleDef } from "../core/modules";
 import { PROP_BUILDERS } from "./props";
+import { buildStairGroup } from "./stairMesh";
 
 /** Inset so neighbouring cells in a multi-cell footprint read as separate. */
 const CUBE_INSET = 0.04;
@@ -38,6 +39,10 @@ function cellGeometry(heightCells: number) {
  * `ghost` produces a translucent, depth-test-light version for drag previews.
  */
 export function buildModuleMesh(def: ModuleDef, rotation: number, ghost = false): THREE.Group {
+  // Stairs are their own stepped geometry (placed and ghost alike), spanning up
+  // to the floor above. No shell, no props, no per-cell cubes.
+  if (def.category === "stair") return buildStairGroup(def, rotation, ghost);
+
   const group = new THREE.Group();
   group.userData.moduleType = def.type;
 

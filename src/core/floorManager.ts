@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { CELL_SIZE, type Grid } from "./grid";
+import { CELL_SIZE, type Grid, type Cell } from "./grid";
 import { Floor } from "./floor";
-import { MODULE_DEFS } from "./modules";
+import { MODULE_DEFS, occupiedCells, type ModuleDef } from "./modules";
 import type { ProjectFile } from "./projectIO";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
@@ -9,6 +9,7 @@ import type { DragDropController } from "../interaction/dragDrop";
 import type { SelectionController } from "../interaction/selection";
 import { markCutawayDirty } from "../scene/cutaway";
 import { rebuildClusterShells } from "../scene/clusterShells";
+import { REFERENCE_STAIR_RISE } from "../scene/stairMesh";
 
 /** Height (cells) assumed for a floor with no rooms yet, so spacing is stable. */
 const DEFAULT_FLOOR_CELLS = 4;
@@ -42,6 +43,11 @@ export class FloorManager {
   /** Fired after any floor's contents change (place/move/rotate/delete/reconcile).
    *  Used to invalidate a stale rules-validation report. */
   onLayoutChange?: (floor: Floor) => void;
+  /** Fired when the floor STACK changes structurally (a stair auto-created a
+   *  floor above). Lets main rebuild the sidebar floor tabs. */
+  onStructureChange?: () => void;
+  /** Re-entrancy guard for {@link syncStairsAndHoles}. */
+  private syncing = false;
 
   constructor(
     private scene: THREE.Scene,
@@ -69,15 +75,85 @@ export class FloorManager {
 
   private createFloor(cols: number, rows: number): Floor {
     const floor = new Floor(this.nextId++, cols, rows);
+    // A stair needs clear floor plate on the floor ABOVE to open into — the grid
+    // alone can't see that, so the store consults the stack here. The topmost
+    // floor is always allowed (a floor above is auto-created on placement).
+    floor.store.extraPlacementCheck = (def: ModuleDef, cells: Cell[]) => {
+      if (def.category !== "stair") return true;
+      const above = this.floorAbove(floor);
+      return above ? above.grid.plateAvailable(cells) : true;
+    };
     floor.store.onChange = () => {
-      this.recomputeStack();
       rebuildClusterShells(floor, floor.grid); // connector clusters may have changed
+      this.syncStairsAndHoles(); // also recomputes the vertical stack + stair rises
       markCutawayDirty(); // walls may have been added/removed/rebuilt
       this.onLayoutChange?.(floor);
     };
     this.scene.add(floor.group);
     this.floors.push(floor);
     return floor;
+  }
+
+  /** The floor directly above `floor` in the stack, or null if it's topmost. */
+  floorAbove(floor: Floor): Floor | null {
+    const i = this.floors.indexOf(floor);
+    return i >= 0 && i + 1 < this.floors.length ? this.floors[i + 1] : null;
+  }
+
+  /** Absolute cells occupied by all stairs on `floor` (their footprints). */
+  private stairCells(floor: Floor): Cell[] {
+    const out: Cell[] = [];
+    for (const inst of floor.store.instances.values())
+      if (inst.def.category === "stair")
+        out.push(...occupiedCells(inst.def, inst.origin, inst.rotation));
+    return out;
+  }
+
+  /**
+   * Reconcile everything derived from stairs: auto-create a floor above the top
+   * one if it now holds a stair, recompute every floor's stairwell holes (each
+   * floor's holes = the stairs on the floor directly below, projected straight
+   * up), restack, and rescale stair geometry to each floor's height. Idempotent
+   * and re-entrancy-guarded; safe to call from any store change or after resize.
+   */
+  syncStairsAndHoles(): void {
+    if (this.syncing) return;
+    this.syncing = true;
+
+    let structureChanged = false;
+    const top = this.floors[this.floors.length - 1];
+    if (this.stairCells(top).length > 0) {
+      // Topmost floor has a stair with nowhere to go — give it a floor above,
+      // inheriting the grid size so the projected hole cell is guaranteed.
+      this.createFloor(top.grid.cols, top.grid.rows);
+      structureChanged = true;
+    }
+
+    for (let j = 0; j < this.floors.length; j++) {
+      const below = j > 0 ? this.floors[j - 1] : null;
+      this.floors[j].setHoles(below ? this.stairCells(below) : []);
+    }
+
+    this.recomputeStack();
+    this.updateStairScales();
+
+    if (structureChanged) {
+      this.applyDim(); // the new floor renders dimmed (inactive)
+      this.onStructureChange?.();
+    }
+    markCutawayDirty();
+    this.syncing = false;
+  }
+
+  /** Scale each stair's geometry so its rise matches its floor's actual height
+   *  (built at {@link REFERENCE_STAIR_RISE}); ≈1 unless the floor holds a tall
+   *  room. Cheap; rebuilt stair groups (on rotate) get re-scaled here too. */
+  private updateStairScales(): void {
+    for (const floor of this.floors) {
+      const scale = this.floorHeight(floor) / REFERENCE_STAIR_RISE;
+      for (const inst of floor.store.instances.values())
+        if (inst.def.category === "stair") inst.group.scale.y = scale;
+    }
   }
 
   /** Add a floor above the topmost one, inheriting its grid size; activate it. */
@@ -94,6 +170,10 @@ export class FloorManager {
     // Clamp before disposing so any onChange during disposal sees a valid active.
     this.activeIndex = Math.min(this.activeIndex, this.floors.length - 1);
     this.disposeFloor(removed);
+    // Holes/stairs may now be stale (a stair lost its floor above, or a floor's
+    // hole source is gone); reconcile. If a stair is left on the new top floor,
+    // this re-creates a floor above it (a stair always needs a destination).
+    this.syncStairsAndHoles();
     this.setActive(this.activeIndex);
   }
 
@@ -115,6 +195,7 @@ export class FloorManager {
     this.deps.selection.store = f.store;
     this.deps.ghost.grid = f.grid;
     this.deps.ghost.parent = f.group;
+    this.deps.ghost.store = f.store; // cross-floor stair validity for the ghost
     this.deps.sizeGroundPlane(f.grid);
 
     this.applyDim();
@@ -164,18 +245,24 @@ export class FloorManager {
 
     const floorsData = data.floors.length
       ? data.floors
-      : [{ cols: this.defaultCols, rows: this.defaultRows, instances: [] }];
+      : [{ cols: this.defaultCols, rows: this.defaultRows, instances: [], entrances: [] }];
 
-    for (const fd of floorsData) {
-      const floor = this.createFloor(fd.cols, fd.rows);
-      for (const inst of fd.instances) {
+    // Create ALL floors first, THEN place instances — so a stair on floor N sees
+    // the (saved) floor N+1 already present and doesn't spuriously auto-create a
+    // duplicate. Holes + stair rises rebuild reactively via store.onChange.
+    const created = floorsData.map((fd) => this.createFloor(fd.cols, fd.rows));
+    created.forEach((floor, k) => {
+      for (const inst of floorsData[k].instances) {
         if (!MODULE_DEFS[inst.type]) {
           console.warn(`Skipping unknown module type "${inst.type}" while loading.`);
           continue;
         }
         floor.store.place(inst.type, { cx: inst.cx, cz: inst.cz }, inst.rotation);
       }
-    }
+      // Entrances are derived only from save data (not the store); restore them.
+      for (const ent of floorsData[k].entrances)
+        floor.addEntrance({ cx: ent.cx, cz: ent.cz }, ent.side);
+    });
 
     this.setActive(0);
   }

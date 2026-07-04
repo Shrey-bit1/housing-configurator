@@ -1,7 +1,11 @@
 import * as THREE from "three";
-import { Grid } from "./grid";
+import { Grid, type Cell } from "./grid";
 import { ModuleStore } from "./store";
 import { GridView } from "../scene/gridView";
+import { HoleView } from "../scene/holeView";
+import { EntranceView } from "../scene/entranceView";
+import type { Entrance } from "./entrance";
+import { edgeKey, type Side } from "./exteriorEdges";
 
 /** Canvas background colour; dimmed floors fade toward it. Keep in sync with
  *  the scene background in sceneSetup.ts. */
@@ -22,14 +26,46 @@ export class Floor {
   readonly grid: Grid;
   readonly store: ModuleStore;
   readonly gridView: GridView;
+  /** Renders stairwell openings cut into this floor's plate by stairs below. */
+  readonly holeView: HoleView;
+  /** Renders ground-floor entrance markers (only floor 0 uses these). */
+  readonly entranceView: EntranceView;
   /** Holds merged connector-cluster wall shells (Circulation / Outdoor). */
   readonly clusterGroup = new THREE.Group();
+
+  /** Ground-floor entrances bound to exterior edges (entry roots). */
+  readonly entrances: Entrance[] = [];
 
   constructor(readonly id: number, cols: number, rows: number) {
     this.grid = new Grid(cols, rows);
     this.store = new ModuleStore(this.group, this.grid);
     this.gridView = new GridView(this.group, this.grid);
+    this.holeView = new HoleView(this.group, this.grid);
+    this.entranceView = new EntranceView(this.group, this.grid);
     this.group.add(this.clusterGroup);
+  }
+
+  /** Add an entrance on the exterior edge (cell, side); rebuilds the markers.
+   *  No-op if one already exists on that exact edge. */
+  addEntrance(cell: Cell, side: Side): void {
+    const id = edgeKey(cell.cx, cell.cz, side);
+    if (this.entrances.some((e) => e.id === id)) return;
+    this.entrances.push({ id, cell: { cx: cell.cx, cz: cell.cz }, side });
+    this.entranceView.rebuild(this.entrances);
+  }
+
+  /** Replace the whole entrance list (used by load); rebuilds the markers. */
+  setEntrances(list: Entrance[]): void {
+    this.entrances.length = 0;
+    this.entrances.push(...list);
+    this.entranceView.rebuild(this.entrances);
+  }
+
+  /** Set the stairwell-hole cells (from stairs on the floor below): updates both
+   *  the occupancy block ({@link Grid.setHoles}) and the visual opening. */
+  setHoles(cells: Cell[]): void {
+    this.grid.setHoles(cells);
+    this.holeView.rebuild(cells);
   }
 
   /**
@@ -52,6 +88,8 @@ export class Floor {
     // Merged connector-cluster walls: their materials carry their own baseColor.
     fade(this.clusterGroup, dimmed, EDGE_COLOR);
     this.gridView.setDimmed(dimmed);
+    this.holeView.setDimmed(dimmed);
+    this.entranceView.setDimmed(dimmed);
   }
 }
 

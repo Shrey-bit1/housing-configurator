@@ -31,6 +31,13 @@ export class ModuleStore {
   onChange?: () => void;
 
   /**
+   * Optional extra placement constraint beyond grid occupancy, keyed on the def.
+   * Used for cross-floor rules the grid alone can't see — e.g. a stair needs
+   * clear floor plate on the floor ABOVE. Returns false to block. Set by the
+   * FloorManager (which knows the floor stack). */
+  extraPlacementCheck?: (def: ModuleDef, cells: Cell[]) => boolean;
+
+  /**
    * @param container the THREE container (a floor's group) meshes are added to,
    *   so the whole floor can be offset/dimmed by transforming that one group.
    */
@@ -49,6 +56,14 @@ export class ModuleStore {
     return h;
   }
 
+  /** Full placement validity for a def at `cells`: grid occupancy/bounds/holes
+   *  plus any {@link extraPlacementCheck} (cross-floor stair rules). Shared by
+   *  place/move and the ghost preview so all three agree. */
+  canPlaceInstance(def: ModuleDef, cells: Cell[], excludeId?: string): boolean {
+    if (!this.grid.canPlace(cells, excludeId)) return false;
+    return this.extraPlacementCheck ? this.extraPlacementCheck(def, cells) : true;
+  }
+
   /** Resolve a group (or any descendant's group) back to its instance. */
   instanceFromObject(obj: THREE.Object3D | null): ModuleInstance | null {
     let o = obj;
@@ -65,7 +80,7 @@ export class ModuleStore {
   place(type: ModuleType, origin: Cell, rotation: number): ModuleInstance | null {
     const def = MODULE_DEFS[type];
     const cells = occupiedCells(def, origin, rotation);
-    if (!this.grid.canPlace(cells)) return null;
+    if (!this.canPlaceInstance(def, cells)) return null;
 
     const id = `m${this.nextId++}`;
     const group = buildModuleMesh(def, rotation);
@@ -86,7 +101,7 @@ export class ModuleStore {
 
     const cells = occupiedCells(inst.def, origin, rotation);
     // Test against everything except this instance's own current footprint.
-    if (!this.grid.canPlace(cells, id)) return false;
+    if (!this.canPlaceInstance(inst.def, cells, id)) return false;
 
     this.grid.free(id);
     this.grid.occupy(cells, id);

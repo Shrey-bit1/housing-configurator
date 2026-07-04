@@ -1,4 +1,9 @@
-import type { AdjacencyGraph, GraphNode } from "../core/adjacencyGraph";
+import {
+  parseDwellingNodeId,
+  type DwellingGraph,
+  type GraphEdge,
+  type GraphNode,
+} from "../core/adjacencyGraph";
 import {
   SEVERITY_COLORS,
   worstSeverity,
@@ -14,6 +19,13 @@ interface NodePos {
   vy: number;
 }
 
+/** A cross-floor stair connection shown as a stub on the active floor. */
+interface StairStub {
+  localId: string;
+  dir: "up" | "down";
+  otherFloor: number;
+}
+
 /** Unordered node-id pair key, for matching highlighted adjacencies to edges. */
 function edgeKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
@@ -21,6 +33,8 @@ function edgeKey(a: string, b: string): string {
 
 const BG = "#e4e0d6"; // matches the 3D canvas background
 const LINE = "#1a1a1a";
+const ENTRY = "#2e7d32"; // entry-node marker (green, reads as "in")
+const STAIR = "#5a5a5a";
 
 // Force-layout tuning (CSS-pixel space). Doesn't need to be physically perfect.
 const REPULSION = 12000;
@@ -31,13 +45,13 @@ const DAMPING = 0.86;
 const MAX_V = 30;
 
 /**
- * Full-screen 2D bubble-diagram view of a floor's adjacency graph.
- *
- * Separate from the 3D configurator (its own canvas). Recomputes the active
- * floor's graph each frame while open (cheap for the handful of rooms here), so
- * it stays live as the layout changes. Node positions persist across recomputes
- * (keyed by node id) and settle under a hand-rolled force-directed layout —
- * repulsion between nodes, springs along edges, gentle gravity to centre.
+ * Full-screen 2D bubble-diagram view. The dwelling graph spans all floors; this
+ * shows ONE floor at a time (the active floor) with:
+ *  - room/cluster nodes + their same-floor adjacencies,
+ *  - entry markers on nodes that carry an entrance,
+ *  - "↑/↓ Floor N" stubs where a stair links a node to another floor.
+ * Recomputed each frame while open; node positions persist by id and settle
+ * under a hand-rolled force-directed layout.
  */
 export class GraphView {
   visible = false;
@@ -47,11 +61,13 @@ export class GraphView {
   private nodeHi = new Map<string, Severity>();
   /** Validation overlay: offending adjacency key → severity. */
   private edgeHi = new Map<string, Severity>();
+  /** Space-syntax depth-from-entrance (set by Check Layout): node id → hops. */
+  private depths = new Map<string, number>();
 
   constructor(
     private canvas: HTMLCanvasElement,
-    private getGraph: () => AdjacencyGraph,
-    private getFloorLabel: () => string,
+    private getGraph: () => DwellingGraph,
+    private getActiveFloor: () => number,
     private floorLabelEl: HTMLElement
   ) {
     this.g = canvas.getContext("2d")!;
@@ -61,8 +77,6 @@ export class GraphView {
     this.visible ? this.hide() : this.show();
   }
 
-  /** Install the validation overlay (worst severity per node, plus offending
-   *  adjacencies). Positions persist by id, so highlights sit on existing nodes. */
   setHighlights(violations: Violation[]): void {
     this.nodeHi.clear();
     this.edgeHi.clear();
@@ -79,6 +93,14 @@ export class GraphView {
   clearHighlights(): void {
     this.nodeHi.clear();
     this.edgeHi.clear();
+    this.depths.clear();
+  }
+
+  /** Install the depth-from-entrance metric (node id → hop count) so each
+   *  node can show a small depth badge. Purely informational — unrelated to
+   *  pass/fail severity. */
+  setDepths(depths: Map<string, number>): void {
+    this.depths = depths;
   }
 
   show(): void {
@@ -97,10 +119,33 @@ export class GraphView {
   frame(): void {
     const { w, h } = this.fitCanvas();
     const graph = this.getGraph();
-    this.syncPositions(graph, w, h);
-    this.step(graph, w, h);
-    this.draw(graph, w, h);
-    this.floorLabelEl.textContent = `${this.getFloorLabel()} — adjacency diagram`;
+    const active = this.getActiveFloor();
+
+    const nodes = graph.nodes.filter((n) => n.floor === active);
+    const ids = new Set(nodes.map((n) => n.id));
+    const edges = graph.edges.filter((e) => !e.viaStair && ids.has(e.a) && ids.has(e.b));
+    const stubs = this.stairStubs(graph, ids, active);
+
+    this.syncPositions(nodes, w, h);
+    this.step(nodes, edges, w, h);
+    this.draw(nodes, edges, stubs, w, h);
+    this.floorLabelEl.textContent = `Floor ${active} — adjacency diagram`;
+  }
+
+  /** Stair edges that cross from the active floor to another floor → stubs. */
+  private stairStubs(graph: DwellingGraph, activeIds: Set<string>, active: number): StairStub[] {
+    const out: StairStub[] = [];
+    for (const e of graph.edges) {
+      if (!e.viaStair) continue;
+      const aIn = activeIds.has(e.a);
+      const bIn = activeIds.has(e.b);
+      if (aIn === bIn) continue; // both on/both off the active floor
+      const localId = aIn ? e.a : e.b;
+      const otherId = aIn ? e.b : e.a;
+      const otherFloor = parseDwellingNodeId(otherId).floor;
+      out.push({ localId, dir: otherFloor > active ? "up" : "down", otherFloor });
+    }
+    return out;
   }
 
   // ---- Canvas sizing -------------------------------------------------------
@@ -119,16 +164,13 @@ export class GraphView {
 
   // ---- Layout --------------------------------------------------------------
 
-  /** Ensure every current node has a position; seed new ones near centre;
-   *  drop positions for nodes that no longer exist. */
-  private syncPositions(graph: AdjacencyGraph, w: number, h: number): void {
-    const present = new Set(graph.nodes.map((n) => n.id));
+  private syncPositions(nodes: GraphNode[], w: number, h: number): void {
+    const present = new Set(nodes.map((n) => n.id));
     for (const id of [...this.positions.keys()])
       if (!present.has(id)) this.positions.delete(id);
 
-    for (const node of graph.nodes) {
+    for (const node of nodes) {
       if (this.positions.has(node.id)) continue;
-      // Deterministic seed angle from the id so re-layouts don't jump around.
       const a = (hash(node.id) % 360) * (Math.PI / 180);
       const r = 60 + (hash(node.id) % 80);
       this.positions.set(node.id, {
@@ -140,11 +182,9 @@ export class GraphView {
     }
   }
 
-  private step(graph: AdjacencyGraph, w: number, h: number): void {
+  private step(nodes: GraphNode[], edges: GraphEdge[], w: number, h: number): void {
     const pos = this.positions;
-    const nodes = graph.nodes;
 
-    // Pairwise repulsion.
     for (let i = 0; i < nodes.length; i++) {
       const a = pos.get(nodes[i].id)!;
       for (let j = i + 1; j < nodes.length; j++) {
@@ -168,8 +208,7 @@ export class GraphView {
       }
     }
 
-    // Springs along edges.
-    for (const e of graph.edges) {
+    for (const e of edges) {
       const a = pos.get(e.a);
       const b = pos.get(e.b);
       if (!a || !b) continue;
@@ -185,7 +224,6 @@ export class GraphView {
       b.vy -= fy;
     }
 
-    // Gravity to centre + integrate.
     for (const node of nodes) {
       const p = pos.get(node.id)!;
       p.vx += (w / 2 - p.x) * GRAVITY;
@@ -202,12 +240,18 @@ export class GraphView {
 
   // ---- Drawing -------------------------------------------------------------
 
-  private draw(graph: AdjacencyGraph, w: number, h: number): void {
+  private draw(
+    nodes: GraphNode[],
+    edges: GraphEdge[],
+    stubs: StairStub[],
+    w: number,
+    h: number
+  ): void {
     const g = this.g;
     g.fillStyle = BG;
     g.fillRect(0, 0, w, h);
 
-    if (graph.nodes.length === 0) {
+    if (nodes.length === 0) {
       g.fillStyle = "#8a857c";
       g.font = "600 15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
       g.textAlign = "center";
@@ -216,8 +260,8 @@ export class GraphView {
       return;
     }
 
-    // Edges first (under nodes). A flagged adjacency is drawn thick + coloured.
-    for (const e of graph.edges) {
+    // Same-floor adjacency edges; flagged ones drawn thick + coloured.
+    for (const e of edges) {
       const a = this.positions.get(e.a);
       const b = this.positions.get(e.b);
       if (!a || !b) continue;
@@ -225,24 +269,21 @@ export class GraphView {
       g.beginPath();
       g.moveTo(a.x, a.y);
       g.lineTo(b.x, b.y);
-      if (sev) {
-        g.strokeStyle = hex(SEVERITY_COLORS[sev]);
-        g.lineWidth = 5;
-      } else {
-        g.strokeStyle = LINE;
-        g.lineWidth = 2;
-      }
+      g.strokeStyle = sev ? hex(SEVERITY_COLORS[sev]) : LINE;
+      g.lineWidth = sev ? 5 : 2;
       g.stroke();
     }
+
+    // Stair stubs (grouped per node + direction so multiples fan out).
+    this.drawStubs(stubs);
 
     // Nodes.
     g.textAlign = "center";
     g.textBaseline = "middle";
-    for (const node of graph.nodes) {
+    for (const node of nodes) {
       const p = this.positions.get(node.id)!;
       const r = nodeRadius(node);
 
-      // Severity ring/glow underneath the node fill, when flagged.
       const sev = this.nodeHi.get(node.id);
       if (sev) {
         const c = hex(SEVERITY_COLORS[sev]);
@@ -260,25 +301,81 @@ export class GraphView {
       g.arc(p.x, p.y, r, 0, Math.PI * 2);
       g.fillStyle = hex(node.color);
       g.fill();
-      if (sev) {
-        g.lineWidth = 4;
-        g.strokeStyle = hex(SEVERITY_COLORS[sev]);
-      } else {
-        g.lineWidth = 2.5;
-        g.strokeStyle = LINE;
-      }
+      g.lineWidth = sev ? 4 : 2.5;
+      g.strokeStyle = sev ? hex(SEVERITY_COLORS[sev]) : LINE;
       g.stroke();
 
-      // Label below the node, dark text on the off-white canvas.
+      // Entry marker: a green ring + an "ENTRY" tag above the node.
+      if (node.isEntry) {
+        g.beginPath();
+        g.arc(p.x, p.y, r + 4, 0, Math.PI * 2);
+        g.strokeStyle = ENTRY;
+        g.lineWidth = 3;
+        g.stroke();
+        g.fillStyle = ENTRY;
+        g.font = "800 10px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+        g.fillText("▶ ENTRY", p.x, p.y - r - 9);
+      }
+
       g.fillStyle = "#1a1a1a";
       g.font = "700 12px 'Helvetica Neue', Helvetica, Arial, sans-serif";
       g.fillText(node.label, p.x, p.y + r + 12);
+
+      // Depth-from-entrance badge (space-syntax hop count) — small, top-right
+      // of the node circle. Purely informational, so it never affects colour.
+      const depth = this.depths.get(node.id);
+      if (depth !== undefined) {
+        g.save();
+        g.textAlign = "left";
+        g.textBaseline = "middle";
+        g.font = "800 10px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+        g.fillStyle = "#5a5a5a";
+        g.fillText(`${depth}`, p.x + r * 0.55, p.y - r * 0.6);
+        g.restore();
+      }
+    }
+  }
+
+  private drawStubs(stubs: StairStub[]): void {
+    const g = this.g;
+    // Group by node + direction so multiple stairs fan out instead of overlapping.
+    const groups = new Map<string, StairStub[]>();
+    for (const s of stubs) {
+      const k = `${s.localId}|${s.dir}`;
+      (groups.get(k) ?? groups.set(k, []).get(k)!).push(s);
+    }
+    for (const list of groups.values()) {
+      const p = this.positions.get(list[0].localId);
+      if (!p) continue;
+      const r = 30;
+      list.forEach((s, i) => {
+        const sign = s.dir === "up" ? -1 : 1;
+        const fan = (i - (list.length - 1) / 2) * 26;
+        const ex = p.x + fan;
+        const ey = p.y + sign * (r + 22);
+        g.beginPath();
+        g.moveTo(p.x, p.y + sign * 6);
+        g.lineTo(ex, ey);
+        g.strokeStyle = STAIR;
+        g.lineWidth = 2;
+        g.setLineDash([4, 3]);
+        g.stroke();
+        g.setLineDash([]);
+        const label = `${s.dir === "up" ? "↑" : "↓"} F${s.otherFloor}`;
+        g.font = "800 11px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+        const tw = g.measureText(label).width + 10;
+        g.fillStyle = STAIR;
+        g.fillRect(ex - tw / 2, ey - 9, tw, 18);
+        g.fillStyle = "#f4f1ea";
+        g.textAlign = "center";
+        g.textBaseline = "middle";
+        g.fillText(label, ex, ey);
+      });
     }
   }
 }
 
 function nodeRadius(node: GraphNode): number {
-  // Mildly scale by footprint size so bigger rooms read as bigger bubbles.
   return clamp(16 + Math.sqrt(node.cells.length) * 3.2, 18, 46);
 }
 

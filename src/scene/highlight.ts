@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { Floor } from "../core/floor";
+import { parseDwellingNodeId } from "../core/adjacencyGraph";
 import {
   SEVERITY_COLORS,
   worstSeverity,
@@ -8,53 +9,80 @@ import {
 } from "../core/rules";
 
 /**
- * Rules-validation highlighting in the 3D view: tint the actual flagged room (or
- * connector cluster) shells by the worst severity implicating them, so the user
- * sees WHICH rooms are problematic without translating from the abstract graph.
+ * Rules-validation highlighting in the 3D view: tint the actual flagged room /
+ * cluster / stair shells (and entrance markers) by the worst severity
+ * implicating them, across ALL floors (the dwelling graph spans floors).
+ * Violation node/entrance ids are dwelling-scoped (`<floor>/<rawId>`), resolved
+ * here to the right floor + instance/cluster/marker.
  *
- * Tinting is an emissive overlay on each shell's existing material. The previous
- * emissive is stashed on the material (`userData.hiPrev`) and restored on clear,
- * so a room that also happens to be selected keeps its selection glow afterward.
+ * Tinting is an emissive overlay; the previous emissive is stashed
+ * (`userData.hiPrev`) and restored on clear so a selected room keeps its glow.
  */
 
 const EMISSIVE_INTENSITY = 0.55;
 
-/** Apply highlights for `violations` to the floor's room + cluster shells. */
-export function applyRoomHighlights(floor: Floor, violations: Violation[]): void {
-  clearRoomHighlights(floor);
+/** Apply highlights for `violations` to every floor's room/cluster/stair shells
+ *  and any implicated entrance markers. */
+export function applyRoomHighlights(floors: Floor[], violations: Violation[]): void {
+  clearRoomHighlights(floors);
 
-  // Worst severity per implicated node id.
+  // Worst severity per implicated dwelling node id (rooms/clusters/stairs).
   const sev = new Map<string, Severity>();
   for (const v of violations)
     for (const id of v.nodeIds) sev.set(id, worstSeverity(sev.get(id), v.severity));
 
   for (const [id, severity] of sev) {
+    const { floor: fi, rawId } = parseDwellingNodeId(id);
+    const floor = floors[fi];
+    if (!floor) continue;
     const color = SEVERITY_COLORS[severity];
 
-    // Room node → tint its instance group's shared material.
-    const inst = floor.store.instances.get(id);
+    // Room/stair node → tint its instance group's shared material (stairs are
+    // ordinary ModuleInstances too, so this resolves them without extra code).
+    const inst = floor.store.instances.get(rawId);
     if (inst) {
       const mat = inst.group.userData.material as THREE.MeshStandardMaterial | undefined;
       if (mat) tint(mat, color);
       continue;
     }
 
-    // Cluster node → tint every wall mesh tagged with this cluster id.
+    // Cluster node → tint every wall mesh tagged with this cluster id (raw).
     floor.clusterGroup.traverse((o) => {
-      if (o.userData.clusterNodeId !== id) return;
+      if (o.userData.clusterNodeId !== rawId) return;
+      const mat = (o as THREE.Mesh).material;
+      if (mat && !Array.isArray(mat)) tint(mat as THREE.MeshStandardMaterial, color);
+    });
+  }
+
+  // Worst severity per implicated dwelling ENTRANCE id (E2) — same encoding,
+  // different id space, so resolved separately against each floor's markers.
+  const entSev = new Map<string, Severity>();
+  for (const v of violations)
+    for (const id of v.entranceIds ?? [])
+      entSev.set(id, worstSeverity(entSev.get(id), v.severity));
+
+  for (const [id, severity] of entSev) {
+    const { floor: fi, rawId } = parseDwellingNodeId(id);
+    const floor = floors[fi];
+    if (!floor) continue;
+    const color = SEVERITY_COLORS[severity];
+    floor.group.traverse((o) => {
+      if (o.userData.entranceId !== rawId) return;
       const mat = (o as THREE.Mesh).material;
       if (mat && !Array.isArray(mat)) tint(mat as THREE.MeshStandardMaterial, color);
     });
   }
 }
 
-/** Restore every material this module tinted on the floor back to its prior look. */
-export function clearRoomHighlights(floor: Floor): void {
-  floor.group.traverse((o) => {
-    const mat = (o as THREE.Mesh).material;
-    if (!mat || Array.isArray(mat)) return;
-    restore(mat as THREE.MeshStandardMaterial);
-  });
+/** Restore every material tinted on any floor back to its prior look. */
+export function clearRoomHighlights(floors: Floor[]): void {
+  for (const floor of floors) {
+    floor.group.traverse((o) => {
+      const mat = (o as THREE.Mesh).material;
+      if (!mat || Array.isArray(mat)) return;
+      restore(mat as THREE.MeshStandardMaterial);
+    });
+  }
 }
 
 function tint(mat: THREE.MeshStandardMaterial, color: number): void {
@@ -68,7 +96,6 @@ function restore(mat: THREE.MeshStandardMaterial): void {
   if (mat.userData.hiPrev === undefined || !mat.emissive) return;
   const prev = mat.userData.hiPrev as number;
   mat.emissive.setHex(prev);
-  // A non-zero stash means the room was selected (white emissive) — keep that glow.
   mat.emissiveIntensity = prev ? 0.35 : 0;
   delete mat.userData.hiPrev;
 }

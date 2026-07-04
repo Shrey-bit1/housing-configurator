@@ -7,11 +7,12 @@ import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
 import { SelectionController } from "./interaction/selection";
 import { updateCutaway } from "./scene/cutaway";
-import { computeAdjacencyGraph } from "./core/adjacencyGraph";
-import { validate } from "./core/rules";
+import { computeDwellingGraph } from "./core/adjacencyGraph";
+import { validate, computeEntranceDepths } from "./core/rules";
 import { GraphView } from "./ui/graphView";
 import { renderValidationPanel } from "./ui/validationPanel";
 import { applyRoomHighlights, clearRoomHighlights } from "./scene/highlight";
+import { EntranceController } from "./interaction/entranceController";
 import { buildPalette } from "./ui/palette";
 import { showToast } from "./ui/toast";
 import {
@@ -20,7 +21,6 @@ import {
   ProjectParseError,
   APP_PROJECT_VERSION,
 } from "./core/projectIO";
-import type { Floor } from "./core/floor";
 
 const DEFAULT_COLS = 16;
 const DEFAULT_ROWS = 16;
@@ -53,7 +53,7 @@ const floors = new FloorManager(scene, DEFAULT_COLS, DEFAULT_ROWS);
 const f0 = floors.active;
 
 // ---- Interaction ----
-const ghost = new GhostPreview(f0.group, f0.grid);
+const ghost = new GhostPreview(f0.group, f0.grid, f0.store);
 const picker = new Picker(canvas, camera, f0.grid, groundPlane);
 const dragDrop = new DragDropController(canvas, picker, ghost, f0.store, controls);
 const selection = new SelectionController(
@@ -66,6 +66,20 @@ const selection = new SelectionController(
 );
 
 floors.attach({ picker, ghost, dragDrop, selection, groundPlane, sizeGroundPlane });
+
+// A stair placed on the top floor auto-creates a floor above it — refresh the
+// sidebar floor tabs when that happens.
+floors.onStructureChange = () => renderSidebar();
+
+// Entrance placement (ground floor only). Binds a door marker to an exterior
+// edge of a floor-0 room/cluster; placing one drops any stale validation report.
+const entranceController = new EntranceController(
+  canvas,
+  picker,
+  controls,
+  () => floors.floors[0],
+  () => clearValidation()
+);
 
 // ---- Sidebar (rebuilt whenever floor state changes) ----
 function renderSidebar(): void {
@@ -89,6 +103,7 @@ function renderSidebar(): void {
             `Floor resized to ${cols}x${rows}; removed ${culled.length} item(s) that no longer fit.`
           );
         }
+        floors.syncStairsAndHoles(); // resize may change which cells have plate above
         renderSidebar();
       },
       onSwitchFloor(index) {
@@ -108,6 +123,15 @@ function renderSidebar(): void {
         if (!ok) return;
         floors.deleteFloor();
         renderSidebar();
+      },
+      onPlaceEntrance() {
+        // Entrances are ground-floor only — switch to floor 0 first if needed.
+        if (floors.activeIndexValue !== 0) {
+          floors.setActive(0);
+          renderSidebar();
+        }
+        selection.deselect();
+        entranceController.start();
       },
       onExport() {
         exportProject();
@@ -132,8 +156,8 @@ resetBtn.addEventListener("click", () => ctx.resetView());
 // ---- Bubble-diagram (adjacency graph) view ----
 const graphView = new GraphView(
   graphCanvas,
-  () => computeAdjacencyGraph(floors.active.store),
-  () => `Floor ${floors.activeIndexValue}`,
+  () => computeDwellingGraph(floors.floors),
+  () => floors.activeIndexValue,
   graphFloorLabel
 );
 viewToggle.addEventListener("click", () => {
@@ -145,42 +169,35 @@ viewToggle.addEventListener("click", () => {
 });
 
 // ---- Layout rules validation (on-demand "Check Layout") ----
-// Advisory only: never blocks placement. Computed on click against the active
-// floor's adjacency graph; surfaced in the text panel, the bubble diagram, and
-// the 3D view. Cleared when that floor's layout changes or the floor switches.
-let validatedFloor: Floor | null = null;
+// Advisory only: never blocks placement. Computed on click against the WHOLE
+// DWELLING graph (all floors + cross-floor stair edges, rooted at entrances);
+// surfaced in the text panel, the bubble diagram, and the 3D view. Cleared on
+// any layout change.
+let validated = false;
 
 function clearValidation(): void {
   validationPanel.style.display = "none";
   validationPanel.replaceChildren();
   graphView.clearHighlights();
-  if (validatedFloor) clearRoomHighlights(validatedFloor);
-  validatedFloor = null;
+  if (validated) clearRoomHighlights(floors.floors);
+  validated = false;
 }
 
 function runCheck(): void {
-  const floor = floors.active;
-  if (validatedFloor && validatedFloor !== floor) clearRoomHighlights(validatedFloor);
-  const graph = computeAdjacencyGraph(floor.store);
+  const graph = computeDwellingGraph(floors.floors);
   const violations = validate(graph);
-  renderValidationPanel(
-    validationPanel,
-    graph,
-    violations,
-    `Floor ${floors.activeIndexValue}`,
-    clearValidation
-  );
+  const depths = computeEntranceDepths(graph);
+  renderValidationPanel(validationPanel, graph, violations, depths, "Dwelling", clearValidation);
   graphView.setHighlights(violations);
-  applyRoomHighlights(floor, violations);
-  validatedFloor = floor;
+  graphView.setDepths(depths);
+  applyRoomHighlights(floors.floors, violations);
+  validated = true;
 }
 
 checkBtn.addEventListener("click", runCheck);
-// A stale report is worse than none: drop it as soon as the layout it described
-// changes, or the user switches away from the floor it was about.
-floors.onLayoutChange = (f) => {
-  if (f === validatedFloor) clearValidation();
-};
+// A stale report is worse than none: drop it as soon as any floor's layout
+// changes (validation spans the whole dwelling now).
+floors.onLayoutChange = () => clearValidation();
 
 // ---- Project save / load (export & import JSON) ----
 // Manual, client-side only. Export downloads a real .json; import replaces the

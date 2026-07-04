@@ -1,6 +1,7 @@
 import {
   MODULE_LIST,
   ROOM_LIST,
+  STAIR_LIST,
   type ModuleType,
   type ModuleDef,
 } from "../core/modules";
@@ -21,6 +22,8 @@ export interface PaletteCallbacks {
   onSwitchFloor: (index: number) => void;
   onAddFloor: () => void;
   onDeleteFloor: () => void;
+  /** Enter entrance-placement mode (ground floor only). */
+  onPlaceEntrance: () => void;
   /** Download the whole project as a .json file. */
   onExport: () => void;
   /** Open the native file picker to import a project .json. */
@@ -41,8 +44,30 @@ export function buildPalette(
   root.appendChild(buildProjectPanel(cb));
   root.appendChild(buildFloorsPanel(cb, state));
   root.appendChild(buildSection("Rooms", ROOM_LIST, cb));
+  root.appendChild(buildSection("Stairs", STAIR_LIST, cb));
+  root.appendChild(buildAccessPanel(cb));
   root.appendChild(buildSection("Modules", MODULE_LIST, cb));
   root.appendChild(buildGridControls(state, cb));
+}
+
+/** Entrance placement tool (ground floor only). */
+function buildAccessPanel(cb: PaletteCallbacks): HTMLElement {
+  const section = document.createElement("div");
+  section.appendChild(heading("Access"));
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "secondary";
+  btn.textContent = "+ Entrance";
+  btn.addEventListener("click", () => cb.onPlaceEntrance());
+  section.appendChild(btn);
+
+  const note = document.createElement("p");
+  note.className = "hint-text";
+  note.textContent =
+    "Click just outside a ground-floor room's exterior wall to add an entrance (the reachability root).";
+  section.appendChild(note);
+  return section;
 }
 
 function buildProjectPanel(cb: PaletteCallbacks): HTMLElement {

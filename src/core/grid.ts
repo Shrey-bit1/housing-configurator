@@ -34,6 +34,14 @@ export class Grid {
   /** Maps `"cx,cz"` -> the id of the module instance occupying that cell. */
   private occupancy = new Map<string, string>();
 
+  /**
+   * Cells voided by a stairwell hole punched from the floor below (a stair's
+   * footprint projected straight up). Nothing may be placed on a hole cell — the
+   * room above must not sit on the void. Derived data: replaced wholesale by
+   * {@link setHoles} whenever the stairs below change; never edited piecemeal.
+   */
+  private holeCells = new Set<string>();
+
   constructor(cols: number, rows: number) {
     this.cols = cols;
     this.rows = rows;
@@ -78,10 +86,36 @@ export class Grid {
   canPlace(cells: Cell[], excludeId?: string): boolean {
     for (const { cx, cz } of cells) {
       if (!this.inBounds(cx, cz)) return false;
+      if (this.holeCells.has(cellKey(cx, cz))) return false; // can't sit on a stairwell void
       const owner = this.occupancy.get(cellKey(cx, cz));
       if (owner !== undefined && owner !== excludeId) return false;
     }
     return true;
+  }
+
+  /**
+   * Does this grid present clear floor plate at every one of `cells`? — i.e. each
+   * cell is in bounds and not occupied by an instance. Used when validating a
+   * stair on the floor BELOW: its footprint projected up must land on real,
+   * unoccupied plate (no room sitting where the stairwell would open). Holes are
+   * intentionally ignored here (a stair doesn't conflict with a stairwell void).
+   */
+  plateAvailable(cells: Cell[]): boolean {
+    for (const { cx, cz } of cells) {
+      if (!this.inBounds(cx, cz)) return false;
+      if (this.occupancy.has(cellKey(cx, cz))) return false;
+    }
+    return true;
+  }
+
+  /** Replace the set of stairwell-hole cells (see {@link holeCells}). */
+  setHoles(cells: Cell[]): void {
+    this.holeCells = new Set(cells.map((c) => cellKey(c.cx, c.cz)));
+  }
+
+  /** The instance id occupying cell (cx,cz), or undefined if free. */
+  ownerAt(cx: number, cz: number): string | undefined {
+    return this.occupancy.get(cellKey(cx, cz));
   }
 
   /** Mark every cell as owned by `id`. Assumes {@link canPlace} already passed. */

@@ -1,4 +1,4 @@
-import type { AdjacencyGraph } from "../core/adjacencyGraph";
+import type { DwellingGraph } from "../core/adjacencyGraph";
 import type { Severity, Violation } from "../core/rules";
 
 /**
@@ -14,15 +14,21 @@ const SEVERITY_LABEL: Record<Severity, string> = {
   note: "Note",
 };
 
-/** Populate `panel` with the report for `violations` (resolved against `graph`). */
+/** Populate `panel` with the report for `violations` (resolved against `graph`),
+ *  plus the depth-from-entrance metric as pure information (not pass/fail). */
 export function renderValidationPanel(
   panel: HTMLElement,
-  graph: AdjacencyGraph,
+  graph: DwellingGraph,
   violations: Violation[],
-  floorLabel: string,
+  depths: Map<string, number>,
+  title: string,
   onClose: () => void
 ): void {
-  const labelById = new Map(graph.nodes.map((n) => [n.id, n.label] as const));
+  // Disambiguate same-named rooms across floors when the dwelling is multi-floor.
+  const multi = graph.floorCount > 1;
+  const labelById = new Map(
+    graph.nodes.map((n) => [n.id, multi ? `${n.label} (F${n.floor})` : n.label] as const)
+  );
 
   const hard = violations.filter((v) => v.severity === "hard");
   const soft = violations.filter((v) => v.severity === "soft");
@@ -33,15 +39,15 @@ export function renderValidationPanel(
 
   // ---- Header ----
   const header = el("div", "vp-header");
-  const title = el("span", "vp-title");
-  title.textContent = `${floorLabel} — Layout Check`;
+  const titleEl = el("span", "vp-title");
+  titleEl.textContent = `${title} — Layout Check`;
   const close = document.createElement("button");
   close.className = "vp-close";
   close.type = "button";
   close.textContent = "✕";
   close.title = "Dismiss";
   close.addEventListener("click", onClose);
-  header.append(title, close);
+  header.append(titleEl, close);
   panel.appendChild(header);
 
   // ---- Summary line ----
@@ -62,7 +68,51 @@ export function renderValidationPanel(
   appendGroup(panel, "Soft — atypical, not wrong", soft, labelById);
   appendGroup(panel, "Notes", notes, labelById);
 
+  // ---- Depth-from-entrance metric (informational, not a pass/fail list) ----
+  appendDepthSection(panel, graph, depths, multi);
+
   panel.style.display = "block";
+}
+
+/** Space-syntax depth-from-entrance: a summary line + a compact per-room list.
+ *  Pure information — DP1 (the ≥threshold flag) already lives in the issue
+ *  groups above; this shows the full picture the metric describes. */
+function appendDepthSection(
+  panel: HTMLElement,
+  graph: DwellingGraph,
+  depths: Map<string, number>,
+  multi: boolean
+): void {
+  const rooms = graph.nodes
+    .filter((n) => n.kind === "room" && depths.has(n.id))
+    .map((n) => ({
+      label: multi ? `${n.label} (F${n.floor})` : n.label,
+      depth: depths.get(n.id)!,
+    }))
+    .sort((a, b) => a.depth - b.depth || a.label.localeCompare(b.label));
+  if (rooms.length === 0) return; // no entrance yet, or nothing reachable
+
+  const h = el("div", "vp-group-heading");
+  h.textContent = "Depth from entrance";
+  panel.appendChild(h);
+
+  const max = Math.max(...rooms.map((r) => r.depth));
+  const mean = rooms.reduce((sum, r) => sum + r.depth, 0) / rooms.length;
+  const summary = el("div", "vp-depth-summary");
+  summary.textContent = `Max ${max} hop${max === 1 ? "" : "s"} · Mean ${mean.toFixed(1)} hops · ${rooms.length} room${rooms.length === 1 ? "" : "s"}`;
+  panel.appendChild(summary);
+
+  const list = el("div", "vp-depth-list");
+  for (const r of rooms) {
+    const row = el("div", "vp-depth-row");
+    const name = el("span", "vp-depth-name");
+    name.textContent = r.label;
+    const val = el("span", "vp-depth-val");
+    val.textContent = String(r.depth);
+    row.append(name, val);
+    list.appendChild(row);
+  }
+  panel.appendChild(list);
 }
 
 function appendGroup(
@@ -98,7 +148,7 @@ function appendGroup(
 }
 
 function involvedText(v: Violation, labelById: Map<string, string>): string {
-  if (v.layout) return "Whole floor";
+  if (v.layout) return "Whole dwelling";
   const names = v.nodeIds.map((id) => labelById.get(id) ?? id);
   if (names.length === 0) return "";
   return (v.edge ? "Between: " : "Room: ") + names.join(v.edge ? " ↔ " : ", ");

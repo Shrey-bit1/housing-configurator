@@ -476,6 +476,41 @@ button.primary:hover {
   color: var(--text-dim);
 }
 
+/* ---- Depth-from-entrance metric (informational) ---- */
+.vp-depth-summary {
+  padding: 4px 12px 8px;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+
+.vp-depth-list {
+  margin: 0 10px 8px;
+  border: 1px solid var(--line-soft);
+}
+
+.vp-depth-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 9px;
+  font-size: 11px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.vp-depth-row:first-child {
+  border-top: none;
+}
+
+.vp-depth-name {
+  color: var(--text);
+}
+
+.vp-depth-val {
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
 /* ---- Reset View button (top-right of viewport, below Check Layout) ---- */
 #reset-view {
   position: absolute;
