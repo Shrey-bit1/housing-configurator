@@ -23,6 +23,14 @@ export type Category = "module" | "room" | "stair";
  *   { side: "north", allowed: true, entry?: { cx, cz }, span?: number }
  * `side` is relative to the footprint's own bounding box at rotation 0;
  * rotation handling would be layered on when rules are implemented.
+ *
+ * MIRRORING NOTE (for the future doors task): the footprint transform mirrors
+ * across the local X axis (negates cx) BEFORE rotating (see {@link transformCell}).
+ * That reflection swaps the two sides perpendicular to the mirror axis —
+ * east ↔ west — while leaving north/south alone, all measured BEFORE the
+ * subsequent rotation. So when this scaffolding grows real per-side behaviour,
+ * a mirrored instance must swap its `east`/`west` edges (then apply rotation),
+ * exactly as the cells do. No behaviour depends on this yet.
  */
 export interface ConnectionEdge {
   side: "north" | "south" | "east" | "west";
@@ -325,22 +333,45 @@ export function rotateCell(cell: Cell, rotation: number): Cell {
   return { cx, cz };
 }
 
-/** The shape's relative cells after applying `rotation`. */
-export function rotatedCells(def: ModuleDef, rotation: number): Cell[] {
-  return def.cells.map((c) => rotateCell(c, rotation));
+/**
+ * Reflect a relative cell offset across the LOCAL X axis (the plane cx = 0),
+ * i.e. negate cx, keeping the origin (0,0) — the rotation pivot — fixed. This
+ * is a left/right flip that swaps a footprint's east (+x) and west (−x) sides.
+ */
+export function mirrorCell(cell: Cell): Cell {
+  return { cx: -cell.cx, cz: cell.cz };
 }
 
 /**
- * Absolute cells a module occupies when its origin cell sits at `origin` and
- * it is rotated by `rotation` steps. This is the bridge from module data to
- * the grid occupancy map.
+ * THE central footprint transform — the single source of truth every consumer
+ * (occupancy, ghost, walls, props, stairs, graph) must agree on.
+ *
+ * Order is fixed and load-bearing: **mirror FIRST (across local X), THEN
+ * rotate.** Mirror-then-rotate and rotate-then-mirror give different results,
+ * so this order is the convention; anything that reconstructs a footprint's
+ * geometry from `(rotation, mirrored)` must apply the two steps in this order.
+ */
+export function transformCell(cell: Cell, rotation: number, mirrored: boolean): Cell {
+  return rotateCell(mirrored ? mirrorCell(cell) : cell, rotation);
+}
+
+/** The shape's relative cells after applying `mirrored` (first) then `rotation`. */
+export function rotatedCells(def: ModuleDef, rotation: number, mirrored = false): Cell[] {
+  return def.cells.map((c) => transformCell(c, rotation, mirrored));
+}
+
+/**
+ * Absolute cells a module occupies when its origin cell sits at `origin`,
+ * mirrored (or not), and rotated by `rotation` steps. This is the bridge from
+ * module data to the grid occupancy map — mirror then rotate then translate.
  */
 export function occupiedCells(
   def: ModuleDef,
   origin: Cell,
-  rotation: number
+  rotation: number,
+  mirrored = false
 ): Cell[] {
-  return rotatedCells(def, rotation).map((c) => ({
+  return rotatedCells(def, rotation, mirrored).map((c) => ({
     cx: origin.cx + c.cx,
     cz: origin.cz + c.cz,
   }));

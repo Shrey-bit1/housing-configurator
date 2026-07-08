@@ -19,13 +19,33 @@
         <button id="check-layout" type="button">Check Layout</button>
         <div id="validation-panel"></div>
         <button id="reset-view" type="button">Reset View</button>
+        <button id="shortcuts-btn" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+        <div id="shortcuts-panel">
+          <div class="vp-header">
+            <span class="vp-title">Shortcuts</span>
+            <button id="shortcuts-close" class="vp-close" type="button" aria-label="Close">✕</button>
+          </div>
+          <ul class="shortcut-list">
+            <li><kbd>R</kbd><span>Rotate selection</span></li>
+            <li><kbd>M</kbd><span>Mirror selection</span></li>
+            <li><kbd>Del</kbd><span>Delete selection</span></li>
+            <li><kbd>Shift</kbd><span>+ Click — add/remove from selection</span></li>
+            <li><kbd>Shift D</kbd><span>Duplicate selection</span></li>
+            <li><kbd>Ctrl/Cmd Z</kbd><span>Undo</span></li>
+            <li><kbd>Ctrl/Cmd Shift Z</kbd><span>Redo (or <kbd>Ctrl/Cmd Y</kbd>)</span></li>
+            <li><kbd>Esc</kbd><span>Cancel gesture / clear selection / exit plan view</span></li>
+            <li class="shortcut-note">Reset View &amp; Top View are buttons only — no shortcut.</li>
+          </ul>
+        </div>
         <div id="history-controls">
           <button id="undo-btn" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
           <button id="redo-btn" type="button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">↷</button>
         </div>
+        <div id="selection-readout"></div>
         <div id="hint">
           Drag rooms &amp; modules onto the grid &middot; Click to select &middot;
-          <kbd>R</kbd> rotate &middot; drag to move &middot; <kbd>Del</kbd> delete
+          <kbd>R</kbd> rotate &middot; <kbd>M</kbd> mirror &middot; drag to move &middot;
+          <kbd>Del</kbd> delete &middot; <kbd>?</kbd> shortcuts
         </div>
         <div id="drop-overlay"><span>Drop project file to import</span></div>
         <div id="toast"></div>

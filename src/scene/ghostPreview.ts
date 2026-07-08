@@ -13,6 +13,7 @@ export class GhostPreview {
   private group: THREE.Group | null = null;
   private def: ModuleDef | null = null;
   private rotation = 0;
+  private mirrored = false;
 
   /** Parent container (the active floor's group), grid, and store — all swapped
    *  by the FloorManager when the active floor changes so the ghost previews on
@@ -23,12 +24,13 @@ export class GhostPreview {
     public store: ModuleStore
   ) {}
 
-  /** Begin previewing `def` at the given rotation. */
-  begin(def: ModuleDef, rotation = 0): void {
+  /** Begin previewing `def` at the given rotation + mirror. */
+  begin(def: ModuleDef, rotation = 0, mirrored = false): void {
     this.clear();
     this.def = def;
     this.rotation = rotation;
-    this.group = buildModuleMesh(def, rotation, true);
+    this.mirrored = mirrored;
+    this.group = buildModuleMesh(def, rotation, true, undefined, mirrored);
     this.group.visible = false;
     this.parent.add(this.group);
   }
@@ -40,11 +42,22 @@ export class GhostPreview {
   setRotation(rotation: number): void {
     if (!this.def) return;
     this.rotation = rotation;
-    this.begin(this.def, rotation);
+    this.begin(this.def, rotation, this.mirrored);
+  }
+
+  /** Toggle/set the ghost's mirror state, rebuilding the preview mesh. */
+  setMirror(mirrored: boolean): void {
+    if (!this.def) return;
+    this.mirrored = mirrored;
+    this.begin(this.def, this.rotation, mirrored);
   }
 
   get currentRotation(): number {
     return this.rotation;
+  }
+
+  get currentMirror(): boolean {
+    return this.mirrored;
   }
 
   /**
@@ -58,7 +71,7 @@ export class GhostPreview {
     const world = this.grid.gridToWorld(origin.cx, origin.cz);
     this.group.position.copy(world);
 
-    const cells = occupiedCells(this.def, origin, this.rotation);
+    const cells = occupiedCells(this.def, origin, this.rotation, this.mirrored);
     const valid = this.store.canPlaceInstance(this.def, cells, excludeId);
     setGhostValidity(this.group, valid);
     return valid;
@@ -75,5 +88,6 @@ export class GhostPreview {
     }
     this.def = null;
     this.rotation = 0;
+    this.mirrored = false;
   }
 }

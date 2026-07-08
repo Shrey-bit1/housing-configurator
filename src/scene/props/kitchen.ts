@@ -20,8 +20,13 @@ import {
  *  - sink is a standalone block on the wall just north of the counter's end.
  *  - fridge sits near the NW corner so its 2-voxel width overflow spreads into
  *    open floor, not through a wall.
+ *
+ * `mirrored` reflects the whole furnished layout across the room's local X axis
+ * (handled entirely inside {@link buildPropsMesh} by flipping voxel x + the
+ * wall-clip footprint), so the fixtures follow the mirrored L-footprint —
+ * counter/sink/fridge back against the reflected walls automatically.
  */
-export function buildKitchenProps(): THREE.Group {
+export function buildKitchenProps(mirrored = false): THREE.Group {
   const cells = MODULE_DEFS.kitchen.cells; // un-rotated L footprint
   const run = findLongestWallRun(cells); // the 5-cell south (+z) wall
 
@@ -40,5 +45,5 @@ export function buildKitchenProps(): THREE.Group {
     { prop: PROP_LIBRARY.fridge, ox: 1, oz: 0, facing: "north" },
   ];
 
-  return buildPropsMesh(placements, cells);
+  return buildPropsMesh(placements, cells, mirrored);
 }

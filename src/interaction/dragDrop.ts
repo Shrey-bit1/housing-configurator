@@ -14,11 +14,15 @@ import type { Picker } from "./picker";
  * Flow: pressing a palette entry calls {@link startPlacement}; moving the
  * pointer over the canvas shows a snapped ghost (green = valid, red =
  * invalid); releasing over a valid cell commits the module. `R` rotates,
- * `Esc` cancels.
+ * `M` mirrors (left/right flip). Escape is arbitrated centrally by main.ts
+ * (see its keydown handler) rather than handled here, so cancelling a
+ * placement never fires alongside clearing a selection or exiting plan mode
+ * in the same keypress — it calls {@link cancelPlacement} directly.
  */
 export class DragDropController {
   private activeType: ModuleType | null = null;
   private rotation = 0;
+  private mirrored = false;
   private lastCell: Cell | null = null;
 
   constructor(
@@ -41,11 +45,20 @@ export class DragDropController {
 
   /** Begin placing `type`. Called by the palette on pointer-down of an entry. */
   startPlacement(type: ModuleType): void {
+    this.startPlacementFrom(type, 0, false);
+  }
+
+  /** Begin placing a NEW instance of `type`, pre-posed at `rotation`/`mirrored`
+   *  instead of resetting to the identity pose — used by Ctrl/Cmd+D duplicate
+   *  (`SelectionController`) to clone a selected instance's pose into a fresh
+   *  placement ghost that follows the cursor until clicked down. */
+  startPlacementFrom(type: ModuleType, rotation: number, mirrored: boolean): void {
     this.activeType = type;
-    this.rotation = 0;
+    this.rotation = rotation;
+    this.mirrored = mirrored;
     this.lastCell = null;
     this.controls.enabled = false; // don't orbit while placing
-    this.ghost.begin(MODULE_DEFS[type], 0);
+    this.ghost.begin(MODULE_DEFS[type], rotation, mirrored);
   }
 
   private install(): void {
@@ -69,8 +82,8 @@ export class DragDropController {
     const cell = this.overCanvas(e)
       ? this.picker.cellAt(e.clientX, e.clientY)
       : null;
-    if (cell) this.store.place(this.activeType, cell, this.rotation);
-    this.cancel();
+    if (cell) this.store.place(this.activeType, cell, this.rotation, this.mirrored);
+    this.cancelPlacement();
     // Snapshot after the placement gesture (no-op if nothing was placed —
     // released off-canvas or on an invalid cell — serialized state unchanged).
     this.onAfterAction?.();
@@ -82,8 +95,10 @@ export class DragDropController {
       this.rotation = (this.rotation + 1) % 4;
       this.ghost.setRotation(this.rotation);
       if (this.lastCell) this.ghost.update(this.lastCell); // keep it on-screen
-    } else if (e.key === "Escape") {
-      this.cancel();
+    } else if (e.key === "m" || e.key === "M") {
+      this.mirrored = !this.mirrored;
+      this.ghost.setMirror(this.mirrored);
+      if (this.lastCell) this.ghost.update(this.lastCell); // re-tint against the flip
     }
   }
 
@@ -97,9 +112,13 @@ export class DragDropController {
     );
   }
 
-  private cancel(): void {
+  /** Cancel any in-progress placement (Escape, arbitrated centrally by
+   *  main.ts) or reset after a commit. Public so the central Escape handler
+   *  can call it directly. */
+  cancelPlacement(): void {
     this.activeType = null;
     this.rotation = 0;
+    this.mirrored = false;
     this.lastCell = null;
     this.controls.enabled = true;
     this.ghost.clear();

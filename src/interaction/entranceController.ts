@@ -13,6 +13,11 @@ import type { Picker } from "./picker";
  *
  * Only floor 0 hosts entrances — `getFloor` always returns the ground floor and
  * the caller guarantees it's active before {@link start}.
+ *
+ * Escape is arbitrated centrally by main.ts's keydown handler (so cancelling
+ * placement mode never fires alongside clearing a selection or exiting plan
+ * mode in the same keypress) — it calls {@link cancel} directly rather than
+ * this class listening for Escape itself.
  */
 export class EntranceController {
   private activeMode = false;
@@ -28,7 +33,6 @@ export class EntranceController {
   ) {
     window.addEventListener("pointermove", (e) => this.onMove(e));
     window.addEventListener("pointerup", (e) => this.onUp(e));
-    window.addEventListener("keydown", (e) => this.onKeyDown(e));
   }
 
   get isActive(): boolean {
@@ -83,11 +87,7 @@ export class EntranceController {
       this.getFloor().addEntrance(cand.cell, cand.side);
       this.onPlaced();
     }
-    this.finish();
-  }
-
-  private onKeyDown(e: KeyboardEvent): void {
-    if (this.activeMode && e.key === "Escape") this.finish();
+    this.cancel();
   }
 
   private showPreview(): void {
@@ -107,7 +107,10 @@ export class EntranceController {
     }
   }
 
-  private finish(): void {
+  /** Leave placement mode, whether a placement just succeeded or the user
+   *  backed out (Escape, arbitrated centrally by main.ts). Public so that
+   *  central handler can call it directly. */
+  cancel(): void {
     this.activeMode = false;
     this.candidate = null;
     this.clearPreview();

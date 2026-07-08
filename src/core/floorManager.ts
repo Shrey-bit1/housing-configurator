@@ -7,6 +7,7 @@ import { edgeKey, parseEdgeKey } from "./exteriorEdges";
 import { computeWindows, type WindowVariant } from "./windows";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
+import type { GroupGhostPreview } from "../scene/groupGhostPreview";
 import type { DragDropController } from "../interaction/dragDrop";
 import type { SelectionController } from "../interaction/selection";
 import { markCutawayDirty } from "../scene/cutaway";
@@ -24,6 +25,9 @@ const CLEARANCE_CELLS = 1;
 interface FloorDeps {
   picker: Picker;
   ghost: GhostPreview;
+  /** Multi-instance ghost for a GROUP move (selection.ts) — kept in sync with
+   *  the active floor exactly like `ghost`. */
+  groupGhost: GroupGhostPreview;
   dragDrop: DragDropController;
   selection: SelectionController;
   groundPlane: THREE.Object3D;
@@ -113,7 +117,7 @@ export class FloorManager {
     const out: Cell[] = [];
     for (const inst of floor.store.instances.values())
       if (inst.def.category === "stair")
-        out.push(...occupiedCells(inst.def, inst.origin, inst.rotation));
+        out.push(...occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored));
     return out;
   }
 
@@ -187,7 +191,7 @@ export class FloorManager {
       const occupied = new Set<string>();
       for (const inst of floor.store.instances.values()) {
         if (inst.def.category === "module") continue;
-        for (const c of occupiedCells(inst.def, inst.origin, inst.rotation))
+        for (const c of occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored))
           occupied.add(cellKey(c.cx, c.cz));
       }
       // Entrance edges (floor 0 only) are skipped by windows — a door wins there.
@@ -198,22 +202,23 @@ export class FloorManager {
       floor.windowStats.clear();
       for (const inst of floor.store.instances.values()) {
         if (inst.def.category !== "room" || inst.def.cluster) continue; // shells only
-        const cells = occupiedCells(inst.def, inst.origin, inst.rotation); // absolute
+        const cells = occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored); // absolute
         const plan = computeWindows(cells, inst.def.type, height, occupied, entranceEdges);
         floor.windowStats.set(inst.id, {
           targetRatio: plan.targetRatio,
           achievedRatio: plan.achievedRatio,
           belowTarget: plan.belowTarget,
         });
-        // Absolute windowed edges → LOCAL edge keys (walls are built from
-        // rotated LOCAL cells = absolute − origin; side is unchanged since the
-        // room group isn't rotated).
+        // Absolute windowed edges → LOCAL edge keys (walls are built from the
+        // mirrored+rotated LOCAL cells = absolute − origin; side is unchanged
+        // since the room group carries no rotation/mirror transform — both are
+        // baked into the cells, so the local frame stays world-axis-aligned).
         const localWindows = new Map<string, WindowVariant>();
         for (const [absKey, variant] of plan.edges) {
           const e = parseEdgeKey(absKey);
           localWindows.set(edgeKey(e.cx - inst.origin.cx, e.cz - inst.origin.cz, e.side), variant);
         }
-        rebuildRoomWalls(inst.group, inst.def, inst.rotation, height, localWindows);
+        rebuildRoomWalls(inst.group, inst.def, inst.rotation, height, localWindows, inst.mirrored);
       }
     });
   }
@@ -257,6 +262,7 @@ export class FloorManager {
   setActive(index: number): void {
     this.deps.selection.deselect();
     this.deps.ghost.clear();
+    this.deps.groupGhost.clear();
     this.activeIndex = Math.max(0, Math.min(index, this.floors.length - 1));
 
     const f = this.active;
@@ -266,6 +272,8 @@ export class FloorManager {
     this.deps.ghost.grid = f.grid;
     this.deps.ghost.parent = f.group;
     this.deps.ghost.store = f.store; // cross-floor stair validity for the ghost
+    this.deps.groupGhost.grid = f.grid;
+    this.deps.groupGhost.parent = f.group;
     this.deps.sizeGroundPlane(f.grid);
 
     this.applyDim();
@@ -384,7 +392,9 @@ export class FloorManager {
           console.warn(`Skipping unknown module type "${inst.type}" while loading.`);
           continue;
         }
-        floor.store.place(inst.type, { cx: inst.cx, cz: inst.cz }, inst.rotation);
+        floor.store.place(
+          inst.type, { cx: inst.cx, cz: inst.cz }, inst.rotation, inst.mirrored ?? false
+        );
       }
       // Entrances are derived only from save data (not the store); restore them.
       for (const ent of floorsData[k].entrances)

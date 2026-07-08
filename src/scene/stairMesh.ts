@@ -26,6 +26,21 @@ import type { ModuleDef } from "../core/modules";
  * in a subgroup rotated by `-rotation·90°` — same convention props use — so the
  * dogleg's handedness/landing rotate with the occupancy footprint.
  *
+ * MIRRORING (`mirrored`): reflect the whole assembly across the local X axis
+ * (the plane x = 0, matching the footprint's cx → −cx transform), flipping the
+ * dogleg's handedness — which side lane A (lower flight) vs lane B (upper
+ * flight) sits on, hence the 180° turn direction. Crucially this is done by
+ * NEGATING each lane's x centre only (`laneAx`/`laneBx`/`fullCx`), NOT by a
+ * `scale.x = -1`. Each piece is a CONSTANT-cross-section prism extruded along x,
+ * so reflecting it across x = 0 is identical to re-extruding the same CCW
+ * profile at the mirrored centre `−cx` (a pure translation of a symmetric
+ * prism). The profile point lists and extrusion width are untouched, so every
+ * face keeps its original CCW-outward winding — no normals flip, no DoubleSide
+ * needed, no re-traversal. The z-profiles (which flight climbs which way) are
+ * unchanged because an x-reflection doesn't touch z; only the left/right lane
+ * sides swap. Riser normals therefore stay (0,0,−1) on flight 1 and (0,0,+1) on
+ * flight 2 — still correct for each flight's climb.
+ *
  * Built at a fixed {@link REFERENCE_STAIR_RISE} (= 2 × the half-rise); the
  * FloorManager scales `group.scale.y` to the floor's real height. Because the
  * landing sits at EXACTLY half the reference rise, uniform y-scaling keeps it at
@@ -53,7 +68,8 @@ export const REFERENCE_STAIR_RISE = HALF_RISE * 2; // 3.0 m
 export function buildStairGroup(
   def: ModuleDef,
   rotation: number,
-  ghost: boolean
+  ghost: boolean,
+  mirrored = false
 ): THREE.Group {
   const group = new THREE.Group();
   group.userData.moduleType = def.type;
@@ -81,8 +97,13 @@ export function buildStairGroup(
   const maxZ = Math.max(...def.cells.map((c) => c.cz));
   const H = CELL_SIZE / 2;
 
-  const laneAx = minX * CELL_SIZE; // lane A centre (base→far, lower flight)
-  const laneBx = maxX * CELL_SIZE; // lane B centre (far→base, upper flight)
+  // Lane x-centres. Mirroring reflects them across x = 0 (negate) — lane A
+  // (lower flight) stays put when it sits on x = 0, lane B swaps to the other
+  // side, flipping handedness. Because each lane is a symmetric prism, this
+  // negation IS the reflection with no winding change (see the file header).
+  const mx = mirrored ? -1 : 1;
+  const laneAx = minX * CELL_SIZE * mx; // lane A centre (base→far, lower flight)
+  const laneBx = maxX * CELL_SIZE * mx; // lane B centre (far→base, upper flight)
   const laneW = CELL_SIZE - STEP_INSET;
   const fullW = (maxX - minX + 1) * CELL_SIZE - STEP_INSET;
   const fullCx = (laneAx + laneBx) / 2;

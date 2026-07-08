@@ -1,8 +1,10 @@
 import "./style.css";
 import { type Grid } from "./core/grid";
+import { rotatedCells } from "./core/modules";
 import { FloorManager } from "./core/floorManager";
 import { createScene } from "./scene/sceneSetup";
 import { GhostPreview } from "./scene/ghostPreview";
+import { GroupGhostPreview } from "./scene/groupGhostPreview";
 import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
 import { SelectionController, type EntranceSelectionAdapter } from "./interaction/selection";
@@ -38,6 +40,10 @@ const checkBtn = document.getElementById("check-layout") as HTMLButtonElement;
 const validationPanel = document.getElementById("validation-panel") as HTMLElement;
 const undoBtn = document.getElementById("undo-btn") as HTMLButtonElement;
 const redoBtn = document.getElementById("redo-btn") as HTMLButtonElement;
+const selectionReadout = document.getElementById("selection-readout") as HTMLElement;
+const shortcutsBtn = document.getElementById("shortcuts-btn") as HTMLButtonElement;
+const shortcutsPanel = document.getElementById("shortcuts-panel") as HTMLElement;
+const shortcutsClose = document.getElementById("shortcuts-close") as HTMLButtonElement;
 
 // ---- Scene ----
 const ctx = createScene(canvas);
@@ -67,6 +73,7 @@ const commitHistory = () => history?.commit();
 
 // ---- Interaction ----
 const ghost = new GhostPreview(f0.group, f0.grid, f0.store);
+const groupGhost = new GroupGhostPreview(f0.group, f0.grid);
 const picker = new Picker(canvas, camera, f0.grid, groundPlane);
 
 // Entrance selection/deletion adapter (entrances live on floor 0 only, and are
@@ -92,14 +99,17 @@ const selection = new SelectionController(
   canvas,
   picker,
   ghost,
+  groupGhost,
   f0.store,
   controls,
   dragDrop,
   commitHistory,
-  entranceAdapter
+  entranceAdapter,
+  () => updateSelectionReadout(),
+  (msg) => showToast("info", msg)
 );
 
-floors.attach({ picker, ghost, dragDrop, selection, groundPlane, sizeGroundPlane });
+floors.attach({ picker, ghost, groupGhost, dragDrop, selection, groundPlane, sizeGroundPlane });
 
 // A stair placed on the top floor auto-creates a floor above it — refresh the
 // sidebar floor tabs when that happens. The floor stack shape changing while
@@ -214,6 +224,39 @@ function renderSidebar(): void {
   );
 }
 renderSidebar();
+
+// ---- Selection readout (small persistent line showing what's selected) ----
+// Fired by SelectionController's onSelectionChange callback whenever the
+// module set or entrance selection changes. Floor-index is read live (not
+// cached) since the readout can be stale-refreshed after a floor switch too
+// (see onSwitchFloor below, where the selection itself is unaffected but the
+// floor label it reports could otherwise go stale — in practice selection is
+// per-floor so it's always empty right after a switch, but this stays correct
+// regardless).
+function updateSelectionReadout(): void {
+  const insts = selection.selectedInstances;
+  const entId = selection.selectedEntranceIdValue;
+  let text = "";
+  if (insts.length === 1) {
+    const inst = insts[0];
+    const cells = rotatedCells(inst.def, inst.rotation, inst.mirrored);
+    const xs = cells.map((c) => c.cx);
+    const zs = cells.map((c) => c.cz);
+    const w = Math.max(...xs) - Math.min(...xs) + 1;
+    const d = Math.max(...zs) - Math.min(...zs) + 1;
+    text = `${inst.def.name} · Floor ${floors.activeIndexValue} · ${w}×${d}`;
+  } else if (insts.length > 1) {
+    text = `${insts.length} selected`;
+  } else if (entId) {
+    text = "Entrance · Floor 0";
+  }
+  selectionReadout.textContent = text;
+  selectionReadout.classList.toggle("visible", !!text);
+}
+
+// ---- Shortcuts legend (static content in index.html; just a visibility toggle) ----
+shortcutsBtn.addEventListener("click", () => shortcutsPanel.classList.toggle("open"));
+shortcutsClose.addEventListener("click", () => shortcutsPanel.classList.remove("open"));
 
 // ---- Camera framing: zoom-to-extent + plan (top) view ----
 // "Zoom to extent" frames the camera on the actual content (all placed rooms/
@@ -513,9 +556,38 @@ undoBtn.addEventListener("click", () => history?.undo());
 redoBtn.addEventListener("click", () => history?.redo());
 
 window.addEventListener("keydown", (e) => {
-  // Don't hijack undo/redo while typing in the sidebar inputs.
+  // Don't hijack shortcuts while typing in the sidebar inputs.
   const tag = (e.target as HTMLElement)?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+  if (e.key === "Escape") {
+    // The single Escape arbitrator: one predictable key, checked in exactly
+    // this priority order — cancel an in-progress GESTURE first (palette
+    // ghost placement, a Shift+D duplicate ghost, or entrance-placement
+    // mode), then clear the SELECTION, then exit PLAN MODE.
+    // dragDrop/selection/entranceController no longer listen for Escape
+    // themselves (see their class docs), so exactly one of these five things
+    // happens per keypress, never more than one.
+    if (dragDrop.isDragging) {
+      dragDrop.cancelPlacement();
+      return;
+    }
+    if (selection.isDuplicating) {
+      selection.cancelDuplicate();
+      return;
+    }
+    if (entranceController.isActive) {
+      entranceController.cancel();
+      return;
+    }
+    if (selection.hasSelection) {
+      selection.deselect();
+      return;
+    }
+    if (planMode) exitPlanMode();
+    return;
+  }
+
   if (!(e.ctrlKey || e.metaKey)) return;
   const k = e.key.toLowerCase();
   if (k === "z" && !e.shiftKey) {

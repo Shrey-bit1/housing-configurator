@@ -79,16 +79,20 @@ export class Grid {
 
   /**
    * Can the given set of absolute cells be occupied?
-   * Every cell must be in bounds and either free or already owned by
-   * `excludeId` (so a module can be tested against its own current footprint
-   * when moving/rotating).
+   * Every cell must be in bounds and either free or already owned by an
+   * excluded id — a single id when testing a module against its own current
+   * footprint (move/rotate/mirror), or a Set of ids for a GROUP move, where
+   * every moving member's cells are excluded so the set can shuffle into each
+   * other's vacated cells (e.g. swapping two adjacent rooms in one gesture).
    */
-  canPlace(cells: Cell[], excludeId?: string): boolean {
+  canPlace(cells: Cell[], exclude?: string | Set<string>): boolean {
+    const isExcluded = (id: string) =>
+      typeof exclude === "string" ? id === exclude : (exclude?.has(id) ?? false);
     for (const { cx, cz } of cells) {
       if (!this.inBounds(cx, cz)) return false;
       if (this.holeCells.has(cellKey(cx, cz))) return false; // can't sit on a stairwell void
       const owner = this.occupancy.get(cellKey(cx, cz));
-      if (owner !== undefined && owner !== excludeId) return false;
+      if (owner !== undefined && !isExcluded(owner)) return false;
     }
     return true;
   }

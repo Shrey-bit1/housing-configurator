@@ -132,13 +132,13 @@ function buildFloorNodes(
         label: def.name,
         color: def.color,
         kind: "stair",
-        cells: occupiedCells(def, inst.origin, inst.rotation),
+        cells: occupiedCells(def, inst.origin, inst.rotation, inst.mirrored),
         hasExteriorEdge: false, // filled in below, once the floor's occupied set exists
       });
       continue;
     }
     if (def.category !== "room") continue; // furniture modules excluded
-    const cells = occupiedCells(def, inst.origin, inst.rotation);
+    const cells = occupiedCells(def, inst.origin, inst.rotation, inst.mirrored);
     if (def.cluster) {
       let entry = connectors.get(def.cluster);
       if (!entry) {
@@ -255,7 +255,7 @@ export function computeDwellingGraph(floors: Floor[]): DwellingGraph {
     if (!aboveOwner) return;
     for (const inst of floor.store.instances.values()) {
       if (inst.def.category !== "stair") continue;
-      const foot = occupiedCells(inst.def, inst.origin, inst.rotation);
+      const foot = occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored);
       const stairId = dwellingNodeId(fi, inst.id);
       for (const t of nodesTouching(foot, aboveOwner)) {
         const k = stairId < t ? `${stairId}|${t}` : `${t}|${stairId}`;

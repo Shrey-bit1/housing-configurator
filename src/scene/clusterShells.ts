@@ -41,7 +41,7 @@ export function rebuildClusterShells(floor: Floor, grid: Grid, wallHeight: numbe
       entry = { color: inst.def.color, cells: new Map() };
       byKey.set(k, entry);
     }
-    for (const c of occupiedCells(inst.def, inst.origin, inst.rotation))
+    for (const c of occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored))
       entry.cells.set(`${c.cx},${c.cz}`, c);
   }
 

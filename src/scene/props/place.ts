@@ -66,8 +66,15 @@ function insideWall(x: number, z: number, occ: Set<string>): boolean {
 }
 
 /** Append a placement's transformed voxels to flat position/colour arrays.
- *  Voxels landing inside a wall strip (`occ` = footprint) are clipped. */
-function emit(p: Placement, pos: number[], col: number[], occ?: Set<string>): void {
+ *  Voxels landing inside a wall strip (`occ` = footprint) are clipped. When
+ *  `mirror` is set, each voxel's local x is negated — a reflection across the
+ *  room's local X axis (x = 0), the SAME axis the footprint mirrors about (cx →
+ *  −cx). This rebuilds the merged prop cloud already flipped (no `scale.x = −1`,
+ *  so the little cubes keep correct winding); `occ` must be the mirrored
+ *  footprint so the wall-clip checks the right walls. */
+function emit(
+  p: Placement, pos: number[], col: number[], occ?: Set<string>, mirror = false
+): void {
   const r = FACING_ROT[p.facing];
   const half = VOXELS_PER_CELL / 2; // 6 voxels = half a cell
   // Seat the prop's +z back face at the cell's +z edge; the wall clip below
@@ -81,8 +88,9 @@ function emit(p: Placement, pos: number[], col: number[], occ?: Set<string>): vo
     const vcx = v.x + 0.5; // voxel centre
     const vcz = v.z + 0.5 + backShift;
     const [rx, rz] = rot2(vcx, vcz, r);
-    const wx = originX + rx * VOXEL_SIZE;
+    let wx = originX + rx * VOXEL_SIZE;
     const wz = originZ + rz * VOXEL_SIZE;
+    if (mirror) wx = -wx; // reflect across local x = 0 (matches the cell mirror)
     if (occ && insideWall(wx, wz, occ)) continue;
     pos.push(wx, (v.y + 0.5) * VOXEL_SIZE, wz);
     col.push(v.color);
@@ -202,16 +210,22 @@ const unitBox = new THREE.BoxGeometry(VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE);
  * cubes, coloured per-voxel via instanceColor. Returns a group ready to be
  * added to (and rotated with) the room.
  */
-export function buildPropsMesh(placements: Placement[], footprint?: Cell[]): THREE.Group {
+export function buildPropsMesh(
+  placements: Placement[],
+  footprint?: Cell[],
+  mirror = false
+): THREE.Group {
   const group = new THREE.Group();
   group.userData.props = true;
 
+  // Mirror the footprint the same way the voxels are mirrored (cx → −cx), so the
+  // wall-clip in emit() tests the reflected walls, not the originals.
   const occ = footprint
-    ? new Set(footprint.map((c) => `${c.cx},${c.cz}`))
+    ? new Set(footprint.map((c) => `${mirror ? -c.cx : c.cx},${c.cz}`))
     : undefined;
   const pos: number[] = [];
   const col: number[] = [];
-  for (const p of placements) emit(p, pos, col, occ);
+  for (const p of placements) emit(p, pos, col, occ, mirror);
   const count = col.length;
   if (count === 0) return group;
 

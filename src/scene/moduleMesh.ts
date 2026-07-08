@@ -48,11 +48,15 @@ export function buildModuleMesh(
    *  floor-to-floor height (`FloorManager.floorHeight`), passed in via
    *  `ModuleStore.wallHeightProvider`. Falls back to the def's own nominal
    *  height when omitted (ghost preview, or any caller that doesn't care). */
-  wallHeight?: number
+  wallHeight?: number,
+  /** Left/right footprint flip (mirror across local X, before rotation). Baked
+   *  into the geometry — cells, walls, props, stairs — never a `scale.x = -1`
+   *  (which would invert winding/normals). */
+  mirrored = false
 ): THREE.Group {
   // Stairs are their own stepped geometry (placed and ghost alike), spanning up
   // to the floor above. No shell, no props, no per-cell cubes.
-  if (def.category === "stair") return buildStairGroup(def, rotation, ghost);
+  if (def.category === "stair") return buildStairGroup(def, rotation, ghost, mirrored);
 
   const group = new THREE.Group();
   group.userData.moduleType = def.type;
@@ -84,19 +88,19 @@ export function buildModuleMesh(
   const asShell = !ghost && def.category === "room" && !isConnector;
 
   if (asTile) {
-    buildConnectorTile(group, def, rotation, material, edgeMaterial);
+    buildConnectorTile(group, def, rotation, material, edgeMaterial, mirrored);
   } else if (asShell) {
     // One glazing material per room group, reused across wall rebuilds. Windows
     // themselves are added by the FloorManager rebuild pass (which knows the
     // floor's occupancy/entrances), fired synchronously right after placement —
     // so the initial shell is built plain and immediately re-walled with windows.
     group.userData.glassMaterial = makeGlassMaterial();
-    buildRoomShell(group, def, rotation, material, edgeMaterial, wallHeight ?? def.height * CELL_SIZE);
+    buildRoomShell(group, def, rotation, material, edgeMaterial, wallHeight ?? def.height * CELL_SIZE, mirrored);
   } else {
     const { box, edges: edgeGeometry } = cellGeometry(def.height);
     const centerY = (def.height * CELL_SIZE) / 2;
 
-    for (const cell of rotatedCells(def, rotation)) {
+    for (const cell of rotatedCells(def, rotation, mirrored)) {
       const mesh = new THREE.Mesh(box, material);
       mesh.castShadow = !ghost;
       mesh.receiveShadow = !ghost;
@@ -121,7 +125,10 @@ export function buildModuleMesh(
   if (!ghost) {
     const buildProps = PROP_BUILDERS[def.type];
     if (buildProps) {
-      const props = buildProps();
+      // Props are mirrored in their voxel DATA (see buildPropsMesh) — never via
+      // a group scale — then this rotation follows, matching the cells'
+      // mirror-then-rotate order.
+      const props = buildProps(mirrored);
       props.rotation.y = -rotation * (Math.PI / 2);
       group.add(props);
     }
@@ -329,9 +336,10 @@ function buildRoomShell(
   rotation: number,
   material: THREE.Material,
   edgeMaterial: THREE.Material,
-  wallHeight: number
+  wallHeight: number,
+  mirrored = false
 ): void {
-  const cells = rotatedCells(def, rotation);
+  const cells = rotatedCells(def, rotation, mirrored);
 
   const floorGeos = cells.map((c) => {
     const g = new THREE.BoxGeometry(CELL_SIZE, FLOOR_H, CELL_SIZE);
@@ -367,15 +375,16 @@ function buildRoomShell(
  * edge-outline material is cheap to recreate (it carries no tinting state).
  *
  * `windows` keys are LOCAL edge keys (cell coords relative to the room origin,
- * matching the rotated local cells the walls are built from) → variant. Omit
- * for a plain (windowless) rebuild.
+ * matching the mirrored+rotated local cells the walls are built from) → variant.
+ * Omit for a plain (windowless) rebuild.
  */
 export function rebuildRoomWalls(
   group: THREE.Group,
   def: ModuleDef,
   rotation: number,
   wallHeight: number,
-  windows?: Map<string, WindowVariant>
+  windows?: Map<string, WindowVariant>,
+  mirrored = false
 ): void {
   const material = group.userData.material as THREE.Material;
   let glassMaterial = group.userData.glassMaterial as THREE.Material | undefined;
@@ -390,7 +399,7 @@ export function rebuildRoomWalls(
     disposeWallMesh(child as THREE.Mesh);
   }
   const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x1a1a1a });
-  const cells = rotatedCells(def, rotation);
+  const cells = rotatedCells(def, rotation, mirrored);
   for (const wall of buildBoundaryWalls(
     cells,
     (cx) => cx * CELL_SIZE,
@@ -423,9 +432,10 @@ function buildConnectorTile(
   def: ModuleDef,
   rotation: number,
   material: THREE.Material,
-  edgeMaterial: THREE.Material
+  edgeMaterial: THREE.Material,
+  mirrored = false
 ): void {
-  const tiles = rotatedCells(def, rotation).map((c) => {
+  const tiles = rotatedCells(def, rotation, mirrored).map((c) => {
     const g = new THREE.BoxGeometry(CELL_SIZE, FLOOR_H, CELL_SIZE);
     g.translate(c.cx * CELL_SIZE, FLOOR_H / 2, c.cz * CELL_SIZE);
     return g;
@@ -453,4 +463,24 @@ export function setSelected(group: THREE.Group, selected: boolean): void {
   const mat = group.userData.material as THREE.MeshStandardMaterial;
   mat.emissive.setHex(selected ? 0xffffff : 0x000000);
   mat.emissiveIntensity = selected ? 0.35 : 0;
+}
+
+/** Subtler emissive intensity than {@link setSelected}'s 0.35 — hover reads as
+ *  a light cue, never competing with the selection glow. */
+const HOVER_INTENSITY = 0.15;
+
+/**
+ * Toggle a subtle hover cue — distinct (lower-intensity) from the selection
+ * glow, so click targets stay legible even with several instances selected.
+ * Deliberately a no-op when `selected` is true (selection's own glow already
+ * reads as "this is under focus"; hover shouldn't fight or double it) or when
+ * a rules-violation tint currently owns this material (`userData.hiPrev` is
+ * set by `highlight.ts` — that signal is rarer and more important than a
+ * passing mouseover, so hover yields to it rather than clobbering it).
+ */
+export function setHovered(group: THREE.Group, hovered: boolean, selected: boolean): void {
+  const mat = group.userData.material as THREE.MeshStandardMaterial | undefined;
+  if (!mat || selected || mat.userData.hiPrev !== undefined) return;
+  mat.emissive.setHex(hovered ? 0xffffff : 0x000000);
+  mat.emissiveIntensity = hovered ? HOVER_INTENSITY : 0;
 }

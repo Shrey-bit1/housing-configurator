@@ -28,6 +28,9 @@ export interface InstanceData {
   cx: number;
   cz: number;
   rotation: number;
+  /** Left/right footprint flip. ADDITIVE (v1): absent in older files → false,
+   *  defaulted by {@link normalizeInstance}, so no version bump/migration. */
+  mirrored?: boolean;
 }
 
 /** A ground-floor entrance: host cell + the exterior side it binds to. */
@@ -79,6 +82,7 @@ export function serializeProject(floors: Floor[]): ProjectFile {
         cx: i.origin.cx,
         cz: i.origin.cz,
         rotation: i.rotation,
+        mirrored: i.mirrored,
       })),
       entrances: f.entrances.map((e) => ({ cx: e.cell.cx, cz: e.cell.cz, side: e.side })),
     })),
@@ -193,6 +197,7 @@ function normalizeInstance(raw: unknown): InstanceData | null {
     cx: Math.round(num(o.cx, 0)),
     cz: Math.round(num(o.cz, 0)),
     rotation: (((Math.round(num(o.rotation, 0)) % 4) + 4) % 4),
+    mirrored: o.mirrored === true, // absent/older files → false
   };
 }
 
