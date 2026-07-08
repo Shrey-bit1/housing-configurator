@@ -1,19 +1,24 @@
 import * as THREE from "three";
-import { CELL_SIZE, type Grid, type Cell } from "./grid";
+import { CELL_SIZE, cellKey, type Grid, type Cell } from "./grid";
 import { Floor } from "./floor";
 import { MODULE_DEFS, occupiedCells, type ModuleDef } from "./modules";
 import type { ProjectFile } from "./projectIO";
+import { edgeKey, parseEdgeKey } from "./exteriorEdges";
+import { computeWindows, type WindowVariant } from "./windows";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
 import type { DragDropController } from "../interaction/dragDrop";
 import type { SelectionController } from "../interaction/selection";
 import { markCutawayDirty } from "../scene/cutaway";
 import { rebuildClusterShells } from "../scene/clusterShells";
+import { rebuildRoomWalls } from "../scene/moduleMesh";
 import { REFERENCE_STAIR_RISE } from "../scene/stairMesh";
 
 /** Height (cells) assumed for a floor with no rooms yet, so spacing is stable. */
 const DEFAULT_FLOOR_CELLS = 4;
-/** Clearance above each floor's tallest room — the slab gap between floors. */
+/** Clearance above each floor's tallest room, added to reach the floor-to-floor
+ *  height — this is also how far room/cluster walls now rise above the tallest
+ *  room's nominal height, so they still meet the plate above with no gap. */
 const CLEARANCE_CELLS = 1;
 
 interface FloorDeps {
@@ -83,8 +88,11 @@ export class FloorManager {
       const above = this.floorAbove(floor);
       return above ? above.grid.plateAvailable(cells) : true;
     };
+    // A new/rebuilt room shell builds its walls directly at the floor's true
+    // height — no post-build rescale (see rebuildWalls()).
+    floor.store.wallHeightProvider = () => this.floorHeight(floor);
     floor.store.onChange = () => {
-      rebuildClusterShells(floor, floor.grid); // connector clusters may have changed
+      rebuildClusterShells(floor, floor.grid, this.floorHeight(floor)); // connector clusters may have changed
       this.syncStairsAndHoles(); // also recomputes the vertical stack + stair rises
       markCutawayDirty(); // walls may have been added/removed/rebuilt
       this.onLayoutChange?.(floor);
@@ -136,6 +144,7 @@ export class FloorManager {
 
     this.recomputeStack();
     this.updateStairScales();
+    this.rebuildWalls();
 
     if (structureChanged) {
       this.applyDim(); // the new floor renders dimmed (inactive)
@@ -154,6 +163,67 @@ export class FloorManager {
       for (const inst of floor.store.instances.values())
         if (inst.def.category === "stair") inst.group.scale.y = scale;
     }
+  }
+
+  /** Rebuild every ROOM shell's wall meshes (in place — floor slab and props
+   *  untouched, see {@link rebuildRoomWalls}) on each floor so they're
+   *  extruded directly at that floor's true floor-to-floor height
+   *  ({@link floorHeight}), not just their own room's nominal height —
+   *  closing the gap to the plate above with real geometry, not a scale
+   *  hack. Also (re)generates DERIVED WINDOWS on the same pass: which exterior
+   *  edges are glazed is recomputed from room type + exterior edges (see
+   *  {@link computeWindows}) and passed into the wall rebuild, and the
+   *  achieved-vs-target glazing stat is stashed on `floor.windowStats` for the
+   *  W1 rule. Merged cluster shells rebuild separately (`rebuildClusterShells`,
+   *  from `store.onChange`) and get no windows. Cheap; rerun on every layout
+   *  change alongside the stair rise. Stairs are intentionally excluded — their
+   *  scale-driven rise is unrelated (see {@link updateStairScales}). */
+  private rebuildWalls(): void {
+    this.floors.forEach((floor, fi) => {
+      const height = this.floorHeight(floor);
+
+      // The floor's occupied set (rooms + clusters + stairs; furniture excluded)
+      // — what makes an edge "exterior" for both window and adjacency purposes.
+      const occupied = new Set<string>();
+      for (const inst of floor.store.instances.values()) {
+        if (inst.def.category === "module") continue;
+        for (const c of occupiedCells(inst.def, inst.origin, inst.rotation))
+          occupied.add(cellKey(c.cx, c.cz));
+      }
+      // Entrance edges (floor 0 only) are skipped by windows — a door wins there.
+      const entranceEdges = new Set(
+        fi === 0 ? floor.entrances.map((e) => edgeKey(e.cell.cx, e.cell.cz, e.side)) : []
+      );
+
+      floor.windowStats.clear();
+      for (const inst of floor.store.instances.values()) {
+        if (inst.def.category !== "room" || inst.def.cluster) continue; // shells only
+        const cells = occupiedCells(inst.def, inst.origin, inst.rotation); // absolute
+        const plan = computeWindows(cells, inst.def.type, height, occupied, entranceEdges);
+        floor.windowStats.set(inst.id, {
+          targetRatio: plan.targetRatio,
+          achievedRatio: plan.achievedRatio,
+          belowTarget: plan.belowTarget,
+        });
+        // Absolute windowed edges → LOCAL edge keys (walls are built from
+        // rotated LOCAL cells = absolute − origin; side is unchanged since the
+        // room group isn't rotated).
+        const localWindows = new Map<string, WindowVariant>();
+        for (const [absKey, variant] of plan.edges) {
+          const e = parseEdgeKey(absKey);
+          localWindows.set(edgeKey(e.cx - inst.origin.cx, e.cz - inst.origin.cz, e.side), variant);
+        }
+        rebuildRoomWalls(inst.group, inst.def, inst.rotation, height, localWindows);
+      }
+    });
+  }
+
+  /** Public trigger for the wall+window rebuild pass, for changes that don't
+   *  go through the store's `onChange` (e.g. placing/removing an entrance,
+   *  which re-skips or re-enables windowing on that edge). */
+  refreshWalls(): void {
+    this.rebuildWalls();
+    markCutawayDirty();
   }
 
   /** Add a floor above the topmost one, inheriting its grid size; activate it. */
@@ -225,6 +295,63 @@ export class FloorManager {
   /** Default grid size for new floors / reset (mirrors the app default). */
   get defaults(): { cols: number; rows: number } {
     return { cols: this.defaultCols, rows: this.defaultRows };
+  }
+
+  /** Show/hide floor `i` entirely (see {@link Floor.setVisible}). Independent
+   *  of the active-floor concept — the active floor can be hidden; its store
+   *  stays bound to interaction regardless of whether it's drawn. */
+  setFloorVisible(i: number, visible: boolean): void {
+    this.floors[i]?.setVisible(visible);
+  }
+  isFloorVisible(i: number): boolean {
+    return this.floors[i]?.visible ?? false;
+  }
+
+  /**
+   * World-space bounding box of the current content — every placed room/
+   * module/stair and merged connector-cluster shell, on every VISIBLE floor —
+   * for camera "zoom to extent" framing. Falls back to the visible floors'
+   * grid footprints if nothing is placed, and further to a small box at the
+   * origin if no floor is visible at all (so framing is always well-defined).
+   */
+  contentBox(): THREE.Box3 {
+    // Box3.setFromObject reads matrixWorld directly; force it fresh first so a
+    // floor repositioned earlier in the SAME synchronous tick (e.g. a stack
+    // recompute right before a caller asks for the extent) isn't measured at
+    // its stale position — matrixWorld otherwise only updates on the next
+    // render pass.
+    this.scene.updateMatrixWorld(true);
+    const box = new THREE.Box3();
+    let any = false;
+    for (const f of this.floors) {
+      if (!f.visible) continue;
+      for (const inst of f.store.instances.values()) {
+        box.union(new THREE.Box3().setFromObject(inst.group));
+        any = true;
+      }
+      if (f.clusterGroup.children.length > 0) {
+        box.union(new THREE.Box3().setFromObject(f.clusterGroup));
+        any = true;
+      }
+    }
+    if (!any) {
+      for (const f of this.floors) {
+        if (!f.visible) continue;
+        const halfW = f.grid.worldWidth / 2;
+        const halfD = f.grid.worldDepth / 2;
+        const y = f.group.position.y;
+        box.union(
+          new THREE.Box3(
+            new THREE.Vector3(-halfW, y, -halfD),
+            new THREE.Vector3(halfW, y + 0.01, halfD)
+          )
+        );
+        any = true;
+      }
+    }
+    if (!any)
+      box.union(new THREE.Box3(new THREE.Vector3(-3, -0.1, -3), new THREE.Vector3(3, 0.1, 3)));
+    return box;
   }
 
   /**

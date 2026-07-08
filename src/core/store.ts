@@ -37,6 +37,12 @@ export class ModuleStore {
    * FloorManager (which knows the floor stack). */
   extraPlacementCheck?: (def: ModuleDef, cells: Cell[]) => boolean;
 
+  /** Wall height (world units) a new/rebuilt room shell should build its
+   *  walls to — the floor's true floor-to-floor height. Set by FloorManager
+   *  (which knows it); `buildModuleMesh` falls back to the def's own nominal
+   *  height when this is unset. */
+  wallHeightProvider?: () => number;
+
   /**
    * @param container the THREE container (a floor's group) meshes are added to,
    *   so the whole floor can be offset/dimmed by transforming that one group.
@@ -83,7 +89,7 @@ export class ModuleStore {
     if (!this.canPlaceInstance(def, cells)) return null;
 
     const id = `m${this.nextId++}`;
-    const group = buildModuleMesh(def, rotation);
+    const group = buildModuleMesh(def, rotation, false, this.wallHeightProvider?.());
     group.position.copy(this.grid.gridToWorld(origin.cx, origin.cz));
     this.container.add(group);
 
@@ -114,7 +120,7 @@ export class ModuleStore {
         | undefined;
       const selected = !!prevMat && prevMat.emissive.getHex() !== 0;
       this.container.remove(inst.group);
-      inst.group = buildModuleMesh(inst.def, rotation);
+      inst.group = buildModuleMesh(inst.def, rotation, false, this.wallHeightProvider?.());
       this.container.add(inst.group);
       inst.rotation = rotation;
       if (selected) setSelected(inst.group, true);

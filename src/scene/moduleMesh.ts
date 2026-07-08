@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { CELL_SIZE, type Cell } from "../core/grid";
 import { rotatedCells, type ModuleDef } from "../core/modules";
+import { edgeKey } from "../core/exteriorEdges";
+import { SILL_H, LINTEL_H, type WindowVariant } from "../core/windows";
 import { PROP_BUILDERS } from "./props";
 import { buildStairGroup } from "./stairMesh";
 
@@ -38,7 +40,16 @@ function cellGeometry(heightCells: number) {
  *
  * `ghost` produces a translucent, depth-test-light version for drag previews.
  */
-export function buildModuleMesh(def: ModuleDef, rotation: number, ghost = false): THREE.Group {
+export function buildModuleMesh(
+  def: ModuleDef,
+  rotation: number,
+  ghost = false,
+  /** Wall height (world units) for a room shell — normally the floor's true
+   *  floor-to-floor height (`FloorManager.floorHeight`), passed in via
+   *  `ModuleStore.wallHeightProvider`. Falls back to the def's own nominal
+   *  height when omitted (ghost preview, or any caller that doesn't care). */
+  wallHeight?: number
+): THREE.Group {
   // Stairs are their own stepped geometry (placed and ghost alike), spanning up
   // to the floor above. No shell, no props, no per-cell cubes.
   if (def.category === "stair") return buildStairGroup(def, rotation, ghost);
@@ -75,7 +86,12 @@ export function buildModuleMesh(def: ModuleDef, rotation: number, ghost = false)
   if (asTile) {
     buildConnectorTile(group, def, rotation, material, edgeMaterial);
   } else if (asShell) {
-    buildRoomShell(group, def, rotation, material, edgeMaterial);
+    // One glazing material per room group, reused across wall rebuilds. Windows
+    // themselves are added by the FloorManager rebuild pass (which knows the
+    // floor's occupancy/entrances), fired synchronously right after placement —
+    // so the initial shell is built plain and immediately re-walled with windows.
+    group.userData.glassMaterial = makeGlassMaterial();
+    buildRoomShell(group, def, rotation, material, edgeMaterial, wallHeight ?? def.height * CELL_SIZE);
   } else {
     const { box, edges: edgeGeometry } = cellGeometry(def.height);
     const centerY = (def.height * CELL_SIZE) / 2;
@@ -118,6 +134,35 @@ export function buildModuleMesh(def: ModuleDef, rotation: number, ghost = false)
 export const WALL_T = 0.1;
 export const FLOOR_H = 0.15;
 
+/** Glazing pane thickness (thinner than the wall, set into the reveal). */
+const GLASS_T = 0.04;
+/** Tiny y inset so glazing doesn't share an exact plane with the sill top /
+ *  lintel bottom (avoids z-fighting on those horizontal faces). */
+const GLASS_EPS = 0.004;
+/** Subtle blue-gray glass tint. */
+const GLASS_COLOR = 0x9fb8c8;
+
+/**
+ * A translucent glazing material — ONE per room group (created here, stashed on
+ * `group.userData.glassMaterial`, reused across wall rebuilds). Per-group (not
+ * shared globally) for the same reason the wall material is: `Floor.setDimmed`
+ * mutates `material.color`, so each floor/room needs its own instance. Carries
+ * `userData.baseColor` so the dim fade restores/fades it from its own tint.
+ */
+export function makeGlassMaterial(): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({
+    color: GLASS_COLOR,
+    roughness: 0.1,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.3,
+    depthWrite: false, // don't occlude what's behind (other panes / interior)
+    side: THREE.DoubleSide,
+  });
+  m.userData.baseColor = GLASS_COLOR;
+  return m;
+}
+
 /**
  * Generate the perimeter wall meshes for an arbitrary set of occupied cells —
  * the shared boundary-tracing + clean-corner logic used by BOTH per-room shells
@@ -134,8 +179,20 @@ export const FLOOR_H = 0.15;
  * corner). At concave corners the two walls belong to different cells and meet
  * edge-to-edge with no overlap — one clean edge everywhere.
  *
- * Returns up to four merged meshes, one per OUTWARD normal (±x, ±z), each tagged
- * with `userData.wallNormal` so the cutaway pass can hide camera-facing walls.
+ * Returns merged meshes tagged with `userData.wallNormal` so the cutaway pass
+ * can hide camera-facing walls. Up to four SOLID wall meshes (one per outward
+ * normal ±x/±z) plus — when `windows` is supplied — up to four GLAZING meshes
+ * (also `wallNormal`-tagged, so panels + glass hide together with their face).
+ *
+ * WINDOWS: a windowed exterior edge (its local `edgeKey` present in `windows`)
+ * has its full-height solid segment replaced by a sill panel (0→{@link SILL_H}),
+ * an optional lintel panel (framed variant: top {@link LINTEL_H}), and a
+ * translucent glazing pane filling the gap. Sill/lintel are still SOLID wall
+ * (same material, merged into the same per-normal wall mesh, so they tint/dim/
+ * cutaway exactly like wall); glass uses `glassMaterial` in its own per-normal
+ * mesh. Panel heights are absolute (stay fixed on taller floors; the glazing
+ * gap absorbs the extra height). Windows are only ever passed for room shells;
+ * cluster shells call without them.
  */
 export function buildBoundaryWalls(
   cells: Cell[],
@@ -143,87 +200,138 @@ export function buildBoundaryWalls(
   centerZ: (cz: number) => number,
   fullH: number,
   material: THREE.Material,
-  edgeMaterial: THREE.Material
+  edgeMaterial: THREE.Material,
+  windows?: Map<string, WindowVariant>,
+  glassMaterial?: THREE.Material
 ): THREE.Mesh[] {
   const key = (x: number, z: number) => `${x},${z}`;
   const occupied = new Set(cells.map((c) => key(c.cx, c.cz)));
   const H = CELL_SIZE / 2;
 
-  const walls = {
-    nx: [] as THREE.BufferGeometry[],
-    px: [] as THREE.BufferGeometry[],
-    nz: [] as THREE.BufferGeometry[],
-    pz: [] as THREE.BufferGeometry[],
+  const walls = { nx: [], px: [], nz: [], pz: [] } as Record<string, THREE.BufferGeometry[]>;
+  const glass = { nx: [], px: [], nz: [], pz: [] } as Record<string, THREE.BufferGeometry[]>;
+
+  /** A box spanning an explicit y band (yMin..yMax). */
+  const box = (
+    xMin: number, xMax: number, zMin: number, zMax: number, yMin: number, yMax: number
+  ) => {
+    const g = new THREE.BoxGeometry(xMax - xMin, yMax - yMin, zMax - zMin);
+    g.translate((xMin + xMax) / 2, (yMin + yMax) / 2, (zMin + zMax) / 2);
+    return g;
   };
 
-  const wallBox = (xMin: number, xMax: number, zMin: number, zMax: number) => {
-    const g = new THREE.BoxGeometry(xMax - xMin, fullH, zMax - zMin);
-    g.translate((xMin + xMax) / 2, fullH / 2, (zMin + zMax) / 2);
-    return g;
+  /**
+   * Emit one boundary edge into the given solid + glass arrays. Non-windowed →
+   * one full-height box. Windowed → sill (+ optional lintel) as solid, plus a
+   * glazing pane (thinner, centred in the wall thickness along `thin`).
+   */
+  const emit = (
+    side: string,
+    cx: number, cz: number,
+    solid: THREE.BufferGeometry[], glazing: THREE.BufferGeometry[],
+    xMin: number, xMax: number, zMin: number, zMax: number,
+    thin: "x" | "z"
+  ) => {
+    const variant = windows?.get(edgeKey(cx, cz, side as any));
+    if (!variant) {
+      solid.push(box(xMin, xMax, zMin, zMax, 0, fullH));
+      return;
+    }
+    // Sill (always) + lintel (framed only) — solid wall.
+    solid.push(box(xMin, xMax, zMin, zMax, 0, SILL_H));
+    const glassTop = variant === "framed" ? fullH - LINTEL_H : fullH;
+    if (variant === "framed") solid.push(box(xMin, xMax, zMin, zMax, fullH - LINTEL_H, fullH));
+    // Glazing pane in the gap — skip if the gap collapsed (never at real heights).
+    if (glassMaterial && glassTop - SILL_H > 0.05) {
+      let gxMin = xMin, gxMax = xMax, gzMin = zMin, gzMax = zMax;
+      if (thin === "x") {
+        const cxm = (xMin + xMax) / 2;
+        gxMin = cxm - GLASS_T / 2;
+        gxMax = cxm + GLASS_T / 2;
+      } else {
+        const czm = (zMin + zMax) / 2;
+        gzMin = czm - GLASS_T / 2;
+        gzMax = czm + GLASS_T / 2;
+      }
+      glazing.push(box(gxMin, gxMax, gzMin, gzMax, SILL_H + GLASS_EPS, glassTop - GLASS_EPS));
+    }
   };
 
   for (const c of cells) {
     const x = centerX(c.cx);
     const z = centerZ(c.cz);
 
-    const emptyN = !occupied.has(key(c.cx, c.cz - 1)); // -z edge
-    const emptyS = !occupied.has(key(c.cx, c.cz + 1)); // +z edge
-    const emptyW = !occupied.has(key(c.cx - 1, c.cz)); // -x edge
-    const emptyE = !occupied.has(key(c.cx + 1, c.cz)); // +x edge
+    const emptyN = !occupied.has(key(c.cx, c.cz - 1)); // -z edge (north)
+    const emptyS = !occupied.has(key(c.cx, c.cz + 1)); // +z edge (south)
+    const emptyW = !occupied.has(key(c.cx - 1, c.cz)); // -x edge (west)
+    const emptyE = !occupied.has(key(c.cx + 1, c.cz)); // +x edge (east)
 
     // E/W walls run in z, inset in x, trimmed in z at convex ends so the
     // perpendicular N/S wall of this cell owns the corner.
     const zMin = z - H + (emptyN ? WALL_T : 0);
     const zMax = z + H - (emptyS ? WALL_T : 0);
-    if (emptyW) walls.nx.push(wallBox(x - H, x - H + WALL_T, zMin, zMax));
-    if (emptyE) walls.px.push(wallBox(x + H - WALL_T, x + H, zMin, zMax));
+    if (emptyW) emit("west", c.cx, c.cz, walls.nx, glass.nx, x - H, x - H + WALL_T, zMin, zMax, "x");
+    if (emptyE) emit("east", c.cx, c.cz, walls.px, glass.px, x + H - WALL_T, x + H, zMin, zMax, "x");
 
     // N/S walls run in x at full cell length (own the corners), inset in z.
-    if (emptyN) walls.nz.push(wallBox(x - H, x + H, z - H, z - H + WALL_T));
-    if (emptyS) walls.pz.push(wallBox(x - H, x + H, z + H - WALL_T, z + H));
+    if (emptyN) emit("north", c.cx, c.cz, walls.nz, glass.nz, x - H, x + H, z - H, z - H + WALL_T, "z");
+    if (emptyS) emit("south", c.cx, c.cz, walls.pz, glass.pz, x - H, x + H, z + H - WALL_T, z + H, "z");
   }
 
-  const dirs: Array<{ geos: THREE.BufferGeometry[]; normal: THREE.Vector3 }> = [
-    { geos: walls.nx, normal: new THREE.Vector3(-1, 0, 0) },
-    { geos: walls.px, normal: new THREE.Vector3(1, 0, 0) },
-    { geos: walls.nz, normal: new THREE.Vector3(0, 0, -1) },
-    { geos: walls.pz, normal: new THREE.Vector3(0, 0, 1) },
+  const dirs: Array<{ key: string; normal: THREE.Vector3 }> = [
+    { key: "nx", normal: new THREE.Vector3(-1, 0, 0) },
+    { key: "px", normal: new THREE.Vector3(1, 0, 0) },
+    { key: "nz", normal: new THREE.Vector3(0, 0, -1) },
+    { key: "pz", normal: new THREE.Vector3(0, 0, 1) },
   ];
   const meshes: THREE.Mesh[] = [];
-  for (const { geos, normal } of dirs) {
-    if (!geos.length) continue;
-    const wallMesh = new THREE.Mesh(mergeGeometries(geos, false), material);
-    wallMesh.castShadow = true;
-    wallMesh.receiveShadow = true;
-    wallMesh.userData.isWall = true;
-    wallMesh.userData.wallNormal = normal;
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(wallMesh.geometry),
-      edgeMaterial
-    );
-    edges.raycast = () => {};
-    wallMesh.add(edges);
-    meshes.push(wallMesh);
+  for (const { key: dk, normal } of dirs) {
+    const solidGeos = walls[dk];
+    if (solidGeos.length) {
+      const wallMesh = new THREE.Mesh(mergeGeometries(solidGeos, false), material);
+      wallMesh.castShadow = true;
+      wallMesh.receiveShadow = true;
+      wallMesh.userData.isWall = true;
+      wallMesh.userData.wallNormal = normal;
+      const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(wallMesh.geometry),
+        edgeMaterial
+      );
+      edges.raycast = () => {};
+      wallMesh.add(edges);
+      meshes.push(wallMesh);
+    }
+
+    const glassGeos = glass[dk];
+    if (glassGeos.length && glassMaterial) {
+      const glassMesh = new THREE.Mesh(mergeGeometries(glassGeos, false), glassMaterial);
+      glassMesh.userData.isWall = true; // hide with its face in the cutaway pass
+      glassMesh.userData.wallNormal = normal;
+      glassMesh.userData.isGlass = true;
+      glassMesh.renderOrder = 1; // draw after opaque geometry
+      glassMesh.raycast = () => {}; // don't steal picks from the room shell
+      meshes.push(glassMesh);
+    }
   }
   return meshes;
 }
 
 /**
  * A hollow, open-top room shell for ONE room instance: a thin floor slab under
- * every footprint cell plus the perimeter walls (via {@link buildBoundaryWalls}).
- * Built from the already-rotated footprint in the room's local frame (cell (0,0)
- * at local origin); the room group is not rotated, so wall normals are
- * world-axis-aligned.
+ * every footprint cell plus the perimeter walls (via {@link buildBoundaryWalls},
+ * extruded directly to `wallHeight` — no post-build rescale). Built from the
+ * already-rotated footprint in the room's local frame (cell (0,0) at local
+ * origin); the room group is not rotated, so wall normals are world-axis-aligned.
  */
 function buildRoomShell(
   group: THREE.Group,
   def: ModuleDef,
   rotation: number,
   material: THREE.Material,
-  edgeMaterial: THREE.Material
+  edgeMaterial: THREE.Material,
+  wallHeight: number
 ): void {
   const cells = rotatedCells(def, rotation);
-  const fullH = def.height * CELL_SIZE;
 
   const floorGeos = cells.map((c) => {
     const g = new THREE.BoxGeometry(CELL_SIZE, FLOOR_H, CELL_SIZE);
@@ -239,11 +347,69 @@ function buildRoomShell(
     cells,
     (cx) => cx * CELL_SIZE,
     (cz) => cz * CELL_SIZE,
-    fullH,
+    wallHeight,
     material,
     edgeMaterial
   ))
     group.add(wall);
+}
+
+/**
+ * Rebuild ONLY the wall meshes of an already-built room shell group, in
+ * place, at `wallHeight` — used when a floor's true floor-to-floor height
+ * changes (e.g. a taller room placed elsewhere on the same floor) so
+ * existing rooms' walls still reach the plate above, and to (re)apply the
+ * derived `windows` assignment (which edges are glazed). Leaves the floor
+ * slab and any interior props untouched; reuses the group's existing shared
+ * wall material (`userData.material`) and glazing material
+ * (`userData.glassMaterial`), both set in {@link buildModuleMesh}, so
+ * selection/dim tinting keeps working on the rebuilt walls. A fresh
+ * edge-outline material is cheap to recreate (it carries no tinting state).
+ *
+ * `windows` keys are LOCAL edge keys (cell coords relative to the room origin,
+ * matching the rotated local cells the walls are built from) → variant. Omit
+ * for a plain (windowless) rebuild.
+ */
+export function rebuildRoomWalls(
+  group: THREE.Group,
+  def: ModuleDef,
+  rotation: number,
+  wallHeight: number,
+  windows?: Map<string, WindowVariant>
+): void {
+  const material = group.userData.material as THREE.Material;
+  let glassMaterial = group.userData.glassMaterial as THREE.Material | undefined;
+  if (!glassMaterial) {
+    glassMaterial = makeGlassMaterial();
+    group.userData.glassMaterial = glassMaterial;
+  }
+  // `isWall` tags both solid walls AND glazing panes, so both rebuild together.
+  for (const child of [...group.children]) {
+    if (!child.userData.isWall) continue;
+    group.remove(child);
+    disposeWallMesh(child as THREE.Mesh);
+  }
+  const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x1a1a1a });
+  const cells = rotatedCells(def, rotation);
+  for (const wall of buildBoundaryWalls(
+    cells,
+    (cx) => cx * CELL_SIZE,
+    (cz) => cz * CELL_SIZE,
+    wallHeight,
+    material,
+    edgeMaterial,
+    windows,
+    glassMaterial
+  ))
+    group.add(wall);
+}
+
+function disposeWallMesh(mesh: THREE.Mesh): void {
+  mesh.geometry.dispose();
+  for (const child of mesh.children) {
+    const line = child as THREE.LineSegments;
+    if (line.isLineSegments) line.geometry.dispose();
+  }
 }
 
 /**

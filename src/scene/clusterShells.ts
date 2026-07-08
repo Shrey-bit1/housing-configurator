@@ -1,12 +1,11 @@
 import * as THREE from "three";
-import { CELL_SIZE, type Grid, type Cell } from "../core/grid";
-import { occupiedCells, ROOM_HEIGHT } from "../core/modules";
+import { type Grid, type Cell } from "../core/grid";
+import { occupiedCells } from "../core/modules";
 import { connectedComponents, clusterNodeId } from "../core/cluster";
 import { buildBoundaryWalls } from "./moduleMesh";
 import type { Floor } from "../core/floor";
 
 const EDGE_COLOR = 0x1a1a1a;
-const FULL_H = ROOM_HEIGHT * CELL_SIZE;
 
 /**
  * Merged cluster shells for connector pieces (Circulation / Outdoor).
@@ -24,9 +23,11 @@ const FULL_H = ROOM_HEIGHT * CELL_SIZE;
  * `def.cluster`; within a key, flood-fill 4-neighbour adjacency into connected
  * components; each component's outer boundary is walled with the SAME
  * {@link buildBoundaryWalls} clean-corner logic the room shells use (mapping
- * cells to world XZ via `gridToWorld`).
+ * cells to world XZ via `gridToWorld`), extruded directly to `wallHeight` —
+ * the floor's true floor-to-floor height (`FloorManager.floorHeight`), passed
+ * in by the caller. No post-build rescale.
  */
-export function rebuildClusterShells(floor: Floor, grid: Grid): void {
+export function rebuildClusterShells(floor: Floor, grid: Grid, wallHeight: number): void {
   const group = floor.clusterGroup;
   disposeChildren(group);
 
@@ -65,7 +66,7 @@ export function rebuildClusterShells(floor: Floor, grid: Grid): void {
         component,
         centerX,
         centerZ,
-        FULL_H,
+        wallHeight,
         material,
         edgeMaterial
       )) {

@@ -6,6 +6,7 @@ import { HoleView } from "../scene/holeView";
 import { EntranceView } from "../scene/entranceView";
 import type { Entrance } from "./entrance";
 import { edgeKey, type Side } from "./exteriorEdges";
+import type { GlazingStat } from "./windows";
 
 /** Canvas background colour; dimmed floors fade toward it. Keep in sync with
  *  the scene background in sceneSetup.ts. */
@@ -36,6 +37,12 @@ export class Floor {
   /** Ground-floor entrances bound to exterior edges (entry roots). */
   readonly entrances: Entrance[] = [];
 
+  /** Derived glazing achieved-vs-target per ROOM instance id, recomputed on
+   *  every wall rebuild by the FloorManager (windows ride the wall pass). Read
+   *  by the adjacency graph to expose on room nodes for the W1 rule. Not
+   *  serialized (windows are derived). */
+  readonly windowStats = new Map<string, GlazingStat>();
+
   constructor(readonly id: number, cols: number, rows: number) {
     this.grid = new Grid(cols, rows);
     this.store = new ModuleStore(this.group, this.grid);
@@ -43,6 +50,21 @@ export class Floor {
     this.holeView = new HoleView(this.group, this.grid);
     this.entranceView = new EntranceView(this.group, this.grid);
     this.group.add(this.clusterGroup);
+  }
+
+  /**
+   * Whether this floor renders at all. A separate concept from {@link setDimmed}:
+   * dimming still draws a floor (colour-faded, for the "not the active edit
+   * floor" reading); hidden means the floor's whole group — geometry, holes,
+   * entrances, everything — is skipped by the renderer entirely, e.g. to see
+   * a floor below without an upper floor in the way. Pure VIEW state (not
+   * serialized — see projectIO.ts): always true again on a fresh load.
+   */
+  get visible(): boolean {
+    return this.group.visible;
+  }
+  setVisible(visible: boolean): void {
+    this.group.visible = visible;
   }
 
   /** Add an entrance on the exterior edge (cell, side); rebuilds the markers.
@@ -59,6 +81,27 @@ export class Floor {
     this.entrances.length = 0;
     this.entrances.push(...list);
     this.entranceView.rebuild(this.entrances);
+  }
+
+  /** Remove the entrance with `id`; rebuilds the markers. Returns true if one
+   *  was removed. (Frees the edge — a window may reappear there; the caller
+   *  triggers the wall/window refresh.) */
+  removeEntrance(id: string): boolean {
+    const i = this.entrances.findIndex((e) => e.id === id);
+    if (i < 0) return false;
+    this.entrances.splice(i, 1);
+    this.entranceView.rebuild(this.entrances);
+    return true;
+  }
+
+  /** Marker meshes for raycast picking (entrance selection). */
+  get entranceMarkers(): THREE.Object3D[] {
+    return this.entranceView.markers;
+  }
+
+  /** Apply the selection highlight to the entrance marker `id` (null clears). */
+  setEntranceSelected(id: string | null): void {
+    this.entranceView.setSelectedId(id);
   }
 
   /** Set the stairwell-hole cells (from stairs on the floor below): updates both

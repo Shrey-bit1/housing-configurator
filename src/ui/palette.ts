@@ -7,7 +7,7 @@ import {
 } from "../core/modules";
 
 export interface FloorState {
-  floors: { label: string }[];
+  floors: { label: string; visible: boolean }[];
   activeIndex: number;
   /** Active floor's grid dimensions (the grid-size control reflects these). */
   cols: number;
@@ -22,6 +22,8 @@ export interface PaletteCallbacks {
   onSwitchFloor: (index: number) => void;
   onAddFloor: () => void;
   onDeleteFloor: () => void;
+  /** Show/hide floor `index` in the 3D view (view state, not design state). */
+  onToggleFloorVisibility: (index: number) => void;
   /** Enter entrance-placement mode (ground floor only). */
   onPlaceEntrance: () => void;
   /** Download the whole project as a .json file. */
@@ -49,6 +51,13 @@ export function buildPalette(
   root.appendChild(buildSection("Modules", MODULE_LIST, cb));
   root.appendChild(buildGridControls(state, cb));
 }
+
+/** Minimal geometric eye glyphs for the per-floor visibility toggle (no emoji,
+ *  consistent with the flat Bauhaus icon-free-otherwise style). */
+const EYE_OPEN_ICON =
+  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8C1 8 4 3 8 3s7 5 7 5-3 5-7 5-7-5-7-5Z"/><circle cx="8" cy="8" r="2.1"/></svg>';
+const EYE_CLOSED_ICON =
+  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8C1 8 4 3 8 3s7 5 7 5-3 5-7 5-7-5-7-5Z"/><line x1="1.5" y1="14" x2="14.5" y2="2"/></svg>';
 
 /** Entrance placement tool (ground floor only). */
 function buildAccessPanel(cb: PaletteCallbacks): HTMLElement {
@@ -108,12 +117,25 @@ function buildFloorsPanel(cb: PaletteCallbacks, state: FloorState): HTMLElement 
   tabs.className = "floor-tabs";
   // Topmost floor first so the list reads like the building (roof → ground).
   state.floors.forEach((f, i) => {
+    const row = document.createElement("div");
+    row.className = "floor-tab-row";
+
     const tab = document.createElement("button");
     tab.type = "button";
     tab.className = "floor-tab" + (i === state.activeIndex ? " active" : "");
     tab.textContent = f.label;
     tab.addEventListener("click", () => cb.onSwitchFloor(i));
-    tabs.prepend(tab);
+    row.appendChild(tab);
+
+    const vis = document.createElement("button");
+    vis.type = "button";
+    vis.className = "floor-vis-toggle" + (f.visible ? "" : " hidden");
+    vis.title = f.visible ? "Hide this floor" : "Show this floor";
+    vis.innerHTML = f.visible ? EYE_OPEN_ICON : EYE_CLOSED_ICON;
+    vis.addEventListener("click", () => cb.onToggleFloorVisibility(i));
+    row.appendChild(vis);
+
+    tabs.prepend(row);
   });
   section.appendChild(tabs);
 

@@ -41,6 +41,12 @@ export function edgeKey(cx: number, cz: number, side: Side): string {
   return `${cx},${cz},${side}`;
 }
 
+/** Inverse of {@link edgeKey}. */
+export function parseEdgeKey(key: string): BoundaryEdge {
+  const [cx, cz, side] = key.split(",");
+  return { cx: Number(cx), cz: Number(cz), side: side as Side };
+}
+
 /**
  * Exterior boundary edges of `cells`. `occupied` is the set of ALL room+cluster
  * cell keys on the floor (typically including `cells` themselves). An edge is

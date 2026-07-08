@@ -27,7 +27,9 @@ export class DragDropController {
     private ghost: GhostPreview,
     /** Active floor's store — reassigned by the FloorManager on floor switch. */
     public store: ModuleStore,
-    private controls: OrbitControls
+    private controls: OrbitControls,
+    /** Fired after a placement gesture ends (for undo/redo snapshots). */
+    private onAfterAction?: () => void
   ) {
     this.install();
   }
@@ -69,6 +71,9 @@ export class DragDropController {
       : null;
     if (cell) this.store.place(this.activeType, cell, this.rotation);
     this.cancel();
+    // Snapshot after the placement gesture (no-op if nothing was placed —
+    // released off-canvas or on an invalid cell — serialized state unchanged).
+    this.onAfterAction?.();
   }
 
   private onKeyDown(e: KeyboardEvent): void {

@@ -64,6 +64,25 @@ export class EntranceView {
     container.add(this.group);
   }
 
+  /** The marker meshes (for raycast picking / selection). */
+  get markers(): THREE.Object3D[] {
+    return [...this.group.children];
+  }
+
+  /** Emissive-highlight the marker for `id` (null clears all) — the selection
+   *  look, matching how placed modules highlight (see moduleMesh.setSelected). */
+  setSelectedId(id: string | null): void {
+    for (const m of this.group.children) {
+      const mat = (m as THREE.Mesh).userData.material as
+        | THREE.MeshStandardMaterial
+        | undefined;
+      if (!mat || !mat.emissive) continue;
+      const on = m.userData.entranceId === id;
+      mat.emissive.setHex(on ? 0xffffff : 0x000000);
+      mat.emissiveIntensity = on ? 0.5 : 0;
+    }
+  }
+
   setDimmed(dimmed: boolean): void {
     this.dimmed = dimmed;
     this.group.traverse((o) => {

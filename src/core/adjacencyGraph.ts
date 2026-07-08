@@ -3,6 +3,7 @@ import type { Floor } from "./floor";
 import { occupiedCells } from "./modules";
 import { connectedComponents, clusterNodeId } from "./cluster";
 import { exteriorEdges } from "./exteriorEdges";
+import type { GlazingStat } from "./windows";
 
 /**
  * Whole-dwelling adjacency graph — all floors' rooms/clusters/STAIRS as nodes,
@@ -46,6 +47,11 @@ export interface GraphNode {
    *  (per the shared {@link exteriorEdges} utility) — daylight rules (D1/D2)
    *  consume this rather than recomputing exterior edges themselves. */
   hasExteriorEdge: boolean;
+  /** Achieved-vs-target glazing for this room (rooms only), from the derived
+   *  window generator (`floor.windowStats`) — the W1 rule consumes this rather
+   *  than recomputing windows. Undefined for clusters/stairs and rooms whose
+   *  type never windows. */
+  glazing?: GlazingStat;
 }
 
 export interface GraphEdge {
@@ -151,6 +157,7 @@ function buildFloorNodes(
         kind: "room",
         cells,
         hasExteriorEdge: false,
+        glazing: floor.windowStats.get(inst.id), // derived by the wall/window pass
       });
     }
   }

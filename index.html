@@ -11,11 +11,18 @@
       <main id="viewport">
         <canvas id="scene"></canvas>
         <canvas id="graph-canvas"></canvas>
-        <button id="view-toggle" type="button">Diagram</button>
+        <div id="view-mode-toggles">
+          <button id="view-toggle" type="button">Diagram</button>
+          <button id="top-view-toggle" type="button">Top View</button>
+        </div>
         <div id="graph-floor-label"></div>
         <button id="check-layout" type="button">Check Layout</button>
         <div id="validation-panel"></div>
         <button id="reset-view" type="button">Reset View</button>
+        <div id="history-controls">
+          <button id="undo-btn" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+          <button id="redo-btn" type="button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">↷</button>
+        </div>
         <div id="hint">
           Drag rooms &amp; modules onto the grid &middot; Click to select &middot;
           <kbd>R</kbd> rotate &middot; drag to move &middot; <kbd>Del</kbd> delete

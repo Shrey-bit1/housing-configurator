@@ -462,6 +462,20 @@ export const RULES: Rule[] = [
         .map((n) => violation("D2", "soft", n));
     },
   },
+  {
+    // Consumes the derived window generator's achieved-vs-target glazing
+    // (`node.glazing`, from `floor.windowStats`) — does NOT recompute windows.
+    // `belowTarget` already covers the zero-windows case (no ≥2-edge straight
+    // exterior run exists), and is only ever set for windowed room types.
+    id: "W1",
+    severity: "soft",
+    description: "Room's glazing is below its daylight target.",
+    check(graph) {
+      return graph.nodes
+        .filter((n) => n.glazing?.belowTarget)
+        .map((n) => violation("W1", "soft", n));
+    },
+  },
 
   // ===== Privacy / access refinements =====
   {

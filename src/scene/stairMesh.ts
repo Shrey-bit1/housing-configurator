@@ -62,7 +62,6 @@ export function buildStairGroup(
     color: CONCRETE,
     roughness: 0.85,
     metalness: 0.0,
-    side: THREE.DoubleSide, // flights wind in opposite senses; render both faces
     transparent: ghost,
     opacity: ghost ? 0.45 : 1,
   });
@@ -102,6 +101,13 @@ export function buildStairGroup(
     if (i < GOINGS_PER_FLIGHT) f1.push([z + GOING, y1]); // tread (toward far)
   }
   f1.push([zBase + FLIGHT_RUN, 0]); // drop to ground at the landing edge
+  // Flight 1's walk (up the stepped side, drop, close along the ground) traces
+  // its outline CLOCKWISE, opposite flight 2 and the landing below (both
+  // counter-clockwise) — ExtrudeGeometry treats CCW as "outward", so a CW
+  // profile comes out with inverted face normals (wrong-way lighting, only
+  // hidden from culling by forcing double-sided material). Reverse the point
+  // order — same boundary, opposite traversal — to match the other two pieces.
+  f1.reverse();
 
   // --- Flight 2: far → base, HALF_RISE → 2·HALF_RISE, solid to the ground. ---
   const f2: [number, number][] = [[zTurn, 0]]; // far-bottom at ground

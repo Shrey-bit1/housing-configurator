@@ -5,7 +5,7 @@ import { createScene } from "./scene/sceneSetup";
 import { GhostPreview } from "./scene/ghostPreview";
 import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
-import { SelectionController } from "./interaction/selection";
+import { SelectionController, type EntranceSelectionAdapter } from "./interaction/selection";
 import { updateCutaway } from "./scene/cutaway";
 import { computeDwellingGraph } from "./core/adjacencyGraph";
 import { validate, computeEntranceDepths } from "./core/rules";
@@ -15,11 +15,13 @@ import { applyRoomHighlights, clearRoomHighlights } from "./scene/highlight";
 import { EntranceController } from "./interaction/entranceController";
 import { buildPalette } from "./ui/palette";
 import { showToast } from "./ui/toast";
+import { History } from "./core/history";
 import {
   serializeProject,
   parseProject,
   ProjectParseError,
   APP_PROJECT_VERSION,
+  type ProjectFile,
 } from "./core/projectIO";
 
 const DEFAULT_COLS = 16;
@@ -30,9 +32,12 @@ const sidebar = document.getElementById("sidebar") as HTMLElement;
 const resetBtn = document.getElementById("reset-view") as HTMLButtonElement;
 const graphCanvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
 const viewToggle = document.getElementById("view-toggle") as HTMLButtonElement;
+const topViewBtn = document.getElementById("top-view-toggle") as HTMLButtonElement;
 const graphFloorLabel = document.getElementById("graph-floor-label") as HTMLElement;
 const checkBtn = document.getElementById("check-layout") as HTMLButtonElement;
 const validationPanel = document.getElementById("validation-panel") as HTMLElement;
+const undoBtn = document.getElementById("undo-btn") as HTMLButtonElement;
+const redoBtn = document.getElementById("redo-btn") as HTMLButtonElement;
 
 // ---- Scene ----
 const ctx = createScene(canvas);
@@ -52,24 +57,58 @@ function sizeGroundPlane(grid: Grid): void {
 const floors = new FloorManager(scene, DEFAULT_COLS, DEFAULT_ROWS);
 const f0 = floors.active;
 
+// ---- Undo/redo history ----
+// Snapshot-based (see core/history.ts): each mutating action commits a
+// serialized-project snapshot; restore reuses the project-import rebuild path.
+// Created near the end of setup (restore depends on functions defined below);
+// controllers snapshot through this stable wrapper meanwhile.
+let history: History | undefined;
+const commitHistory = () => history?.commit();
+
 // ---- Interaction ----
 const ghost = new GhostPreview(f0.group, f0.grid, f0.store);
 const picker = new Picker(canvas, camera, f0.grid, groundPlane);
-const dragDrop = new DragDropController(canvas, picker, ghost, f0.store, controls);
+
+// Entrance selection/deletion adapter (entrances live on floor 0 only, and are
+// only interactive while floor 0 is the active floor).
+const entranceAdapter: EntranceSelectionAdapter = {
+  pick(x, y) {
+    if (floors.activeIndexValue !== 0) return null;
+    const hit = picker.groupAt(x, y, floors.floors[0].entranceMarkers);
+    return (hit?.userData.entranceId as string | undefined) ?? null;
+  },
+  setSelected(id) {
+    floors.floors[0].setEntranceSelected(id);
+  },
+  remove(id) {
+    floors.floors[0].removeEntrance(id);
+    floors.refreshWalls(); // the freed edge may regain a window
+    clearValidation(); // drop stale entryIds / entrance highlight
+  },
+};
+
+const dragDrop = new DragDropController(canvas, picker, ghost, f0.store, controls, commitHistory);
 const selection = new SelectionController(
   canvas,
   picker,
   ghost,
   f0.store,
   controls,
-  dragDrop
+  dragDrop,
+  commitHistory,
+  entranceAdapter
 );
 
 floors.attach({ picker, ghost, dragDrop, selection, groundPlane, sizeGroundPlane });
 
 // A stair placed on the top floor auto-creates a floor above it — refresh the
-// sidebar floor tabs when that happens.
-floors.onStructureChange = () => renderSidebar();
+// sidebar floor tabs when that happens. The floor stack shape changing while
+// in plan mode would leave its by-index hidden-floor bookkeeping stale, so
+// leave plan mode first (safe/simple over trying to remap indices).
+floors.onStructureChange = () => {
+  if (planMode) exitPlanMode();
+  renderSidebar();
+};
 
 // Entrance placement (ground floor only). Binds a door marker to an exterior
 // edge of a floor-0 room/cluster; placing one drops any stale validation report.
@@ -78,7 +117,13 @@ const entranceController = new EntranceController(
   picker,
   controls,
   () => floors.floors[0],
-  () => clearValidation()
+  () => {
+    // A new entrance may sit on a windowed edge — regenerate windows so the
+    // door wins that edge. Entrance placement doesn't go through store.onChange.
+    floors.refreshWalls();
+    clearValidation();
+    commitHistory(); // entrance placement is an undoable action
+  }
 );
 
 // ---- Sidebar (rebuilt whenever floor state changes) ----
@@ -105,23 +150,40 @@ function renderSidebar(): void {
         }
         floors.syncStairsAndHoles(); // resize may change which cells have plate above
         renderSidebar();
+        commitHistory(); // grid resize is an undoable action
       },
       onSwitchFloor(index) {
         clearValidation();
         floors.setActive(index);
+        // Plan mode hides everything above the active floor — recompute which
+        // floors that means now that "active" has moved (no re-frame here:
+        // switching floors shouldn't yank the camera the user has panned/zoomed).
+        if (planMode) applyPlanVisibility();
         renderSidebar();
       },
       onAddFloor() {
+        if (planMode) exitPlanMode(); // stack shape changes — see onStructureChange
         floors.addFloor();
         renderSidebar();
+        commitHistory(); // adding a floor is an undoable action
       },
       onDeleteFloor() {
         if (floors.floors.length <= 1) return;
         const ok = window.confirm(
-          "Delete this floor and everything on it? This cannot be undone."
+          "Delete this floor and everything on it?"
         );
         if (!ok) return;
+        if (planMode) exitPlanMode();
         floors.deleteFloor();
+        renderSidebar();
+        commitHistory(); // deleting a floor is an undoable action
+      },
+      onToggleFloorVisibility(index) {
+        const next = !floors.isFloorVisible(index);
+        floors.setFloorVisible(index, next);
+        // Keep the plan-mode snapshot in sync so exiting doesn't discard a
+        // manual toggle made while it was active.
+        if (planMode && index < prePlanVisibility.length) prePlanVisibility[index] = next;
         renderSidebar();
       },
       onPlaceEntrance() {
@@ -141,7 +203,10 @@ function renderSidebar(): void {
       },
     },
     {
-      floors: floors.floors.map((_, i) => ({ label: `Floor ${i}` })),
+      floors: floors.floors.map((_, i) => ({
+        label: `Floor ${i}`,
+        visible: floors.isFloorVisible(i),
+      })),
       activeIndex: floors.activeIndexValue,
       cols: floors.active.grid.cols,
       rows: floors.active.grid.rows,
@@ -150,8 +215,70 @@ function renderSidebar(): void {
 }
 renderSidebar();
 
-// ---- Camera reset ----
-resetBtn.addEventListener("click", () => ctx.resetView());
+// ---- Camera framing: zoom-to-extent + plan (top) view ----
+// "Zoom to extent" frames the camera on the actual content (all placed rooms/
+// modules/stairs across VISIBLE floors, or the grid if empty) rather than a
+// fixed position — like Rhino's Zoom Extents. Reset View always lands here,
+// at the default axo angle, and always leaves plan mode first so it has one
+// predictable destination regardless of what view you were just in.
+function resetToExtent(): void {
+  if (planMode) {
+    exitPlanMode(); // exitPlanMode already re-frames axo
+    return;
+  }
+  ctx.frameBox(floors.contentBox(), "axo");
+}
+resetBtn.addEventListener("click", resetToExtent);
+
+// ---- Plan (top) view ----
+// Looking straight down a multi-floor building only shows the topmost visible
+// plate — useless as a plan — so entering plan mode auto-hides every floor
+// ABOVE the active one (restored on exit) and re-frames straight down onto
+// what's left, reading as "the plan of the floor I'm editing." Orbit ROTATION
+// is locked while active (pan/zoom still work) so the plan reading can't be
+// orbited away into an oblique, half-plan view; the toggle button is the only
+// way in or out (besides Reset View, which also exits it).
+let planMode = false;
+let prePlanVisibility: boolean[] = [];
+
+/** Re-derive which floors plan mode should hide from the CURRENT active floor
+ *  — floors above it hidden, floors at-or-below restored to their pre-plan
+ *  (or since-manually-toggled, see onToggleFloorVisibility) state. */
+function applyPlanVisibility(): void {
+  const activeIdx = floors.activeIndexValue;
+  floors.floors.forEach((_, i) => {
+    floors.setFloorVisible(i, i <= activeIdx ? (prePlanVisibility[i] ?? true) : false);
+  });
+}
+
+function enterPlanMode(): void {
+  if (planMode) return;
+  setDiagramVisible(false); // mutually exclusive with the bubble-diagram view
+  planMode = true;
+  prePlanVisibility = floors.floors.map((_, i) => floors.isFloorVisible(i));
+  applyPlanVisibility();
+  controls.enableRotate = false;
+  ctx.frameBox(floors.contentBox(), "top");
+  topViewBtn.textContent = "Axo View";
+  topViewBtn.classList.add("active");
+}
+
+/** Leave plan mode: restore every floor's pre-plan visibility, unlock orbit,
+ *  and re-frame back to the default axo extent (the one guaranteed exit). */
+function exitPlanMode(): void {
+  if (!planMode) return;
+  planMode = false;
+  prePlanVisibility.forEach((v, i) => floors.setFloorVisible(i, v));
+  controls.enableRotate = true;
+  topViewBtn.textContent = "Top View";
+  topViewBtn.classList.remove("active");
+  ctx.frameBox(floors.contentBox(), "axo");
+}
+
+topViewBtn.addEventListener("click", () => {
+  if (planMode) exitPlanMode();
+  else enterPlanMode();
+});
 
 // ---- Bubble-diagram (adjacency graph) view ----
 const graphView = new GraphView(
@@ -160,13 +287,22 @@ const graphView = new GraphView(
   () => floors.activeIndexValue,
   graphFloorLabel
 );
-viewToggle.addEventListener("click", () => {
+
+function setDiagramVisible(show: boolean): void {
+  if (graphView.visible === show) return;
+  if (show && planMode) exitPlanMode(); // mutually exclusive with plan view
   graphView.toggle();
   viewToggle.textContent = graphView.visible ? "3D View" : "Diagram";
   // Hide the 3D-only chrome while in diagram mode (Check Layout stays available).
   resetBtn.style.display = graphView.visible ? "none" : "";
   document.getElementById("hint")!.style.display = graphView.visible ? "none" : "";
-});
+}
+viewToggle.addEventListener("click", () => setDiagramVisible(!graphView.visible));
+
+// Initial view: frame whatever's on the (likely empty) starting floor instead
+// of a hardcoded camera position, so this stays correct however the default
+// grid size changes.
+resetToExtent();
 
 // ---- Layout rules validation (on-demand "Check Layout") ----
 // Advisory only: never blocks placement. Computed on click against the WHOLE
@@ -246,6 +382,7 @@ function importProjectText(text: string): void {
     selection.deselect();
     floors.loadProject(parsed.data);
     renderSidebar();
+    commitHistory(); // importing a project is an undoable action
   } catch (err) {
     console.error(err);
     showToast("error", "Import failed while loading — the file may be corrupt.");
@@ -325,6 +462,70 @@ viewport.addEventListener("drop", (e) => {
 function hasFiles(e: DragEvent): boolean {
   return !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
 }
+
+// ---- Undo / redo (history) ----
+// Restore reuses the project-import rebuild path (floors.loadProject) minus the
+// confirm/parse — the SAME code path manual building and import use. It clears
+// selection + any stale validation, keeps the active floor if it still exists
+// (else clamps), and leaves camera / floor-visibility untouched. Plan mode is
+// exited only if the floor STACK shape changed (its per-index bookkeeping would
+// otherwise be stale — matching onStructureChange's behaviour).
+function restoreState(snapshot: string): void {
+  const data = JSON.parse(snapshot) as ProjectFile;
+  // View state is NOT part of a snapshot — capture it so the rebuild (which
+  // makes fresh, all-visible floors) doesn't disturb it. Active floor + per-
+  // floor visibility are preserved by index (clamped if the stack shrank).
+  const prevActive = floors.activeIndexValue;
+  const prevCount = floors.floors.length;
+  const prevVisible = floors.floors.map((_, i) => floors.isFloorVisible(i));
+
+  selection.deselect();
+  clearValidation();
+  floors.loadProject(data); // rebuilds floors + all derived state; sets active 0
+  const newCount = floors.floors.length;
+
+  // Plan mode's per-index bookkeeping goes stale if the stack shape changed;
+  // exit it (matching onStructureChange). Otherwise restore visibility by index.
+  if (planMode && newCount !== prevCount) {
+    exitPlanMode();
+  } else if (!planMode) {
+    floors.floors.forEach((_, i) => floors.setFloorVisible(i, prevVisible[i] ?? true));
+  }
+
+  floors.setActive(Math.min(prevActive, newCount - 1));
+  renderSidebar();
+}
+
+function updateHistoryButtons(): void {
+  undoBtn.disabled = !history?.canUndo;
+  redoBtn.disabled = !history?.canRedo;
+}
+
+history = new History(
+  () => JSON.stringify(serializeProject(floors.floors)),
+  restoreState,
+  updateHistoryButtons,
+  20
+);
+updateHistoryButtons();
+
+undoBtn.addEventListener("click", () => history?.undo());
+redoBtn.addEventListener("click", () => history?.redo());
+
+window.addEventListener("keydown", (e) => {
+  // Don't hijack undo/redo while typing in the sidebar inputs.
+  const tag = (e.target as HTMLElement)?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  if (k === "z" && !e.shiftKey) {
+    e.preventDefault();
+    history?.undo();
+  } else if (k === "y" || (k === "z" && e.shiftKey)) {
+    e.preventDefault();
+    history?.redo();
+  }
+});
 
 // ---- Resize handling ----
 const resizeObserver = new ResizeObserver(() => ctx.handleResize());
