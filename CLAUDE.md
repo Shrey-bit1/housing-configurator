@@ -7,6 +7,10 @@
 - Update PROJECT_STATE.md to reflect the change BEFORE reporting back.
   Keep it reference-style and accurate to the actual code (read files, don't recall).
 - Run `tsc` and `npm run build`; report clean or explain.
+- If `rules.ts` changed (rules added/removed/reworded, or a constant retuned),
+  note that `docs/rules-reference` needs regeneration — edit
+  `docs/rules-reference.html` to match the code, then rebuild the PDF via
+  `python docs/build-pdf.py docs/rules-reference.html docs/rules-reference.pdf`.
 
 ## Architectural conventions (do not violate without discussion)
 - Derive, don't store: cluster shells, stair holes, adjacency graph, wall heights

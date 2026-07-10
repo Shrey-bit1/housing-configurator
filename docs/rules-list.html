@@ -1,0 +1,307 @@
+<meta charset="utf-8">
+<title>Layout Validation Rules — List</title>
+<style>
+  :root {
+    --ink: #1c1a17; --muted: #6b645b; --line: #d8d2c8; --line-soft: #ece7de;
+    --hard: #d32f2f; --soft-text: #a3690a; --note: #2e7d32;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    color: var(--ink); background: #fff;
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.2pt; line-height: 1.5;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  h1, h2, h3 { font-family: "Century Gothic", "Futura", "Segoe UI", Arial, sans-serif; font-weight: 700; }
+  @media screen {
+    body { background: #f4f1ec; }
+    .sheet { max-width: 205mm; margin: 0 auto; padding: 20mm; background: #fff; }
+  }
+
+  h1 { font-size: 21pt; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 10.5pt; margin: 0 0 16px; }
+  h2 { font-size: 14pt; margin: 22px 0 8px; border-bottom: 2px solid var(--ink); padding-bottom: 4px; }
+  h2:first-of-type { margin-top: 0; }
+  p { margin: 0 0 8px; }
+
+  .concept { margin-bottom: 9px; }
+  .concept b { font-family: "Century Gothic", "Segoe UI", Arial, sans-serif; }
+
+  .index { font-size: 8.6pt; color: var(--muted); line-height: 1.9; margin: 4px 0 4px; }
+  .index b { color: var(--ink); }
+  .idx-hard { color: var(--hard); font-weight: 700; }
+  .idx-soft { color: var(--soft-text); font-weight: 700; }
+  .idx-note { color: var(--note); font-weight: 700; }
+
+  .rule { break-inside: avoid; margin: 0 0 13px; padding-top: 2px; }
+  .rule h3 { font-size: 11.4pt; margin: 0 0 5px; display: flex; align-items: baseline; gap: 8px; }
+  .rule h3 .rid { }
+  .rid.hard { color: var(--hard); }
+  .rid.soft { color: var(--soft-text); }
+  .rid.note { color: var(--note); }
+  .rule h3 .name { font-weight: 400; color: var(--ink); flex: 1; font-size: 10.6pt;
+                   font-family: "Segoe UI", Arial, sans-serif; }
+  .tier { display: inline-block; font-size: 7pt; font-weight: 700; letter-spacing: 0.06em;
+          text-transform: uppercase; color: #fff; padding: 1.5px 5px; border-radius: 2px;
+          font-family: "Segoe UI", Arial, sans-serif; }
+  .tier.hard { background: var(--hard); }
+  .tier.soft { background: #e6a100; }
+  .tier.note { background: var(--note); }
+
+  .rule p { margin: 0 0 5px; font-size: 9.9pt; }
+  .rule p b { font-family: "Century Gothic", "Segoe UI", Arial, sans-serif; font-size: 8.6pt;
+              text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-right: 4px; }
+
+  code { font-family: "Consolas", "SF Mono", monospace; font-size: 8.9pt; background: var(--line-soft);
+         padding: 0.5px 4px; border-radius: 2px; }
+
+  .footer-note { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 9pt; color: var(--muted); }
+</style>
+
+<div class="sheet">
+
+<h1>Layout Validation Rules</h1>
+<p class="sub">All 35 rules in <code>src/core/rules.ts</code> — why each exists, and how it's computed.</p>
+
+<!-- ============================ CONCEPTS ============================ -->
+<h2>Core concepts</h2>
+
+<p class="concept"><b>The graph.</b> Every rule reads one graph built by <code>computeDwellingGraph()</code> in <code>adjacencyGraph.ts</code> from all floors at once. Nodes (<code>GraphNode</code>) are rooms, merged circulation/outdoor clusters, and stairs, each carrying <code>kind</code>, <code>roomTypeId</code>, <code>floor</code>, <code>cells</code>, and two fields other systems derive and rules just read: <code>hasExteriorEdge</code> and an optional <code>glazing</code> stat.</p>
+
+<p class="concept"><b>Two edge types.</b> <code>GraphEdge.viaDoor: boolean</code> is the whole model. A <b>touch</b> edge (<code>viaDoor: false</code>) means two spaces share a wall. An <b>access</b> edge (<code>viaDoor: true</code>) means an authored door joins them. Reachability rules (the H-family, ST2, G1, C1/C2, O1, DP1, PG1, F1) traverse access edges only — a shared wall with no door is not a connection. Character/proximity rules (S3, AC1, H4, S6, S5) read whichever edge type matches what they're describing: a physical fact reads touch, a circulation fact reads access.</p>
+
+<p class="concept"><b>Entrances as roots.</b> <code>graph.entryIds</code> holds the host-node id of every non-blocked entrance (ground floor only, re-derived on every graph build — nothing is cached). <code>ctx.hasEntrance = entryIds.length &gt; 0</code>. Every reachability rule checks this first and returns <code>[]</code> if it's false; E1 covers the no-entrance case with its own note instead.</p>
+
+<p class="concept"><b>The RuleContext.</b> <code>buildContext(graph)</code> runs once per <code>validate()</code> call and builds <code>ctx</code>, which every rule's <code>check(graph, ctx)</code> receives: <code>ctx.adj</code> (an access-only adjacency map — built by iterating <code>graph.edges</code> and adding both directions only where <code>e.viaDoor</code> is true), <code>ctx.viaStairAdj</code> (the same, but only edges where <code>e.viaStair</code> is also true — isolates a stair's floor-above connections from its same-floor ones), <code>ctx.degree(id)</code> (= <code>ctx.adj.get(id)?.size</code>, i.e. door count), <code>ctx.reachableFrom(seeds, blocked?)</code> (the BFS primitive described below), and <code>ctx.is.*</code> — type predicates (<code>bedroom</code>, <code>bathroom</code>, <code>kitchen</code>, <code>living</code>, <code>stair</code>, <code>outdoor</code>, <code>circulation</code>, <code>roomOrStair</code>, <code>public</code>, <code>habitable</code>) built from simple <code>roomTypeId</code>/<code>kind</code> matches.</p>
+
+<p class="concept"><b>The blocked-BFS pattern.</b> <code>ctx.reachableFrom(seeds, blocked?)</code> is a multi-source BFS over <code>ctx.adj</code>. Seeds are always entered regardless of <code>blocked</code>; during the walk, any neighbour for which <code>blocked(node)</code> is true is never added to the visited set or queue. Five rules (H2, H3, H6, G1, S7) call this twice — once with no <code>blocked</code> argument (the full reachable set) and once with one room type blocked as an intermediate — then compare the two sets. A node reachable in the first call but not the second can only be reached by crossing the blocked type.</p>
+
+<p class="concept"><b>The <code>edgeViolations()</code> helper.</b> Five rules (H4, S6, S3, AC1, S5) are pure edge-matching checks and share one function: <code>edgeViolations(graph, ctx, ruleId, severity, matchFn, access = false, excludeAccessCovered = false)</code>. It filters <code>graph.edges</code> by <code>viaDoor</code> matching the <code>access</code> flag, resolves each edge's two endpoint nodes via <code>ctx.nodesById</code>, and applies <code>matchFn(a, b)</code> (usually built with the small symmetric helper <code>pair(p, q, a, b) = (p(a)&amp;&amp;q(b)) || (p(b)&amp;&amp;q(a))</code>, so edge direction doesn't matter). When <code>excludeAccessCovered</code> is set, it first builds a <code>Set</code> of every access-edge pair (keyed by the order-independent <code>pairKey(a, b)</code>) and skips any touch edge that's also in it — the exact mechanism that keeps H4 (door) and S6 (wall) from ever both firing on the same boundary.</p>
+
+<p class="concept"><b>The depth/hop machinery.</b> <code>accessDepths(graph, seeds)</code> is a 0-1 BFS (array-as-deque) over access edges, independent of <code>ctx.adj</code>. Its weighting: entering a stair node costs 1 hop, leaving one costs 0, everything else costs 1 — so a floor transition costs exactly one hop in total, not two. <code>computeEntranceDepths(graph)</code> is just <code>accessDepths(graph, graph.entryIds)</code>. DP1, PG1, and F1 all build on this one function (F1 with a different seed list).</p>
+
+<p class="concept"><b>Severity tiers.</b> Every rule carries <code>severity: "hard" | "soft" | "note"</code>. Hard renders the dwelling uninhabitable or breaks near-universal code. Soft departs from empirical practice or comfort norms. Note characterizes a recognized pattern without judging it. <code>validate(graph)</code> runs all 35 <code>RULES</code> entries and concatenates every <code>Violation</code> they return; nothing here ever blocks placement — it only runs on "Check Layout" and only reports.</p>
+
+<div class="index">
+<b class="idx-hard">Hard (10)</b> — D1, E2, H1, H2, H3, H4, H6, P1, P2, ST2<br>
+<b class="idx-soft">Soft (18)</b> — A1, AC1, C1, C2, D2, DP1, F1, G1, G2, MB1, N1, O1, PG1, S1, S2, S3, ST1, W1<br>
+<b class="idx-note">Note (7)</b> — DR1, DR2, E1, P3, S5, S6, S7
+</div>
+
+<!-- ============================ RULES ============================ -->
+<h2>The rules</h2>
+
+<div class="rule">
+  <h3><span class="rid note">E1</span><span class="name">Entrance required to validate</span><span class="tier note">Note</span></h3>
+  <p><b>Why</b> Reachability is measured from the entrance; with none placed there's nothing to measure from, so this one note replaces the reachability flags instead of leaving them silently absent.</p>
+  <p><b>Code</b> <code>check(graph, ctx)</code> returns <code>[]</code> if <code>ctx.hasEntrance</code> is true (set in <code>buildContext()</code> as <code>graph.entryIds.length &gt; 0</code>). The description branches on <code>graph.entrances.length &gt; 0</code> — entrances exist but are all blocked vs. none were ever placed — picking between a custom string and the static <code>RULES_BY_ID.E1.description</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">E2</span><span class="name">Entrance blocked</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> An entrance whose edge got built over no longer opens to the outside.</p>
+  <p><b>Code</b> <code>graph.entrances.filter(e =&gt; e.blocked).map(...)</code> — one violation per blocked entrance, carrying <code>entranceIds: [e.id]</code> and <code>nodeIds: [e.hostId]</code>. The <code>blocked</code> flag isn't computed in <code>rules.ts</code> at all — it lives on <code>EntranceStatus</code> in <code>adjacencyGraph.ts</code>, re-tested against <code>exteriorEdges()</code> on every graph build, so a room built later against the entrance invalidates it with zero rules-side bookkeeping.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid note">DR1</span><span class="name">No doors placed</span><span class="tier note">Note</span></h3>
+  <p><b>Why</b> Reachability is door-based, so a plan with rooms and zero doors floods H1 on every room; this note explains why before that flood looks like a bug.</p>
+  <p><b>Code</b> <code>if (graph.doorCount &gt; 0) return [];</code> then <code>if (!graph.nodes.some(n =&gt; ctx.is.room(n))) return [];</code> (nothing to explain if there are no rooms yet either). <code>doorCount</code> is a field on <code>DwellingGraph</code>, the total authored-door count across all floors, computed in <code>adjacencyGraph.ts</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid note">DR2</span><span class="name">Over-doored bedroom</span><span class="tier note">Note</span></h3>
+  <p><b>Why</b> A bedroom with three or more doors is unusual — most carry one, sometimes two for an en-suite — and starts costing furnishable wall space and privacy.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.bedroom(n) &amp;&amp; ctx.degree(n.id) &gt;= 3)</code>. The message is built per-node with the live count interpolated (<code>`Bedroom has ${ctx.degree(n.id)} doors...`</code>) rather than the static <code>RULES_BY_ID</code> string, since the number varies.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">P1</span><span class="name">Bathroom required</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> Basic program requirement — a dwelling with no sanitary room isn't habitable.</p>
+  <p><b>Code</b> <code>graph.nodes.some(ctx.is.bathroom)</code> — one boolean across the whole graph, independent of floor or reachability. <code>ctx.is.bathroom</code> matches <code>roomTypeId</code> against <code>["bathroom_small", "bathroom_large"]</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">P2</span><span class="name">Kitchen required</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> Basic program requirement.</p>
+  <p><b>Code</b> Identical shape to P1, with <code>ctx.is.kitchen</code> (<code>roomTypeId === "kitchen"</code>).</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid note">P3</span><span class="name">More than one kitchen</span><span class="tier note">Note</span></h3>
+  <p><b>Why</b> Unusual for a single dwelling, not wrong (shared house, granny flat).</p>
+  <p><b>Code</b> <code>graph.nodes.filter(ctx.is.kitchen).length &lt;= 1</code> returns <code>[]</code>; otherwise one dwelling-level note with <code>layout: true</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">MB1</span><span class="name">Sleeping floor without a bathroom</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A sleeping floor with no toilet means a stair trip at night — a comfort issue, not a code failure, and it must never double up with P1's total-absence case.</p>
+  <p><b>Code</b> Guards first on <code>graph.nodes.some(ctx.is.bathroom)</code> — bails to <code>[]</code> entirely if no bathroom exists anywhere (P1 already owns that). Then iterates <code>new Set(graph.nodes.map(n =&gt; n.floor))</code>; per floor, filters <code>onFloor</code>, checks <code>beds = onFloor.filter(ctx.is.bedroom)</code> against <code>!onFloor.some(ctx.is.bathroom)</code>. One violation per offending floor, <code>nodeIds</code> set to that floor's bedroom ids.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">H1</span><span class="name">Orphaned room</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> A room with no doored path from any entrance can't be used.</p>
+  <p><b>Code</b> <code>const reach = ctx.reachableFrom(ctx.entryIds)</code>, no <code>blocked</code> argument — the unconstrained multi-source BFS over <code>ctx.adj</code>. <code>graph.nodes.filter(n =&gt; ctx.is.room(n) &amp;&amp; !reach.has(n.id))</code>. This is the simplest consumer of <code>reachableFrom</code>; every other reachability rule builds on the same call with a <code>blocked</code> predicate added.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">H2</span><span class="name">Reachable only through a bathroom</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> The only doored route to this space crosses a bathroom — a privacy and practicality failure.</p>
+  <p><b>Code</b> <code>const full = ctx.reachableFrom(ctx.entryIds)</code> and <code>const noBath = ctx.reachableFrom(ctx.entryIds, ctx.is.bathroom)</code> — the second call passes <code>ctx.is.bathroom</code> as the <code>blocked</code> predicate, so bathroom nodes are never walked <i>through</i> during that BFS (they can still be entered as a seed or as a leaf, just not crossed). Filter: <code>ctx.is.roomOrStair(n) &amp;&amp; !ctx.is.bathroom(n) &amp;&amp; full.has(n.id) &amp;&amp; !noBath.has(n.id)</code> — present in the unconstrained set, absent from the blocked one.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">H3</span><span class="name">Reachable only through a bedroom</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> Same failure mode as H2 for bedrooms, except a bathroom reached only through its own bedroom is an en-suite, not a failure, so bathrooms are exempt from this one.</p>
+  <p><b>Code</b> Same two-<code>reachableFrom</code> pattern with <code>ctx.is.bedroom</code> as the blocked predicate. The filter adds <code>&amp;&amp; !ctx.is.bathroom(n)</code> on top of <code>&amp;&amp; !ctx.is.bedroom(n)</code>, so a bathroom that only survives via a bedroom-crossing path is deliberately excluded here — S7 flags exactly that excluded case, positively.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">H4</span><span class="name">Direct bathroom–kitchen door</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> A door straight from food preparation into a toilet is a hygiene hazard.</p>
+  <p><b>Code</b> <code>edgeViolations(graph, ctx, "H4", "hard", (a,b) =&gt; pair(ctx.is.bathroom, ctx.is.kitchen, a, b), true)</code>. The trailing <code>true</code> is the <code>access</code> parameter — <code>edgeViolations</code> keeps only edges where <code>e.viaDoor === true</code>, so H4 never sees a sealed shared wall at all.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid note">S6</span><span class="name">Shared wet wall</span><span class="tier note">Note</span></h3>
+  <p><b>Why</b> The positive counterpart to H4: a kitchen and bathroom sharing a wall with no door is efficient plumbing (stacked riser), worth confirming rather than flagging.</p>
+  <p><b>Code</b> <code>edgeViolations(graph, ctx, "S6", "note", pair(ctx.is.bathroom, ctx.is.kitchen), false, true)</code> — <code>access=false</code> reads touch edges; the trailing <code>true</code> is <code>excludeAccessCovered</code>, which builds <code>accessPairs = new Set(graph.edges.filter(e =&gt; e.viaDoor).map(e =&gt; pairKey(e.a, e.b)))</code> and skips any touch pair also present there. This is the exact mechanism that keeps H4 and S6 from co-firing on one boundary.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">H6</span><span class="name">Reachable only through outdoor space</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> A room reachable only by crossing a balcony or terrace is weather-dependent before anyone can use it.</p>
+  <p><b>Code</b> Same two-<code>reachableFrom</code> pattern, <code>ctx.is.outdoor</code> blocked. No extra exclusion needed in the filter (unlike H2/H3) because <code>ctx.is.roomOrStair</code> only matches <code>kind === "room" || kind === "stair"</code>, and outdoor spaces are <code>kind: "cluster"</code> — structurally outside the target set already.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">C1</span><span class="name">Orphaned corridor</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A circulation cluster with no doors onto it is dead space — a design flaw, not uninhabitability, hence soft (demoted from an earlier hard version).</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.circulation(n) &amp;&amp; ctx.degree(n.id) === 0)</code>. <code>ctx.is.circulation</code> matches <code>kind === "cluster" &amp;&amp; roomTypeId === "circulation"</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">C2</span><span class="name">Under-used corridor</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A corridor with exactly one door doesn't circulate — you step in and back out.</p>
+  <p><b>Code</b> Identical to C1's filter with <code>ctx.degree(n.id) === 1</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">A1</span><span class="name">Circulation below accessible width</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> SIA 500 wants ~1.2 m clear width for accessibility (2 grid cells); nothing else in the ruleset checks width, so a plan could have 600 mm corridors with 1200 mm doors opening onto them.</p>
+  <p><b>Code</b> Iterates circulation nodes and calls the module-level helper <code>narrowWidthCells(n.cells)</code>, defined outside the rules table. It builds a <code>Set</code> of <code>"cx,cz"</code> keys for the cluster's cells, then for every cell tests the four candidate 2×2 blocks that could contain it (offsets <code>dx,dz ∈ {-1,0}</code>) via <code>fits2x2(mx,mz)</code>, which checks all four corners of that block are present in the set. A cell is narrow if none of the four blocks is fully occupied by the cluster. The message interpolates <code>narrow.length</code>; <code>nodeIds</code> is just the cluster id — narrow cells aren't individually highlighted.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">O1</span><span class="name">Unreachable outdoor space</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A balcony or terrace with no door onto it can't be used — the outdoor mirror of C1.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.outdoor(n) &amp;&amp; ctx.degree(n.id) === 0)</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">ST1</span><span class="name">Stair unconnected at an end</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A stair should be doored at both the floor it leaves and the floor it arrives at.</p>
+  <p><b>Code</b> Per stair node: <code>const top = ctx.viaStairAdj.get(n.id)?.size ?? 0</code> and <code>const bottom = ctx.degree(n.id) - top</code>. <code>ctx.viaStairAdj</code> is built alongside <code>ctx.adj</code> in <code>buildContext()</code> — same door-edge iteration, but only edges where <code>e.viaStair</code> is also true get added, isolating the floor-above side from the same-floor side. <code>missing</code> collects <code>"bottom"</code>/<code>"top"</code> by name into the message.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">ST2</span><span class="name">Stair unreachable</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> An unreachable stair cuts off whatever floor it serves — H1 for vertical circulation.</p>
+  <p><b>Code</b> Same reachable-set check as H1 (<code>ctx.reachableFrom(ctx.entryIds)</code>, no blocking), filtered to <code>ctx.is.stair(n)</code> instead of <code>ctx.is.room(n)</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">D1</span><span class="name">No exterior wall — no daylight</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> A habitable room with no exterior wall gets no daylight; no interior arrangement fixes that.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.habitable(n) &amp;&amp; !n.hasExteriorEdge)</code>. <code>ctx.is.habitable</code> = <code>bedroom(n) || isPublic(n)</code> (living/recreation). <code>hasExteriorEdge</code> is <b>not</b> computed in <code>rules.ts</code> — it's a <code>GraphNode</code> boolean set once per floor in <code>adjacencyGraph.ts</code>, derived from the same <code>buildSpaceTargets()</code> occupied-cell set the door system uses, which is what makes it correctly exclude edges facing a stairwell hole.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">D2</span><span class="name">Kitchen without ventilation</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> Same check for kitchens, soft not hard — internal kitchens are common and get mechanical ventilation.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.kitchen(n) &amp;&amp; !n.hasExteriorEdge)</code> — same field as D1, different predicate and tier.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">W1</span><span class="name">Glazing below daylight target</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A room's actual glazing area falls short of its type's target, even though it does have exterior wall.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; n.hasExteriorEdge &amp;&amp; n.glazing?.belowTarget)</code>. <code>node.glazing</code> is a <code>GlazingStat</code> populated from <code>floor.windowStats</code>, itself the output of <code>computeWindows()</code> in <code>windows.ts</code> — W1 never recomputes windows, it just reads the flag. That function looks up <code>WINDOW_CONFIG[roomTypeId]</code> (living/recreation <code>1/6</code> full-height; bedroom/kitchen <code>1/10</code> framed; kitchen additionally fixed at <code>fixedEdges: 2</code>), computes <code>floorArea = cells.length * 0.36</code>, computes <code>perEdge = perEdgeGlazing(variant, floorHeight)</code> (<code>0.6 * (floorHeight - 0.9)</code> full-height, minus another <code>0.9</code> for a framed lintel), derives <code>edgesNeeded = ceil(floorArea * targetRatio / perEdge)</code> clamped up to <code>MIN_WINDOW_EDGES = 2</code>, then greedily bands the longest available exterior runs first. <code>belowTarget = placed &lt; targetEdges</code>. The <code>hasExteriorEdge</code> guard keeps W1 from double-firing on a room D1/D2 already own.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">G1</span><span class="name">Guest access to a bathroom</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A guest should be able to reach a toilet without crossing someone's bedroom — a dwelling-wide question, not a per-room one.</p>
+  <p><b>Code</b> Guarded first on <code>bathrooms.length === 0</code> (bail to <code>[]</code>; P1 owns total absence). Then <code>const noBed = ctx.reachableFrom(ctx.entryIds, ctx.is.bedroom)</code> and checks <code>bathrooms.some(n =&gt; noBed.has(n.id))</code>. If none survive, one dwelling-level violation (<code>layout: true</code>, empty <code>nodeIds</code>) fires.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">G2</span><span class="name">Entrance into a private room</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> The front door opening straight into a bedroom or bathroom skips the usual public threshold — deliberate in studios, hence soft.</p>
+  <p><b>Code</b> Iterates <code>graph.entrances</code> directly (not the reachability graph); for each non-blocked entrance with a <code>hostId</code>, looks up the host node and tests <code>ctx.is.bedroom(host) || ctx.is.bathroom(host)</code>. Carries both <code>nodeIds: [host.id]</code> and <code>entranceIds: [e.id]</code> so both the room and the marker highlight.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">S1</span><span class="name">Over-connected outdoor space</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> An outdoor space with more than two doors onto it is usually being used as a through-route, not a leaf.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.outdoor(n) &amp;&amp; ctx.degree(n.id) &gt; 2)</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">S2</span><span class="name">Under-connected living room</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A living room reached by one door or none isn't functioning as the social hub it's meant to be.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.living(n) &amp;&amp; ctx.degree(n.id) &lt;= 1)</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">S3</span><span class="name">Bedroom beside a social room or kitchen</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A bedroom directly touching a kitchen, living room or recreation room bleeds noise and compromises privacy.</p>
+  <p><b>Code</b> <code>edgeViolations(graph, ctx, "S3", "soft", (a,b) =&gt; pair(ctx.is.bedroom, n =&gt; ctx.is.kitchen(n) || ctx.is.public(n), a, b))</code> — called with no <code>access</code>/<code>excludeAccessCovered</code> args, so it defaults to touch edges with no dedup against doored pairs; fires whether or not there's also a door on that wall.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">AC1</span><span class="name">Bedroom beside a stair</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> Stairs carry impact and airborne noise (SIA 181); replaced an earlier rule (two bedrooms touching) that had no defensible grounding.</p>
+  <p><b>Code</b> <code>edgeViolations(graph, ctx, "AC1", "soft", pair(ctx.is.bedroom, ctx.is.stair))</code> — same touch-edge default as S3, scoped to stairs specifically so it never overlaps S3 (bedroom-vs-recreation is S3's case, not AC1's).</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid note">S5</span><span class="name">Open-plan kitchen–living</span><span class="tier note">Note</span></h3>
+  <p><b>Why</b> A doored kitchen–living connection reads as open-plan — confirmed, not flagged.</p>
+  <p><b>Code</b> <code>edgeViolations(graph, ctx, "S5", "note", pair(ctx.is.kitchen, ctx.is.living), true)</code> — <code>access=true</code> reads door edges only; a sealed touching wall earns nothing.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid note">S7</span><span class="name">En-suite bathroom</span><span class="tier note">Note</span></h3>
+  <p><b>Why</b> A bathroom reachable only through its own bedroom is an en-suite — the exact case H3 exempts, named positively here.</p>
+  <p><b>Code</b> Recomputes its own <code>full</code>/<code>noBed</code> pair (independent call, not shared with H3's) and filters <code>ctx.is.bathroom(n) &amp;&amp; full.has(n.id) &amp;&amp; !noBed.has(n.id)</code> — the mirror image of H3's exclusion clause.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">DP1</span><span class="name">Unusually deep room</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A room five or more doored hops from the entrance is unusually buried in the plan (space-syntax depth).</p>
+  <p><b>Code</b> <code>const depths = computeEntranceDepths(graph)</code>, then flags rooms with <code>d &gt;= DEEP_ROOM_THRESHOLD_HOPS</code> (= 5). <code>computeEntranceDepths</code> is just <code>accessDepths(graph, graph.entryIds)</code> — a 0-1 BFS (array-as-deque) over an access-only adjacency map built independently of <code>ctx.adj</code>. Weighting: <code>stepCost(from,to) = isStair.has(to) ? 1 : isStair.has(from) ? 0 : 1</code> — entering a stair costs 1, leaving one costs 0. Relaxations with weight 0 are <code>unshift</code>ed to the front of the deque (processed next), weight-1 relaxations are <code>push</code>ed to the back — standard 0-1 BFS.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">N1</span><span class="name">Circulation-heavy layout</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> Too much of the interior given over to circulation is inefficient — every circulation m² is cost without habitable benefit.</p>
+  <p><b>Code</b> <code>computeCirculationFraction(graph)</code> sums each node's <code>cells.length</code> into <code>denom</code>, skipping outdoor clusters entirely (<code>continue</code>, excluded from both sides), and additionally into <code>circ</code> when the node is a circulation cluster or a stair. Returns <code>circ/denom</code>, or <code>null</code> if <code>denom === 0</code>. The rule compares that against <code>CIRCULATION_FRACTION_MAX</code> (= 0.25). The same function backs the always-on "Circulation: N%" line in <code>validationPanel.ts</code>, so the flag and the printed number can never disagree.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">PG1</span><span class="name">Inverted privacy gradient</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> Hillier &amp; Hanson's genotype expects public rooms shallower than bedrooms; this flags the inversion.</p>
+  <p><b>Code</b> <code>publicVsBedroomDepth(graph, depths)</code> — <code>depths</code> comes from a fresh call to <code>computeEntranceDepths(graph)</code>, not shared with DP1's. It computes <code>meanOf(pred)</code> twice, once for <code>roomTypeId ∈ {living, recreation}</code> and once for <code>{bedroom_small, bedroom_large}</code>, filtering to nodes that actually have a depth entry (i.e. are reachable) before averaging. Returns <code>null</code> if either set is empty. Fires when <code>publicMean &gt; bedroomMean</code>; both means also print in the report regardless.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">F1</span><span class="name">Far from an exit</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A room far from any exit is an egress concern — approximated as a hop count, not fire-code metres of travel distance.</p>
+  <p><b>Code</b> <code>const stairIds = graph.nodes.filter(ctx.is.stair).map(n =&gt; n.id)</code>, then <code>accessDepths(graph, [...ctx.entryIds, ...stairIds])</code> — the exact same 0-1 BFS function DP1 uses, called with a different seed list: entrances <i>and</i> every stair, instead of entrances alone. Flags rooms with <code>d &gt; ESCAPE_DEPTH_MAX</code> (= 4). Because it's the same function as DP1 with only the seeds changed, the two rules can diverge sharply on multi-floor plans, where a room sits deep from the entrance but close to a stair.</p>
+</div>
+
+<div class="footer-note">Tier counts: 10 hard, 18 soft, 7 note. Written from <code>src/core/rules.ts</code> and <code>src/core/windows.ts</code>; every id, tier, and constant here matches the code as built.</div>
+
+</div>

@@ -1,0 +1,354 @@
+<meta charset="utf-8">
+<title>Layout Validation Rules — Working Notes</title>
+<style>
+  :root {
+    --ink: #1c1a17;
+    --muted: #6b645b;
+    --line: #d8d2c8;
+    --line-soft: #ece7de;
+    --hard: #d32f2f;
+    --soft: #e6a100;
+    --soft-text: #a3690a;
+    --note: #2e7d32;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    color: var(--ink);
+    background: #fff;
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.4pt;
+    line-height: 1.58;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1, h2, .display {
+    font-family: "Century Gothic", "Futura", "Segoe UI", Arial, sans-serif;
+    font-weight: 700;
+  }
+  @media screen {
+    body { background: #f4f1ec; }
+    .sheet { max-width: 205mm; margin: 0 auto; padding: 22mm 20mm; background: #fff; }
+  }
+
+  .cover, .toc { break-after: page; }
+  .appendix { break-before: page; }
+  h2.sec { break-after: avoid; }
+  .eg, .cal-row, .ref, tr { break-inside: avoid; }
+
+  /* Cover */
+  .cover { padding-top: 32mm; }
+  .cover .marks { display: flex; gap: 9px; margin-bottom: 24px; }
+  .cover .marks i { width: 24px; height: 24px; display: inline-block; }
+  .cover .marks .m1 { background: var(--hard); }
+  .cover .marks .m2 { background: var(--soft); }
+  .cover .marks .m3 { background: var(--note); border-radius: 50%; }
+  .cover h1 { font-size: 27pt; line-height: 1.12; margin: 0 0 10px; }
+  .cover .sub { font-size: 12pt; color: var(--muted); margin: 0 0 32px; font-weight: 400;
+                font-family: "Segoe UI", Arial, sans-serif; max-width: 138mm; line-height: 1.45; }
+  .cover .facts { border-top: 2px solid var(--ink); border-bottom: 1px solid var(--line); padding: 11px 0; }
+  .cover .facts div { display: flex; justify-content: space-between; padding: 3px 0; font-size: 9.6pt; }
+  .cover .facts .k { color: var(--muted); }
+
+  /* TOC */
+  .toc h2 { font-size: 15pt; border-bottom: 2px solid var(--ink); padding-bottom: 6px; margin: 0; }
+  .toc ol { list-style: none; padding: 0; margin: 14px 0 0; }
+  .toc > ol > li { padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 10.4pt; font-weight: 700;
+                   font-family: "Century Gothic", "Segoe UI", Arial, sans-serif; }
+  .toc .n { color: var(--hard); display: inline-block; width: 26px; }
+
+  /* Section headings */
+  h2.sec { font-size: 15.4pt; margin: 26px 0 4px; }
+  h2.sec:first-of-type { margin-top: 0; }
+  .sec-rule { height: 4px; background: var(--ink); width: 40px; margin: 0 0 13px; }
+  p { margin: 0 0 9px; }
+
+  /* Inline rule-id markers — bold, tier-coloured, no boxes */
+  .rid { font-weight: 700; font-family: "Century Gothic", "Segoe UI", Arial, sans-serif; }
+  .rid.hard { color: var(--hard); }
+  .rid.soft { color: var(--soft-text); }
+  .rid.note { color: var(--note); }
+
+  code { font-family: "Consolas", monospace; font-size: 9pt; background: var(--line-soft);
+         padding: 0.5px 4px; border-radius: 2px; }
+
+  .eg { border-left: 3px solid var(--line); padding: 3px 0 3px 12px; margin: 9px 0 12px; color: #3a352f; font-size: 9.9pt; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 9.2pt; margin: 8px 0; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line-soft); }
+  th { border-bottom: 1.5px solid var(--ink); font-size: 8.2pt; text-transform: uppercase;
+       letter-spacing: 0.05em; color: var(--muted); }
+  td.rid-cell { font-weight: 700; white-space: nowrap; font-family: "Century Gothic", "Segoe UI", Arial, sans-serif; }
+  td.tier-cell { white-space: nowrap; }
+  .tier { display: inline-block; font-size: 7.2pt; font-weight: 700; letter-spacing: 0.06em;
+          text-transform: uppercase; color: #fff; padding: 2px 6px; border-radius: 2px;
+          font-family: "Segoe UI", Arial, sans-serif; }
+  .tier.hard { background: var(--hard); }
+  .tier.soft { background: var(--soft); }
+  .tier.note { background: var(--note); }
+
+  ul.plain { margin: 6px 0; padding-left: 18px; }
+  ul.plain li { margin-bottom: 6px; }
+
+  .ref { margin: 0 0 10px; padding-left: 18px; text-indent: -18px; font-size: 9.6pt; }
+  .ref .use { display: block; text-indent: 0; color: var(--muted); font-size: 9pt; margin-top: 1px; }
+  .small { font-size: 9pt; color: var(--muted); }
+</style>
+
+<div class="sheet">
+
+<!-- ============================ COVER ============================ -->
+<div class="cover">
+  <div class="marks"><i class="m1"></i><i class="m2"></i><i class="m3"></i></div>
+  <h1>Layout Validation Rules</h1>
+  <p class="sub">How the 35 checks in the configurator's layout validator came together — the order they arrived in, what each one answers, and what earlier versions got wrong.</p>
+  <div class="facts">
+    <div><span class="k">Rules</span><span>35, told as ten passages, plus a reference appendix</span></div>
+    <div><span class="k">Tiers</span><span><span class="tier hard">Hard</span>&nbsp; <span class="tier soft">Soft</span>&nbsp; <span class="tier note">Note</span></span></div>
+    <div><span class="k">Written from</span><span><code>src/core/rules.ts</code>, <code>src/core/windows.ts</code></span></div>
+    <div><span class="k">Date</span><span>July 2026</span></div>
+  </div>
+</div>
+
+<!-- ============================ TOC ============================ -->
+<div class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><span class="n">1</span>The tool and the graph</li>
+    <li><span class="n">2</span>Entrances</li>
+    <li><span class="n">3</span>Reachability: what "connected" means</li>
+    <li><span class="n">4</span>Reachable, but reachable how</li>
+    <li><span class="n">5</span>A door in the wrong place</li>
+    <li><span class="n">6</span>Measuring depth</li>
+    <li><span class="n">7</span>Circulation: corridors, balconies, width</li>
+    <li><span class="n">8</span>Adjacency by touch</li>
+    <li><span class="n">9</span>Program</li>
+    <li><span class="n">10</span>Daylight and glazing</li>
+    <li><span class="n">A</span>All 35 rules, for lookup</li>
+    <li><span class="n">B</span>Metrics the report prints</li>
+    <li><span class="n">C</span>Assumptions and limits</li>
+    <li><span class="n">D</span>References</li>
+  </ol>
+</div>
+
+<!-- ============================ 1 ============================ -->
+<h2 class="sec">1 · The tool and the graph</h2>
+<div class="sec-rule"></div>
+
+<p>You place rooms, circulation, outdoor space and stairs on a 0.6 m grid across as many floors as you want, then put entrances on exterior edges and doors on interior ones. Pressing Check Layout runs all 35 rules and shows what they found in a written panel, a bubble diagram, and coloured tints on the shells in the 3D view. The checks are advisory: they run when you ask for them, and they never stop you placing anything.</p>
+
+<p>Every rule reads one graph built from the whole dwelling. Its nodes are rooms, merged circulation and outdoor clusters, and stairs. Two spaces can be joined by a touch edge, meaning they share a wall, or an access edge, meaning a door connects them — a distinction the next section is really about, because most of what follows depends on it. Entrances sit on ground-floor exterior edges and are re-derived on every run, so building a room against an old entrance invalidates it.</p>
+
+<p>What follows is roughly the order the rules arrived in. Most of them answer a question the previous one raised, or correct something the previous one got wrong. Each carries one of three tiers: hard, meaning the dwelling fails on it; soft, meaning the plan is unusual but often works fine anyway; or a note, meaning the tool recognised a pattern and is telling you it saw it, without judging. I'll say more about each tier as the rules that carry it come up.</p>
+
+<!-- ============================ 2 ============================ -->
+<h2 class="sec">2 · Entrances</h2>
+<div class="sec-rule"></div>
+
+<p>Before anything else works you need a door to the outside. <span class="rid note">E1</span> is the mildest rule in the set: if no entrance exists yet, it says so once, in place of every reachability flag that would otherwise fire with nothing to measure from. If you placed one but it's since been blocked, the message says that instead: something built across the entrance's edge, which needs a different fix than placing one from scratch.</p>
+
+<p><span class="rid hard">E2</span> is what fires when a single entrance gets blocked this way. An entrance binds to one exterior cell edge; put a room or a cluster against that edge and it now faces an interior space, so nobody can come in through it. Entrance validity is re-derived from the exterior-edge geometry on every run, so a room built long after the entrance still catches it.</p>
+
+<!-- ============================ 3 ============================ -->
+<h2 class="sec">3 · Reachability: what "connected" means</h2>
+<div class="sec-rule"></div>
+
+<p>The first real question a plan raises is whether you can get everywhere in it. <span class="rid hard">H1</span> is the direct check: is there a path of doors, including doors onto stairs, from an entrance to this room? If not, the room is orphaned — nobody can walk into it, so it fails, hard.</p>
+
+<p>That rule only means what it says if "connected" means something real. My first version of the graph counted two rooms as connected whenever they shared a wall, which isn't the same claim. A wall between two rooms means they happen to be next to each other; it doesn't mean you can walk between them. So I moved reachability off shared walls and onto doors: a touch edge in the graph now just records that two spaces share a wall, and only an access edge — an authored door joining them — counts for anything <span class="rid hard">H1</span> or its relatives compute. Circulation stopped being a byproduct of the floor plan's geometry and became something you state on purpose, one door at a time.</p>
+
+<p>That change has a visible cost on a plan you're still building. Place a dozen rooms with no doors between any of them and <span class="rid hard">H1</span> flags every one, because none of them are connected to anything yet. <span class="rid note">DR1</span> exists to explain that wall of red so it doesn't read as a bug. It's a note — the lightest of the three tiers, meaning the tool isn't judging anything, just telling you what it saw — and it says plainly what's going on: no doors placed yet, so nothing is reachable yet. It goes quiet the moment you place your first door.</p>
+
+<p>Stairs get the identical treatment. <span class="rid soft">ST1</span> wants a door at both ends of a stair — one on the floor it leaves, one on the floor it arrives at, the second reached through the projection of the stairwell hole onto the floor above — and names whichever end is missing. <span class="rid hard">ST2</span> is <span class="rid soft">ST1</span>'s harder cousin, and it's really <span class="rid hard">H1</span> for vertical circulation: no doored route from any entrance reaches the stair, so the floor it serves is cut off along with it.</p>
+
+<p>I also tried, early on, requiring a dedicated corridor between any two connected rooms. That rule doesn't exist anymore. A door straight from a living room into a bedroom is as legitimate a route as one that passes through a hallway, and plenty of working flats are built that way. Reachability only checks whether a path of doors exists between two rooms.</p>
+
+<!-- ============================ 4 ============================ -->
+<h2 class="sec">4 · Reachable, but reachable how</h2>
+<div class="sec-rule"></div>
+
+<p>Once "reachable" meant something, a sharper question followed: reachable by what route? A room can have a perfectly good doored path to the entrance and still be badly placed, if that path happens to run through somebody's bedroom or through the one bathroom in the flat.</p>
+
+<p>Three rules ask this the same way. Run the breadth-first search from the entrances once, normally, to get the full reachable set. Run it again with one room type barred from being crossed — you can still enter a room of that type, since it might be your destination, but you can't walk through it to get somewhere else. Anything present in the first set and missing from the second can only be reached by crossing the barred type.</p>
+
+<div class="eg">
+  <p style="margin:0">A small example. The entrance is on the living room. A door leads to a bathroom, and a door from that bathroom leads to a bedroom with no other door of its own. The full search reaches all three rooms. Run it again with bathrooms barred as through-routes, and it reaches the living room and stops there — the bathroom is off limits as a route now, even though you could still walk into it as a destination. The bedroom is in the first set and missing from the second, so <span class="rid hard">H2</span> flags it: the only way in is through the bathroom. Add a second door straight from the living room to the bedroom, and the barred search now reaches it too, and <span class="rid hard">H2</span> goes quiet.</p>
+</div>
+
+<p><span class="rid hard">H3</span> runs the same search with bedrooms barred, and it's the more consequential of the two — crossing someone's bedroom to get anywhere is a privacy failure, whether the room behind it is another bedroom or a stair. It caught something I hadn't intended, though: any bathroom reachable only through its own bedroom got hard-flagged. That isn't a mistake in the plan — it's what an en-suite looks like in this graph. So <span class="rid hard">H3</span> exempts bathrooms from the flag. What used to be a false failure became <span class="rid note">S7</span>, a note that just names the pattern: this bathroom is reached through its bedroom, and that's fine. <span class="rid hard">H3</span> still fires for every other room type, and it still fires for stairs — vertical circulation gated behind a bedroom door is the kind of thing this rule exists to catch.</p>
+
+<p>Exempting bathrooms from <span class="rid hard">H3</span> leaves an actual question unanswered: can a guest reach a toilet at all without crossing someone's private room? That's a dwelling-wide question, so it's a separate rule: <span class="rid soft">G1</span>, and it's the first soft rule in this account. A rule is soft when the plan has departed from ordinary practice without being unusable, and small flats built around one en-suite bathroom are common enough that hard would overstate the problem. <span class="rid soft">G1</span> runs the bedroom-barred search once for the whole dwelling and fires if no bathroom survives it.</p>
+
+<p>There's a second gap the barred searches leave, and it comes from how they treat their own starting point. You always enter through the room hosting the entrance — that's what walking in the front door means — so the search never bars the entrance's own host, even if it's a bedroom. A studio whose front door opens straight into its only bedroom never trips <span class="rid hard">H3</span>, which is correct, but it's still worth knowing about, so <span class="rid soft">G2</span> flags it directly: this entrance opens into a private room. Soft, because studios do this on purpose.</p>
+
+<p><span class="rid hard">H6</span> is the outdoor case of the same pattern — a room reachable only by crossing a balcony or terrace is at the mercy of the weather before anyone can use it — and it needs no extra guard the way <span class="rid hard">H2</span> and <span class="rid hard">H3</span> do: outdoor space is a cluster node, so it drops out of the room-and-stair target set on its own.</p>
+
+<!-- ============================ 5 ============================ -->
+<h2 class="sec">5 · A door in the wrong place</h2>
+<div class="sec-rule"></div>
+
+<p>A kitchen and a bathroom sharing a wall is ordinary practice: it's how the plumbing stays cheap, with both rooms stacked on one riser and short pipe runs. My first version of <span class="rid hard">H4</span> read the shared wall and flagged that arrangement. That was backwards: the hazard is a door straight from food preparation into a toilet. The wall on its own is fine. So I moved <span class="rid hard">H4</span> onto access edges: it now fires only when a door joins a bathroom and a kitchen, and leaves the shared-wall case alone.</p>
+
+<p>The wall case earned its own note instead, <span class="rid note">S6</span>, which fires where <span class="rid hard">H4</span> doesn't — a kitchen and bathroom sharing a wall with no door through it — so the two never land on the same boundary. The House-GAN failure mode behind the earlier version described a closet built inside a kitchen: a containment problem, and it never really supported flagging a shared wall in the first place.</p>
+
+<!-- ============================ 6 ============================ -->
+<h2 class="sec">6 · Measuring depth</h2>
+<div class="sec-rule"></div>
+
+<p>Space syntax has a way of measuring how buried a room is in a plan: count the doored steps from the entrance to get there. I compute that for every room, and <span class="rid soft">DP1</span> is the first thing built on it — flag any room five or more steps in. The threshold is <code>DEEP_ROOM_THRESHOLD_HOPS = 5</code>, and it's one of the numbers here I'd most like to be argued out of.</p>
+
+<p>Getting that count right needed one correction. A stair is a graph node like any room, so a plain count charges two hops for a floor change — one to enter the stair, one to leave it — and every room on the floor above drifts toward the threshold just by existing there. I weight the two differently: entering a stair costs a step, leaving one costs nothing, so a floor change costs one hop overall, the same as any other doored step. That keeps the threshold meaning what it meant on a single floor once a second one is added.</p>
+
+<p>Once every room has a depth, you can also ask about groups of rooms. Hillier and Hanson describe the depth pattern that recurs across a building type as its genotype: strip away the shape and what's left in common is which rooms sit shallow and which sit deep. For a dwelling the pattern holds fairly consistently — the rooms where you receive people sit near the entrance, and the rooms where you sleep sit further in, so a visitor is carried through the social part of the plan before reaching the private part. <span class="rid soft">PG1</span> tests for the inversion of that pattern: compare the mean depth of the public rooms, living and recreation, against the mean depth of the bedrooms, and flag if the public mean comes out larger — bedrooms shallower than the sitting room, so a guest reaches private space before social space. It needs at least one reachable room in each set, and it needs an entrance to measure from at all. Both means print in the report whether or not the rule fires, so the gradient is legible on the plans where <span class="rid soft">PG1</span> stays quiet too.</p>
+
+<p><span class="rid soft">F1</span> reuses the same hop-counting machinery for a different question: not how buried is this room socially, but how far is it from a way out. It seeds the same kind of search at every entrance and every stair together, since a stair is the way off whatever floor you're standing on, and flags anything past <code>ESCAPE_DEPTH_MAX = 4</code> hops from the nearest one. It counts door-hops on the access graph. Real fire code measures metres of travel distance and wants a second independent escape route as well; neither of those is modelled here. <span class="rid soft">F1</span> approximates the idea with a hop count.</p>
+
+<div class="eg">
+  <p style="margin:0">Take an entrance on the ground-floor living room, a door to a hall, a door from the hall onto a stair, and upstairs a corridor with a chain of doors running through two rooms to a bedroom. Counted from the entrance: hall at 1, stair at 2, corridor at 2 as well, since leaving the stair costs nothing, then 3, then 4, then the bedroom at 5 — <span class="rid soft">DP1</span> flags it. Counted from the stair, which <span class="rid soft">F1</span> also treats as a seed: the corridor is 0, then 1, then 2, and the bedroom sits 3 hops from a way out, so <span class="rid soft">F1</span> says nothing about it. The bedroom is deep in the social sense and close to an exit at the same time; the two rules report each half of that.</p>
+</div>
+
+<!-- ============================ 7 ============================ -->
+<h2 class="sec">7 · Circulation: corridors, balconies, width</h2>
+<div class="sec-rule"></div>
+
+<p>A corridor earns its floor area by connecting spaces, so the first two checks on circulation ask how well it's doing that. <span class="rid soft">C1</span> flags a circulation cluster with no doors onto it at all — dead space, circulating nothing. <span class="rid soft">C2</span> flags one with a single door, which lets you step in and step back out the way you came but joins nothing to anything. Both read access degree, the count of doors onto the cluster. Before reachability moved onto doors, degree counted the rooms a corridor happened to touch through sealed walls, so a corridor could sit surrounded by rooms and register as well connected while having no way in at all — neither rule could have caught that.</p>
+
+<p><span class="rid soft">C1</span> started out hard and isn't anymore. A dead corridor wastes plan area, but the flat around it still works, so hard overstated what the rule was finding. It's soft now, alongside <span class="rid soft">O1</span> — the same zero-degree condition applied to outdoor space instead of circulation, a balcony or terrace with no door onto it, unusable for the same reason a doorless corridor is.</p>
+
+<p><span class="rid soft">S1</span> sits at the other end of the same axis: an outdoor space with more than two doors onto it usually means it's being used as a route between rooms, when the ordinary use is stepping out and back. <span class="rid soft">S2</span> asks a related question about the living room — one door or none, when the room best positioned to be the flat's social hub is acting like a dead end instead. Both thresholds trace to the connection counts in House-GAN's Table 1, which were measured on physical adjacency; this model counts doors, so the numbers are approximate against that data.</p>
+
+<p>A well-connected corridor can still fail on a different axis: width. SIA 500 wants roughly 1.2 m of clear passage for a wheelchair, two cells on this grid, and nothing before <span class="rid soft">A1</span> looked at width at all — a plan could pass every other check with every corridor a single 600 mm cell wide, while the doors opening onto those corridors were 1200 mm.</p>
+
+<p>Counting neighbours doesn't find a narrow corridor reliably. Take an L-shaped corridor one cell wide. The cell at the corner has a neighbour to the west and a neighbour to the south, so by a neighbour count it looks the same as a cell in the middle of a proper two-wide hall, which also has neighbours on two axes. The corner is still a 600 mm passage. So <span class="rid soft">A1</span> asks about area instead: a cell has accessible width if it belongs to at least one 2×2 block of cells lying wholly inside the same cluster. Four such blocks contain any given cell, and if none of them is fully occupied by that cluster, the cell is narrow. A one-wide corridor fails at every cell, corner included, because no 2×2 square fits anywhere along a one-wide run. A two-wide corridor passes everywhere. A wide hall with a one-wide spur off it flags only the spur. <span class="rid soft">A1</span> reports once per cluster, with the count of narrow cells in the message, and it only looks at circulation — rooms come from fixed presets, and outdoor space is out of scope.</p>
+
+<!-- ============================ 8 ============================ -->
+<h2 class="sec">8 · Adjacency by touch</h2>
+<div class="sec-rule"></div>
+
+<p>A few checks read the shared wall itself, because the thing they're describing is a fact about adjacency. <span class="rid soft">S3</span> flags a bedroom sharing a wall with a kitchen, a living room or a recreation room — noise and privacy bleeding through a wall that a corridor or a service space could have absorbed instead.</p>
+
+<p>I had an earlier rule in the same family, flagging two bedrooms sharing a wall, and it didn't survive testing. Two quiet rooms next to each other is how most flats are built, and I couldn't find anything to ground a rule against it. What replaced it, <span class="rid soft">AC1</span>, targets something groundable: a bedroom sharing a wall with a stair, which carries footfall as impact noise through the structure and airborne noise through the air, and SIA 181's separation of noisy uses from quiet ones speaks directly to that case. <span class="rid soft">AC1</span> is scoped to stairs alone — a bedroom against a recreation room already goes through <span class="rid soft">S3</span>, since recreation counts as a public room there, and firing both on the same wall would add nothing.</p>
+
+<p><span class="rid note">S5</span> is the door version of a similar adjacency, and it isn't a warning: a door between a kitchen and a living room reads as an open-plan layout, and the note confirms the tool saw the pattern. A kitchen and living room that only share a sealed wall get nothing from <span class="rid note">S5</span>, since a sealed wall between them says nothing about how the plan is meant to work.</p>
+
+<p>Two more notes just flag counts, without judging them. <span class="rid note">P3</span> mentions when a dwelling has more than one kitchen — unusual for a single flat, common enough in a shared house or a granny annex. <span class="rid note">DR2</span> mentions a bedroom with three or more doors, which starts to eat into both the wall space a bedroom needs for furniture and the privacy it's supposed to offer; most bedrooms carry one door, sometimes two if there's an en-suite behind one of them.</p>
+
+<!-- ============================ 9 ============================ -->
+<h2 class="sec">9 · Program</h2>
+<div class="sec-rule"></div>
+
+<p>A few checks aren't about the graph's shape at all, just about what's present. <span class="rid hard">P1</span> and <span class="rid hard">P2</span> ask whether a bathroom and a kitchen exist anywhere in the dwelling; without either one the flat doesn't work, hard, and there isn't much more to say about them.</p>
+
+<p><span class="rid soft">MB1</span> is a softer version of the same idea, scoped to one floor at a time: bedrooms present, no bathroom on that floor, which on a multi-storey flat means an inconvenient trip down the stairs at three in the morning, so it's soft. It only runs once a bathroom exists somewhere in the dwelling — a bathroom-less flat is already <span class="rid hard">P1</span>'s problem, and <span class="rid soft">MB1</span> is gated on <span class="rid hard">P1</span> being satisfied so the two don't both fire over the same missing room.</p>
+
+<!-- ============================ 10 ============================ -->
+<h2 class="sec">10 · Daylight and glazing</h2>
+<div class="sec-rule"></div>
+
+<p><span class="rid hard">D1</span> asks whether a bedroom, living room or recreation room has any exterior wall at all — no facade means no daylight, and no interior arrangement fixes that, so it's hard. <span class="rid soft">D2</span> is the same question for kitchens, soft instead of hard, because an internal kitchen is common enough and gets mechanically ventilated as a matter of course.</p>
+
+<p><span class="rid hard">D1</span> depended on getting "exterior wall" right, and my first version of that test didn't handle stairwells correctly. An edge facing the stairwell hole used to count as exterior, so a room on an upper floor bordering the opening passed <span class="rid hard">D1</span> with no real facade, and the window generator could put glass on an edge that faced straight down an open shaft. I fixed the edge classification to read the same occupancy map the door system already used, which understands a stairwell hole as occupied space, and <span class="rid hard">D1</span> now catches those rooms.</p>
+
+<p><span class="rid soft">W1</span> goes a step further than "any exterior wall" and asks whether the room has enough glazing on the wall it has. Swiss practice targets roughly a tenth of floor area in glass for a habitable room; bedrooms and kitchens use that figure directly, <code>1/10</code>. I set living rooms and recreation rooms higher, at <code>1/6</code>, since those are the rooms occupied through the daylight hours in a way that supports a larger opening. A kitchen gets a fixed two-cell band instead of a ratio, since a kitchen window is really sized by the counter run beneath it.</p>
+
+<div class="eg">
+  <p style="margin:0">Work through a bedroom at the default floor height of 3.0 m to see how the numbers land. Twelve cells of floor area is 4.32 m², so the target is 0.432 m² of glass. A framed edge — the bedroom variant, with a sill and a lintel each taking 900 mm — supplies 0.6 × (3.0 − 0.9 − 0.9) = 0.72 m², so one edge already clears the target, and it's really the two-edge minimum that decides the window size: the room gets a 1.2 m band, close to a third of its own floor area in glass. The ratio only starts to govern room size on larger rooms. A full-height living-room edge supplies 0.6 × (3.0 − 0.9) = 1.26 m², so a living room needs more than about 15 m² of floor before a sixth of its area calls for a third edge.</p>
+</div>
+
+<p><span class="rid soft">W1</span> fires when the exterior wall a room actually has can't supply the edges it needs — in practice, when the facade is broken into runs shorter than two cells — and it only evaluates rooms that have some exterior wall to glaze. A room with none belongs to <span class="rid hard">D1</span> or <span class="rid soft">D2</span> instead.</p>
+
+<p class="small" style="margin-top:16px">What follows is reference material: the full rule list for lookup, the numbers the report prints alongside the rules, where the model stops short of a fuller analysis, and the sources behind the rules above.</p>
+
+<!-- ============================ APPENDIX A ============================ -->
+<div class="appendix">
+<h2 class="sec">A · All 35 rules, for lookup</h2>
+<div class="sec-rule"></div>
+<table>
+  <thead><tr><th style="width:56px">Id</th><th>What it checks</th><th style="width:64px">Tier</th></tr></thead>
+  <tbody>
+    <tr><td class="rid-cell">A1</td><td>A circulation cluster contains a cell narrower than 1.2 m clear width.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">AC1</td><td>A bedroom shares a wall with a stair.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">C1</td><td>A circulation cluster has no doors onto it (orphaned corridor).</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">C2</td><td>A circulation cluster is reached by a single door.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">D1</td><td>A habitable room (bedroom, living, recreation) has no exterior wall.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">D2</td><td>A kitchen has no exterior wall.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">DP1</td><td>A room is 5 or more door-hops from the entrance.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">DR1</td><td>No doors are placed yet; explains the reachability flags this causes.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
+    <tr><td class="rid-cell">DR2</td><td>A bedroom has three or more doors.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
+    <tr><td class="rid-cell">E1</td><td>No working entrance exists yet to validate reachability from.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
+    <tr><td class="rid-cell">E2</td><td>An entrance's edge no longer faces outside.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">F1</td><td>A room is more than 4 door-hops from the nearest entrance or stair.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">G1</td><td>No bathroom is reachable without crossing a bedroom.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">G2</td><td>An entrance opens directly into a bedroom or bathroom.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">H1</td><td>A room has no doored path from any entrance (orphaned room).</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">H2</td><td>A room or stair is reachable from an entrance only by crossing a bathroom.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">H3</td><td>A room or stair (bathrooms exempt) is reachable only by crossing a bedroom.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">H4</td><td>A door joins a bathroom and a kitchen directly.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">H6</td><td>A room or stair is reachable only by crossing outdoor space.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">MB1</td><td>A floor has bedrooms and no bathroom (checked once a bathroom exists somewhere).</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">N1</td><td>Whole-dwelling circulation area exceeds 25% of the interior.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">O1</td><td>An outdoor cluster has no door onto it.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">P1</td><td>No bathroom exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">P2</td><td>No kitchen exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">P3</td><td>More than one kitchen exists in the dwelling.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
+    <tr><td class="rid-cell">PG1</td><td>The mean depth of public rooms exceeds the mean depth of bedrooms.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">S1</td><td>An outdoor cluster has more than two doors onto it.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">S2</td><td>A living room has one door or none.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">S3</td><td>A bedroom shares a wall with a kitchen or a public room.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">S5</td><td>A door joins a kitchen and a living room (open plan).</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
+    <tr><td class="rid-cell">S6</td><td>A kitchen and bathroom share a wall with no door between them.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
+    <tr><td class="rid-cell">S7</td><td>A bathroom is reachable from an entrance only through its bedroom (en-suite).</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
+    <tr><td class="rid-cell">ST1</td><td>A stair has no door on its bottom and/or top landing.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">ST2</td><td>A stair is not reachable by doors from any entrance.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">W1</td><td>A room's achieved glazing falls short of its daylight target.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ============================ APPENDIX B ============================ -->
+<h2 class="sec">B · Metrics the report prints</h2>
+<div class="sec-rule"></div>
+<p>Four figures the report shows on every run, whether or not the rules reading them fire.</p>
+<p><strong>Entrance depth.</strong> For each reachable room, the number of doored steps from the nearest entrance. The report gives the maximum, the mean, and a per-room list; the diagram puts the number on the node. Stairs are weighted as in §6, so a floor change costs one hop overall. <span class="rid soft">DP1</span> reads this map, and <span class="rid soft">PG1</span> reads its group means.</p>
+<p><strong>Circulation percentage.</strong> Circulation-cluster cells plus stair cells, over all occupied interior cells, with outdoor excluded from both. Printed as "Circulation: N% of interior area". <span class="rid soft">N1</span> flags above 25%.</p>
+<p><strong>Glazing against target.</strong> Per room, the glazing area the generator managed to place, set against the target for that room's type. <span class="rid soft">W1</span> flags the shortfall.</p>
+<p><strong>Public and bedroom mean depth.</strong> The two means <span class="rid soft">PG1</span> compares, printed as "Public mean depth X · Bedroom mean depth Y".</p>
+
+<!-- ============================ APPENDIX C ============================ -->
+<h2 class="sec">C · Assumptions and limits</h2>
+<div class="sec-rule"></div>
+<ul class="plain">
+  <li><span class="rid soft">F1</span> counts door-hops on the access graph. Fire code measures metres of travel distance and asks for a second independent escape route; neither is modelled.</li>
+  <li>The House-GAN connection counts behind <span class="rid soft">S1</span>, <span class="rid soft">S2</span> and <span class="rid note">DR2</span> came from proximity adjacency; this model counts doors, so the thresholds are approximate against that data.</li>
+  <li>There is no compass. Nothing in the model depends on orientation, so there are no solar or facing rules, and daylight is a question of exterior wall and glazed area only.</li>
+  <li>Rooms come from fixed presets, so minimum areas and dimensions are built into the presets and never checked. <span class="rid soft">A1</span> is the one dimensional test in the ruleset, because circulation is the one thing the user shapes freely.</li>
+  <li>One dwelling, no site: no neighbours, no party walls, no structural stacking. An upper-floor cell cantilevered past the floor below passes without comment.</li>
+  <li><span class="rid soft">N1</span>'s fraction covers the whole dwelling, so a single circulation-heavy storey can hide behind efficient ones.</li>
+  <li>The named constants — <code>DEEP_ROOM_THRESHOLD_HOPS = 5</code>, <code>ESCAPE_DEPTH_MAX = 4</code>, <code>CIRCULATION_FRACTION_MAX = 0.25</code>, <span class="rid note">DR2</span>'s three doors, the glazing ratios — are starting points I chose. None of them are derived optima.</li>
+</ul>
+
+<!-- ============================ APPENDIX D ============================ -->
+<h2 class="sec">D · References</h2>
+<div class="sec-rule"></div>
+
+<p class="ref">Nauata, N., Chang, K.-H., Cheng, C.-Y., Mori, G., &amp; Furukawa, Y. (2020). <em>House-GAN: Relational Generative Adversarial Networks for Graph-constrained House Layout Generation.</em> European Conference on Computer Vision (ECCV) 2020. arXiv:2003.06988.
+  <span class="use">The failure modes behind the reachability family, and the Table 1 room-connection counts behind S1, S2 and DR2. Those counts were measured on proximity adjacency.</span></p>
+
+<p class="ref">Hillier, B., &amp; Hanson, J. (1984). <em>The Social Logic of Space.</em> Cambridge University Press.
+  <span class="use">Depth from the entrance, the metric behind DP1, and the genotype of shallow public rooms and deep private ones that PG1 tests for inversion.</span></p>
+
+<p class="ref">SIA 500 — <em>Hindernisfreie Bauten</em> (Barrier-free construction). Swiss Society of Engineers and Architects.
+  <span class="use">The 1.2 m clear circulation width that A1 tests as two grid cells.</span></p>
+
+<p class="ref">SIA 181 — <em>Schallschutz im Hochbau</em> (Sound insulation in buildings). Swiss Society of Engineers and Architects.
+  <span class="use">Separation of noisy uses from quiet ones, grounding AC1.</span></p>
+
+<p class="ref">VKF / AEAI — Swiss Fire Protection Guidelines (Vereinigung Kantonaler Feuerversicherungen).
+  <span class="use">The escape travel-distance concept behind F1, approximated here with a hop count.</span></p>
+
+<p class="ref">Swiss glazing practice — daylight provision for habitable rooms as a fraction of floor area.
+  <span class="use">The window targets under D1, D2 and W1: 1/6 for living and recreation, 1/10 for bedrooms and kitchens.</span></p>
+
+<p class="small" style="margin-top:18px">Written from <code>src/core/rules.ts</code> and <code>src/core/windows.ts</code>; every id, tier and constant here matches the code as built.</p>
+
+</div>
