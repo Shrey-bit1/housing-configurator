@@ -228,27 +228,34 @@ function buildContext(graph: DwellingGraph): RuleContext {
 export const DEEP_ROOM_THRESHOLD_HOPS = 5;
 
 /**
- * Space-syntax "depth from entrance": a multi-source shortest-path hop-count from
- * `entryIds` to every node, over ACCESS (door) edges only — depth is a
- * door-to-door walking metric now, so an undoored space simply has no depth.
- * Depth 0 = an entry node itself; a node with no door path from any entrance has
- * no entry in the map at all (H1/ST2 already flag those as a separate failure).
+ * Max door-hops from the nearest EXIT (an entrance OR a stair) before a room is
+ * "far from escape" (F1). A topological proxy for VKF/SIA fire-practice travel-
+ * distance limits (~35 m class) — honestly a hop count on the access graph, NOT
+ * a metric distance (see F1 and §7). Same numeric ceiling as DP1's threshold, but
+ * measured from a different seed set (exits, not just the entrance).
+ */
+export const ESCAPE_DEPTH_MAX = 4;
+
+/**
+ * 0-1 BFS shortest-path hop-count from `seeds` to every node, over ACCESS (door)
+ * edges only — a door-to-door walking metric, so an undoored space simply has no
+ * depth. Seeds have depth 0; a node with no door path from any seed is absent
+ * from the map.
  *
  * STAIR-HOP WEIGHTING: a stair is a graph NODE (so it can be inspected), which
  * would make a floor transition room→stair→room cost TWO hops and drift a normal
- * multi-storey dwelling's upper rooms toward DP1's threshold by merely existing.
- * A floor transition should cost ONE hop, so ENTERING a stair costs 1 and LEAVING
- * one costs 0 (the hop is paid on the way in). Weights are 0/1, so this is a 0-1
- * BFS over a deque (0-cost relaxations to the front, 1-cost to the back). The
- * `DEEP_ROOM_THRESHOLD_HOPS` constant is unchanged — this restores its single-
- * floor meaning across floors.
+ * multi-storey dwelling's upper rooms toward the DP1/F1 thresholds by merely
+ * existing. A floor transition should cost ONE hop, so ENTERING a stair costs 1
+ * and LEAVING one costs 0 (the hop is paid on the way in). Weights are 0/1, so
+ * this is a 0-1 BFS over a deque (0-cost relaxations to the front, 1-cost to the
+ * back). The `DEEP_ROOM_THRESHOLD_HOPS`/`ESCAPE_DEPTH_MAX` constants keep their
+ * single-floor meaning across floors this way.
  *
- * Kept STANDALONE and exported — this is a pure METRIC, not a pass/fail check.
- * DP1 consumes it to flag outliers, but the text report and the bubble diagram
- * also call it directly to surface the raw numbers as information, decoupled
- * from the violation list. The data may be reused by future rules/analysis.
+ * Factored out (this batch) so entrance-depth (DP1/PG1, seeds = entrances) and
+ * escape-distance (F1, seeds = entrances + stairs) traverse IDENTICALLY — same
+ * edge set, same stair weighting — differing ONLY in the seed set.
  */
-export function computeEntranceDepths(graph: DwellingGraph): Map<string, number> {
+export function accessDepths(graph: DwellingGraph, seeds: string[]): Map<string, number> {
   const adj = new Map<string, Set<string>>();
   for (const n of graph.nodes) adj.set(n.id, new Set());
   for (const e of graph.edges) {
@@ -265,8 +272,8 @@ export function computeEntranceDepths(graph: DwellingGraph): Map<string, number>
 
   const depth = new Map<string, number>();
   const deque: string[] = [];
-  for (const id of graph.entryIds) {
-    if (depth.has(id)) continue;
+  for (const id of seeds) {
+    if (depth.has(id) || !adj.has(id)) continue;
     depth.set(id, 0);
     deque.push(id);
   }
@@ -283,6 +290,21 @@ export function computeEntranceDepths(graph: DwellingGraph): Map<string, number>
     }
   }
   return depth;
+}
+
+/**
+ * Space-syntax "depth from entrance": {@link accessDepths} seeded at the entrance
+ * set. Depth 0 = an entry node itself; a node with no door path from any entrance
+ * has no entry in the map at all (H1/ST2 already flag those as a separate
+ * failure).
+ *
+ * Kept STANDALONE and exported — this is a pure METRIC, not a pass/fail check.
+ * DP1 consumes it to flag outliers, but the text report and the bubble diagram
+ * also call it directly to surface the raw numbers as information, decoupled
+ * from the violation list. The data may be reused by future rules/analysis.
+ */
+export function computeEntranceDepths(graph: DwellingGraph): Map<string, number> {
+  return accessDepths(graph, graph.entryIds);
 }
 
 // ---- Circulation efficiency (net-to-gross) ---------------------------------
@@ -597,6 +619,38 @@ export const RULES: Rule[] = [
     },
   },
   {
+    // SIA 500 (barrier-free construction): a wheelchair needs ~1.2 m clear
+    // corridor width, which on this 0.6 m grid is exactly 2 cells. Nothing else
+    // in the ruleset sees width, so a fully-valid dwelling could have every
+    // corridor a single 600 mm cell — with 1200 mm DOORS opening onto passages
+    // half their own width, an internal contradiction this rule resolves.
+    // MORPHOLOGICAL test, per circulation cluster (see narrowWidthCells): a cell
+    // is accessible-width iff it belongs to at least one 2×2 block of cells fully
+    // inside the SAME cluster. A 1-wide corridor flags every cell (L-corners
+    // included — they have neighbours on two axes but never form a full 2×2
+    // square, so they're still 600 mm passages); a 2-wide corridor passes
+    // everywhere; a wide hall with a 1-wide spur flags only the spur. Scoped to
+    // circulation clusters — rooms have preset dimensions, outdoor is excluded.
+    id: "A1",
+    severity: "soft",
+    description: "Circulation narrower than 1.2 m (below accessible width).",
+    check(graph, ctx) {
+      const out: Violation[] = [];
+      for (const n of graph.nodes) {
+        if (!ctx.is.circulation(n)) continue;
+        const narrow = narrowWidthCells(n.cells);
+        if (narrow.length)
+          out.push({
+            ruleId: "A1",
+            severity: "soft",
+            description: `Circulation narrower than 1.2 m (below accessible width) — ${narrow.length} narrow cell${narrow.length === 1 ? "" : "s"}.`,
+            nodeIds: [n.id],
+          });
+      }
+      return out;
+    },
+  },
+  {
     // The outdoor analogue of C1: post-doors an undoored balcony/terrace connects
     // to nothing, and no other rule sees it (H1 checks rooms; C1/C2 check
     // circulation). Zero ACCESS edges → unreachable. Distinct from S1 (which is
@@ -871,6 +925,48 @@ export const RULES: Rule[] = [
       return [{ ruleId: "PG1", severity: "soft", description: RULES_BY_ID.PG1.description, nodeIds: [], layout: true }];
     },
   },
+
+  // ===== Egress — travel distance to an exit =====
+  {
+    // Rooms far from any way out. Multi-source 0-1 BFS over ACCESS edges
+    // (accessDepths), seeded at EVERY entrance host AND EVERY stair — both are
+    // exits (a stair is vertical egress) — reusing the shared stair-hop
+    // weighting. A room more than ESCAPE_DEPTH_MAX door-hops from the nearest
+    // seed flags SOFT.
+    //
+    // HONESTLY SIMPLIFIED: this is a topological hop count on the access graph,
+    // NOT a metric travel distance. Real fire egress (VKF/SIA ~35 m travel-
+    // distance class, plus second independent escape routes) is future-gated
+    // (§7) and deliberately NOT pretended here.
+    //
+    // OVERLAP with DP1 (deliberate, not a bug): both can flag a very deep room,
+    // but they measure different concerns from different seed sets — F1 is egress
+    // (seeds = entrances + stairs), DP1 is livability/depth-from-entry (seeds =
+    // entrances only). On single-floor dwellings they correlate; on multi-floor
+    // they diverge (an upper room is deep from the entrance yet near its stair),
+    // which is exactly F1's value.
+    id: "F1",
+    severity: "soft",
+    description: `Room is far from any exit (more than ${ESCAPE_DEPTH_MAX} hops from the nearest entrance or stair).`,
+    check(graph, ctx) {
+      if (!ctx.hasEntrance) return []; // gated on entrance existence, like all egress/reachability rules
+      const stairIds = graph.nodes.filter(ctx.is.stair).map((n) => n.id);
+      const dist = accessDepths(graph, [...ctx.entryIds, ...stairIds]);
+      const out: Violation[] = [];
+      for (const n of graph.nodes) {
+        if (!ctx.is.room(n)) continue;
+        const d = dist.get(n.id);
+        if (d !== undefined && d > ESCAPE_DEPTH_MAX)
+          out.push({
+            ruleId: "F1",
+            severity: "soft",
+            description: `Room is far from any exit (${d} hops from the nearest entrance or stair).`,
+            nodeIds: [n.id],
+          });
+      }
+      return out;
+    },
+  },
 ];
 
 /** Rules indexed by id, for reusing a rule's canonical description. */
@@ -906,6 +1002,32 @@ function pair(
 /** Unordered node-pair key (for matching a touch edge against the access set). */
 function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+/**
+ * Cells of a circulation cluster that fall BELOW accessible width (SIA 500,
+ * ~1.2 m = 2 cells on this 0.6 m grid). A cell is accessible-width iff it lies in
+ * at least one 2×2 block of cells fully inside the cluster; the ones that don't
+ * are 600 mm passage cells. The four 2×2 blocks CONTAINING (cx,cz) have their
+ * min-corners at offsets {-1,0}×{-1,0}, so a cell is narrow iff NONE of those four
+ * is fully in-cluster. Correctly flags L-corners (locally neighboured on two axes,
+ * but never enclosed by a full 2×2 square) and, in a wide hall with a 1-wide spur,
+ * only the spur. Consumed by A1.
+ */
+function narrowWidthCells(cells: GraphNode["cells"]): GraphNode["cells"] {
+  const key = (cx: number, cz: number) => `${cx},${cz}`;
+  const inCluster = new Set(cells.map((c) => key(c.cx, c.cz)));
+  const fits2x2 = (mx: number, mz: number) =>
+    inCluster.has(key(mx, mz)) &&
+    inCluster.has(key(mx + 1, mz)) &&
+    inCluster.has(key(mx, mz + 1)) &&
+    inCluster.has(key(mx + 1, mz + 1));
+  return cells.filter((c) => {
+    for (let dx = -1; dx <= 0; dx++)
+      for (let dz = -1; dz <= 0; dz++)
+        if (fits2x2(c.cx + dx, c.cz + dz)) return false; // enclosed by a 2×2 → wide
+    return true; // no enclosing 2×2 → a 600 mm passage cell
+  });
 }
 
 function edgeViolations(

@@ -846,8 +846,10 @@ interface Rule {
   check: (graph: DwellingGraph, ctx: RuleContext) => Violation[];
 }
 function validate(graph: DwellingGraph): Violation[];
-function computeEntranceDepths(graph: DwellingGraph): Map<string, number>; // standalone metric, see §8
-const DEEP_ROOM_THRESHOLD_HOPS = 5;
+function accessDepths(graph, seeds): Map<string, number>;  // 0-1 BFS w/ stair-hop weighting, seed-parameterized
+function computeEntranceDepths(graph): Map<string, number>; // = accessDepths(graph, entryIds); standalone metric, §8
+const DEEP_ROOM_THRESHOLD_HOPS = 5;   // DP1: deep-from-entrance ceiling
+const ESCAPE_DEPTH_MAX = 4;           // F1: far-from-exit ceiling (entrance+stair seeds)
 ```
 `RuleContext` (built once per `validate()` call, `buildContext()`): node/edge
 lookups, `degree()`, `is.{circulation,outdoor,bathroom,bedroom,kitchen,living,
@@ -1108,6 +1110,20 @@ screenshots):**
   can't raycast real screen coordinates.
 - **`connectionEdges` retired (§2i):** removed from `modules.ts` (one-line
   historical note kept); `tsc`/build clean with it gone.
+- **Rules batch ④ — accessibility width + escape distance (post-doors, §8):**
+  verified via synthetic-graph dumps through `validate`/`accessDepths` (canvas is
+  0×0, so real raycasting stays unavailable). **A1** (accessible width, 2×2
+  morphological test per circulation cluster): a straight 1-wide 4-cell corridor
+  flags all 4 cells; a 2×4 corridor passes (0 narrow); a **1-wide L flags all 5
+  cells including the corner** (neighboured on two axes but never in a full 2×2
+  square); a 2×3 hall with a 1-wide spur flags **only the 2 spur cells**. **F1**
+  (far from exit, seeds = entrances + stairs, `ESCAPE_DEPTH_MAX = 4`): on a
+  r0(entry)…r6 chain with no stair, r5/r6 (entrance-depth 5/6) flag; doring a
+  stair near the deep end drops their exit-distance to 0 and clears F1 (stairs ARE
+  seeds); a room **6 hops from the entrance but 2 from a stair stays silent**
+  (the spec's divergence case); F1 is gated off with no entrance; no crash with no
+  circulation or no stairs. `accessDepths` factored out of `computeEntranceDepths`
+  (identical entrance-depth behaviour preserved). Rule count 33 → 35.
 - **Rules-additions batch ③ (post-doors, §8):** verified via state dumps —
   **N1** circulation fraction reads 4.3% on a normal layout (unchanged when an
   outdoor balcony is added — excluded both sides) and 64% on a corridor-palace,
@@ -1166,7 +1182,7 @@ screenshots):**
   badges, highlight overlays; ACCESS edges solid vs TOUCH-only dashed + legend).
 - **Interior doors** (§2i): authored, serialized, door-based reachability;
   2-edge openings cut in both wall segments; plan-view markers; auto-removal.
-- **Layout rules engine**: 33 rules (see §8), advisory/on-demand, surfaced in
+- **Layout rules engine**: 35 rules (see §8), advisory/on-demand, surfaced in
   a text report, the diagram, and 3D shell/marker tinting.
 - **Rule-driven windows** (§2d): derived sill/lintel panels + glazing on
   exterior edges, per-type ratio targets, W1 shortfall rule.
@@ -1233,6 +1249,22 @@ modified `PROJECT_STATE.md`, `src/core/floor.ts`, `src/core/floorManager.ts`,
   ground variant (shift is currently unbound for drags, only for clicks) would
   sidestep the conflict and is the natural next step if marquee is wanted.
 
+**Future-gated rule / analysis proposals** (surfaced during the batch-④ review;
+recorded so they survive context loss — NO code exists for these yet):
+- **Orientation-dependent daylight** — daylight-quality rules that distinguish
+  north/south/east/west glazing; needs a compass / north concept the model
+  currently lacks (rooms have no absolute orientation).
+- **Full egress analysis** — F1 is honestly just topological hops; real fire
+  egress wants a SECOND independent escape route per room and METRIC travel
+  distance (~35 m class), not one BFS to the nearest exit.
+- **SV1 — structural stacking** — flag upper-floor cells cantilevered beyond the
+  floor below (no load path down); needs a cross-floor footprint-overlap check.
+- **Per-floor N1 fractions** — N1 computes only the whole-dwelling circulation
+  ratio; a per-floor breakdown could catch one circulation-heavy storey masked by
+  efficient others.
+- **Corner windows** — the window generator never wraps a run around a corner
+  (bands stay on one straight same-side run); L-corner glazing is a future case.
+
 ---
 
 ## 8. Layout rules — current table (`src/core/rules.ts`)
@@ -1298,6 +1330,7 @@ typology — open-plan, en-suite, efficient services).
 |---|---|---|
 | C1 | 🟡 soft | Orphaned corridor — connects to nothing via doors (dead space). SOFT (was hard) — matches O1, the identical degree-0-cluster condition; dead space is a design flaw, not uninhabitability. |
 | C2 | 🟡 soft | Under-used corridor — reached by only one door, so it doesn't circulate. |
+| A1 | 🟡 soft | Circulation narrower than 1.2 m (below accessible width, SIA 500). Per circulation cluster: a cell is accessible-width iff it lies in ≥1 **2×2 block of cells fully inside the same cluster** (`narrowWidthCells`); a cluster with ≥1 narrow cell flags (message includes the narrow-cell count). A 1-wide corridor flags every cell (L-corners included — neighboured on two axes but never in a full 2×2 square); a 2-wide corridor passes; a wide hall with a 1-wide spur flags only the spur. Resolves the doors-are-1200mm-but-corridors-could-be-600mm contradiction. Circulation clusters only. |
 
 **Stairs**
 | ID | Severity | Description |
@@ -1326,14 +1359,21 @@ typology — open-plan, en-suite, efficient services).
 | N1 | 🟡 soft | Circulation-heavy layout — whole-dwelling circulation fraction > `CIRCULATION_FRACTION_MAX` = 0.25. Fraction = (circulation-cluster + stair-footprint cells) ÷ all occupied cells, OUTDOOR excluded from BOTH sides. The % is ALSO surfaced as an always-on report line ("Circulation: N% of interior area"). |
 | PG1 | 🟡 soft | Inverted privacy gradient — mean depth of PUBLIC rooms (Living/Recreation) exceeds mean depth of BEDROOMS (bedrooms shallower than social rooms). Silent if either set is empty; gated on an entrance. Both means are surfaced as a report line ("Public mean depth X · Bedroom mean depth Y"). Hillier & Hanson genotype. |
 
-**Depth STAIR-HOP weighting** (`computeEntranceDepths`): a stair is a graph NODE,
-so a naïve BFS makes a floor transition room→stair→room cost TWO hops and drifts
-upper rooms toward DP1's threshold by merely existing. A floor transition should
-cost ONE hop, so ENTERING a stair costs 1 and LEAVING one costs 0 — a 0-1 BFS over
-a deque (0-cost relaxations to the front). `DEEP_ROOM_THRESHOLD_HOPS = 5` is
-UNCHANGED; this restores its single-floor meaning across floors. Verified:
-room→stair→room = +1 hop (was +2); depth badges / the report's depth section
-shift on multi-floor layouts, intended.
+**Egress — travel distance to an exit**
+| ID | Severity | Description |
+|---|---|---|
+| F1 | 🟡 soft | Room is far from any exit (> `ESCAPE_DEPTH_MAX` = 4 hops from the nearest entrance OR stair). Multi-source 0-1 BFS over ACCESS edges (`accessDepths`), seeded at every entrance host AND every stair (a stair is vertical egress), reusing the shared stair-hop weighting; gated on an entrance. HONESTLY SIMPLIFIED — a topological hop count, NOT metric distance; full egress (second escape routes, ~35 m travel distance) is future-gated (§7). OVERLAPS DP1 deliberately: same numeric ceiling, different seed sets (F1 = entrances+stairs/egress; DP1 = entrances only/livability) — they correlate on single-floor dwellings and diverge on multi-floor (an upper room is deep from the entrance yet near its stair), which is F1's value. |
+
+**Depth STAIR-HOP weighting** (`accessDepths`, which `computeEntranceDepths` now
+wraps by seeding at the entrance set — F1 wraps it seeding at entrances + stairs):
+a stair is a graph NODE, so a naïve BFS makes a floor transition room→stair→room
+cost TWO hops and drifts upper rooms toward the DP1/F1 thresholds by merely
+existing. A floor transition should cost ONE hop, so ENTERING a stair costs 1 and
+LEAVING one costs 0 — a 0-1 BFS over a deque (0-cost relaxations to the front).
+`DEEP_ROOM_THRESHOLD_HOPS = 5` / `ESCAPE_DEPTH_MAX = 4` are UNCHANGED; this
+restores their single-floor meaning across floors. Verified: room→stair→room = +1
+hop (was +2); depth badges / the report's depth section shift on multi-floor
+layouts, intended.
 
 Recreation Room is classified as **public/social** (`ctx.is.public`, same
 category as Living Room) for the privacy rules, and as **habitable**
