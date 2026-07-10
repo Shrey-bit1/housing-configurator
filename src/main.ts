@@ -7,7 +7,7 @@ import { GhostPreview } from "./scene/ghostPreview";
 import { GroupGhostPreview } from "./scene/groupGhostPreview";
 import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
-import { SelectionController, type EntranceSelectionAdapter } from "./interaction/selection";
+import { SelectionController, type MarkerSelectionAdapter } from "./interaction/selection";
 import { updateCutaway } from "./scene/cutaway";
 import { computeDwellingGraph } from "./core/adjacencyGraph";
 import { validate, computeEntranceDepths } from "./core/rules";
@@ -15,6 +15,7 @@ import { GraphView } from "./ui/graphView";
 import { renderValidationPanel } from "./ui/validationPanel";
 import { applyRoomHighlights, clearRoomHighlights } from "./scene/highlight";
 import { EntranceController } from "./interaction/entranceController";
+import { DoorController } from "./interaction/doorController";
 import { buildPalette } from "./ui/palette";
 import { showToast } from "./ui/toast";
 import { History } from "./core/history";
@@ -78,7 +79,7 @@ const picker = new Picker(canvas, camera, f0.grid, groundPlane);
 
 // Entrance selection/deletion adapter (entrances live on floor 0 only, and are
 // only interactive while floor 0 is the active floor).
-const entranceAdapter: EntranceSelectionAdapter = {
+const entranceAdapter: MarkerSelectionAdapter = {
   pick(x, y) {
     if (floors.activeIndexValue !== 0) return null;
     const hit = picker.groupAt(x, y, floors.floors[0].entranceMarkers);
@@ -94,6 +95,23 @@ const entranceAdapter: EntranceSelectionAdapter = {
   },
 };
 
+// Door selection/deletion adapter (doors live on any floor; interactive on the
+// ACTIVE floor). Removing a door closes its opening in both adjacent shells.
+const doorAdapter: MarkerSelectionAdapter = {
+  pick(x, y) {
+    const hit = picker.groupAt(x, y, floors.active.doorMarkers);
+    return (hit?.userData.doorId as string | undefined) ?? null;
+  },
+  setSelected(id) {
+    floors.active.setDoorSelected(id);
+  },
+  remove(id) {
+    floors.active.removeDoor(id);
+    floors.refreshWalls(); // re-close the opening in both wall segments
+    clearValidation(); // door removal changes reachability
+  },
+};
+
 const dragDrop = new DragDropController(canvas, picker, ghost, f0.store, controls, commitHistory);
 const selection = new SelectionController(
   canvas,
@@ -106,7 +124,12 @@ const selection = new SelectionController(
   commitHistory,
   entranceAdapter,
   () => updateSelectionReadout(),
-  (msg) => showToast("info", msg)
+  (msg) => showToast("info", msg),
+  doorAdapter,
+  // A placement tool (entrance/door) owns the canvas while armed — selection
+  // stays out entirely (both controllers are declared below; this closure only
+  // runs during pointer events, long after they're initialised).
+  () => entranceController.isActive || doorController.isActive
 );
 
 floors.attach({ picker, ghost, groupGhost, dragDrop, selection, groundPlane, sizeGroundPlane });
@@ -136,12 +159,41 @@ const entranceController = new EntranceController(
   }
 );
 
+// Interior-door placement (any floor). Binds a 2-edge door to a shared interior
+// boundary of the ACTIVE floor; placing one cuts the opening in both adjacent
+// shells and changes reachability, so it refreshes walls + drops validation.
+const doorController = new DoorController(
+  canvas,
+  picker,
+  controls,
+  () => floors.active,
+  () => floors.doorTargets(floors.active),
+  () => {
+    floors.refreshWalls(); // cut the opening in both adjacent wall segments
+    clearValidation();
+    commitHistory(); // door placement is an undoable action
+  }
+);
+
+// Exactly one placement mode may be armed at a time. Every entry point (palette
+// grab, +Entrance, +Door) disarms all the others first, so a single pointer
+// release can never drive two placement handlers at once (each of dragDrop /
+// entrance / door / duplicate listens on its own active flag). Each cancel is a
+// safe no-op when that mode isn't active.
+function cancelPlacementModes(): void {
+  dragDrop.cancelPlacement();
+  entranceController.cancel();
+  doorController.cancel();
+  selection.cancelDuplicate();
+}
+
 // ---- Sidebar (rebuilt whenever floor state changes) ----
 function renderSidebar(): void {
   buildPalette(
     sidebar,
     {
       onGrabModule(type) {
+        cancelPlacementModes(); // disarm any entrance/door tool or duplicate ghost
         selection.deselect();
         dragDrop.startPlacement(type);
       },
@@ -202,8 +254,15 @@ function renderSidebar(): void {
           floors.setActive(0);
           renderSidebar();
         }
+        cancelPlacementModes(); // disarm palette drag / door tool / duplicate ghost
         selection.deselect();
         entranceController.start();
+      },
+      onPlaceDoor() {
+        // Doors go on any floor — place on whatever floor is active.
+        cancelPlacementModes(); // disarm palette drag / entrance tool / duplicate ghost
+        selection.deselect();
+        doorController.start();
       },
       onExport() {
         exportProject();
@@ -236,6 +295,7 @@ renderSidebar();
 function updateSelectionReadout(): void {
   const insts = selection.selectedInstances;
   const entId = selection.selectedEntranceIdValue;
+  const doorSelected = selection.selectedDoorIdValue;
   let text = "";
   if (insts.length === 1) {
     const inst = insts[0];
@@ -249,6 +309,8 @@ function updateSelectionReadout(): void {
     text = `${insts.length} selected`;
   } else if (entId) {
     text = "Entrance · Floor 0";
+  } else if (doorSelected) {
+    text = `Door · Floor ${floors.activeIndexValue}`;
   }
   selectionReadout.textContent = text;
   selectionReadout.classList.toggle("visible", !!text);
@@ -563,10 +625,10 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     // The single Escape arbitrator: one predictable key, checked in exactly
     // this priority order — cancel an in-progress GESTURE first (palette
-    // ghost placement, a Shift+D duplicate ghost, or entrance-placement
+    // ghost placement, a Shift+D duplicate ghost, or entrance/door-placement
     // mode), then clear the SELECTION, then exit PLAN MODE.
-    // dragDrop/selection/entranceController no longer listen for Escape
-    // themselves (see their class docs), so exactly one of these five things
+    // dragDrop/selection/entrance+doorController no longer listen for Escape
+    // themselves (see their class docs), so exactly one of these things
     // happens per keypress, never more than one.
     if (dragDrop.isDragging) {
       dragDrop.cancelPlacement();
@@ -578,6 +640,10 @@ window.addEventListener("keydown", (e) => {
     }
     if (entranceController.isActive) {
       entranceController.cancel();
+      return;
+    }
+    if (doorController.isActive) {
+      doorController.cancel();
       return;
     }
     if (selection.hasSelection) {

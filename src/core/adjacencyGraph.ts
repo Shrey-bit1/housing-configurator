@@ -3,12 +3,14 @@ import type { Floor } from "./floor";
 import { occupiedCells } from "./modules";
 import { connectedComponents, clusterNodeId } from "./cluster";
 import { exteriorEdges } from "./exteriorEdges";
+import { buildSpaceTargets, resolveDoorSpaces, BELOW_PREFIX } from "./door";
 import type { GlazingStat } from "./windows";
 
 /**
  * Whole-dwelling adjacency graph — all floors' rooms/clusters/STAIRS as nodes,
- * with intra-floor touch edges PLUS cross-floor `viaStair` edges, and the
- * floor-0 entrances (resolved + validity-checked) marking entry roots.
+ * with TOUCH edges (physical adjacency, incl. cross-floor `viaStair` touch) AND
+ * authored-door ACCESS edges (`viaDoor`), and the floor-0 entrances (resolved +
+ * validity-checked) marking entry roots.
  *
  * Purely DERIVED (recomputed from the live layout). It is what the rules engine
  * (`rules.ts`) consumes for entrance-rooted, cross-floor reachability, and what
@@ -57,8 +59,18 @@ export interface GraphNode {
 export interface GraphEdge {
   a: string; // node id
   b: string; // node id
-  /** FUTURE: door/opening-based adjacency. Touch edges leave this undefined. */
-  viaDoor?: boolean;
+  /**
+   * The graph emits BOTH kinds of edge between spaces:
+   *  - `viaDoor: false` — a TOUCH edge: the two footprints share a wall
+   *    (physical adjacency). Consumed only by the proximity rules (H4/S3/S4/S5),
+   *    which are about being next to each other, not about access.
+   *  - `viaDoor: true` — an ACCESS edge: an authored door connects the two
+   *    spaces. ALL reachability-family rules (H1/H2/H3/H6/G1/ST2/C1/C2/DP1,
+   *    entrance-rooted) traverse ONLY these — physical touch without a door is
+   *    not a connection. Stair links (bottom and top) are access edges too,
+   *    formed only where a door faces the stair footprint / hole projection.
+   */
+  viaDoor: boolean;
   /** A cross-floor link made by a stair (vs. a normal same-floor wall touch). */
   viaStair?: boolean;
 }
@@ -89,6 +101,9 @@ export interface DwellingGraph {
   /** Every floor-0 entrance's current validity (see {@link EntranceStatus}). */
   entrances: EntranceStatus[];
   floorCount: number;
+  /** Total authored doors across all floors — lets the cutover note (DR1)
+   *  explain a wall of reachability flags on a doorless dwelling. */
+  doorCount: number;
 }
 
 /** Namespace a per-floor raw id into a dwelling-unique node id. */
@@ -113,10 +128,13 @@ const NEIGH: [number, number][] = [
   [0, -1],
 ];
 
-/** Build one floor's room/cluster/stair nodes (namespaced) + a cell→node-id owner map. */
+/** Build one floor's room/cluster/stair nodes (namespaced) + a cell→node-id owner map.
+ *  `floorBelow` (null on the ground floor) supplies stair-hole projections so
+ *  `hasExteriorEdge` doesn't count a void-facing edge as exterior (see below). */
 function buildFloorNodes(
   floor: Floor,
-  fi: number
+  fi: number,
+  floorBelow: Floor | null
 ): { nodes: GraphNode[]; owner: Map<string, string> } {
   const nodes: GraphNode[] = [];
   const connectors = new Map<string, { color: number; label: string; cells: Cell[] }>();
@@ -184,10 +202,14 @@ function buildFloorNodes(
     for (const c of node.cells) owner.set(cellKey(c.cx, c.cz), node.id);
 
   // Daylight/ventilation rules (D1/D2) need to know which rooms touch the
-  // outside — reuse the shared exteriorEdges utility against this floor's full
-  // occupied-cell set (includes the node's own cells, so an interior boundary
-  // between two cells of the SAME footprint correctly doesn't count as exterior).
-  const occupied = new Set(owner.keys());
+  // OUTSIDE (open sky), not just any non-room edge. Classify exterior edges
+  // against the SAME `buildSpaceTargets` set the door system uses — which adds,
+  // beyond this floor's rooms/clusters/stairs, the stair-HOLE PROJECTIONS from
+  // the floor below. Without those, a floor-N+1 room bordering the stairwell
+  // void would count the void-facing edge as "exterior" (no sky there), letting
+  // D1 pass a windowless room and W1 count void-facing edges. (Same-floor
+  // stairs were already covered — they're real occupants; the hole is the gap.)
+  const occupied = new Set(buildSpaceTargets(floor, floorBelow).keys());
   for (const node of nodes) node.hasExteriorEdge = exteriorEdges(node.cells, occupied).length > 0;
 
   return { nodes, owner };
@@ -207,27 +229,31 @@ function nodesTouching(cells: Cell[], owner: Map<string, string>): string[] {
 /**
  * Build the whole-dwelling graph from the floor stack.
  *
- * Edges:
- *  - intra-floor (any node kind, incl. stairs): two nodes are adjacent when
- *    their footprints share a wall edge (orthogonal cells; corner-only contact
- *    doesn't count). This is what gives a stair its "bottom-side" connections.
- *  - cross-floor (`viaStair`): each stair's OWN node gets an edge to every
- *    room/cluster/stair touching its footprint projected onto the floor above
- *    (its "top-side" connections). A stair adjacent to nothing on a side simply
- *    has no edges there — inspectable by rules (ST1/ST2).
+ * Edges (see {@link GraphEdge}):
+ *  - TOUCH (`viaDoor: false`): two footprints share a wall edge (orthogonal
+ *    cells; corner-only contact doesn't count), plus cross-floor `viaStair`
+ *    touch where a stair physically underlies the floor above. Physical
+ *    adjacency only — feeds the proximity rules and the diagram's faint lines.
+ *  - ACCESS (`viaDoor: true`): an authored door binds the two spaces. The only
+ *    edges that confer reachability. Stair links (bottom + top) are access
+ *    edges too, formed only where a door faces the stair footprint / its
+ *    hole projection on the floor above — no automatic stair reachability.
  *
  * Entrances: each floor-0 entrance is re-validated against the CURRENT
  * occupancy (a later room may have built over its edge) and, if still open to
- * the outside, roots reachability at the node owning its cell.
+ * the outside, roots reachability at the node owning its cell (the entrance is
+ * the exterior door).
  */
 export function computeDwellingGraph(floors: Floor[]): DwellingGraph {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const owners: Map<string, string>[] = [];
 
-  // 1) Per-floor nodes + intra-floor touch edges (generic over room/cluster/stair).
+  // 1) Per-floor nodes + intra-floor TOUCH edges (generic over room/cluster/
+  // stair) — physical shared-wall adjacency, `viaDoor: false`. Feeds the
+  // proximity rules (H4/S3/S4/S5) and the diagram's faint/dashed "touching" lines.
   floors.forEach((floor, fi) => {
-    const built = buildFloorNodes(floor, fi);
+    const built = buildFloorNodes(floor, fi, fi > 0 ? floors[fi - 1] : null);
     nodes.push(...built.nodes);
     owners[fi] = built.owner;
 
@@ -240,15 +266,17 @@ export function computeDwellingGraph(floors: Floor[]): DwellingGraph {
           const k = node.id < other ? `${node.id}|${other}` : `${other}|${node.id}`;
           if (seen.has(k)) continue;
           seen.add(k);
-          edges.push({ a: node.id, b: other });
+          edges.push({ a: node.id, b: other, viaDoor: false });
         }
       }
     }
   });
 
-  // 2) Cross-floor stair edges: each stair's node (its bottom-side edges came
-  // from step 1 above, generically) gets viaStair edges to whatever touches its
-  // footprint on the floor above.
+  // 2) Cross-floor stair TOUCH edges (`viaDoor: false`, `viaStair: true`): each
+  // stair physically reaches whatever sits over its footprint on the floor
+  // above. Informational only now (the diagram shows it as a faint stub, "could
+  // door here"); it does NOT confer reachability — that needs a real door (step
+  // 4). Kept so the physical stair-over-room relationship stays legible.
   const stairSeen = new Set<string>();
   floors.forEach((floor, fi) => {
     const aboveOwner = owners[fi + 1];
@@ -261,12 +289,41 @@ export function computeDwellingGraph(floors: Floor[]): DwellingGraph {
         const k = stairId < t ? `${stairId}|${t}` : `${t}|${stairId}`;
         if (stairSeen.has(k)) continue;
         stairSeen.add(k);
-        edges.push({ a: stairId, b: t, viaStair: true });
+        edges.push({ a: stairId, b: t, viaDoor: false, viaStair: true });
       }
     }
   });
 
-  // 3) Entrances → validity-checked entry roots (floor 0 only).
+  // 3) AUTHORED DOOR ACCESS edges (`viaDoor: true`): the only edges that confer
+  // reachability. Each door resolves to the two spaces its edges bind (via the
+  // shared space-target map, incl. stair holes projected up from the floor
+  // below), producing a room↔room / room↔cluster / cluster↔cluster / space↔stair
+  // access edge. A door onto a below-floor stair hole is the stair's "top"
+  // access; a door onto a same-floor stair footprint is its "bottom" access.
+  const nodeIdSet = new Set(nodes.map((n) => n.id));
+  const accessSeen = new Set<string>();
+  const toNode = (token: string, fi: number): { id: string; below: boolean } =>
+    token.startsWith(BELOW_PREFIX)
+      ? { id: dwellingNodeId(fi - 1, token.slice(BELOW_PREFIX.length)), below: true }
+      : { id: dwellingNodeId(fi, token), below: false };
+  floors.forEach((floor, fi) => {
+    if (floor.doors.length === 0) return;
+    const targets = buildSpaceTargets(floor, fi > 0 ? floors[fi - 1] : null);
+    const targetAt = (cx: number, cz: number) => targets.get(cellKey(cx, cz)) ?? null;
+    for (const door of floor.doors) {
+      const spaces = resolveDoorSpaces(door, targetAt);
+      if (!spaces) continue;
+      const na = toNode(spaces.a, fi);
+      const nb = toNode(spaces.b, fi);
+      if (na.id === nb.id || !nodeIdSet.has(na.id) || !nodeIdSet.has(nb.id)) continue;
+      const k = na.id < nb.id ? `${na.id}|${nb.id}` : `${nb.id}|${na.id}`;
+      if (accessSeen.has(k)) continue;
+      accessSeen.add(k);
+      edges.push({ a: na.id, b: nb.id, viaDoor: true, viaStair: na.below || nb.below });
+    }
+  });
+
+  // 5) Entrances → validity-checked entry roots (floor 0 only).
   const entrances: EntranceStatus[] = [];
   const entryIds = new Set<string>();
   const f0 = floors[0];
@@ -292,5 +349,6 @@ export function computeDwellingGraph(floors: Floor[]): DwellingGraph {
     entryIds: [...entryIds],
     entrances,
     floorCount: floors.length,
+    doorCount: floors.reduce((sum, f) => sum + f.doors.length, 0),
   };
 }

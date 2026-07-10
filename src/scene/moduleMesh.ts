@@ -4,6 +4,7 @@ import { CELL_SIZE, type Cell } from "../core/grid";
 import { rotatedCells, type ModuleDef } from "../core/modules";
 import { edgeKey } from "../core/exteriorEdges";
 import { SILL_H, LINTEL_H, type WindowVariant } from "../core/windows";
+import { DOOR_OPENING_H } from "../core/door";
 import { PROP_BUILDERS } from "./props";
 import { buildStairGroup } from "./stairMesh";
 
@@ -200,6 +201,15 @@ export function makeGlassMaterial(): THREE.MeshStandardMaterial {
  * mesh. Panel heights are absolute (stay fixed on taller floors; the glazing
  * gap absorbs the extra height). Windows are only ever passed for room shells;
  * cluster shells call without them.
+ *
+ * DOORS: a doored INTERIOR edge (its `edgeKey` present in `doors` — LOCAL for a
+ * room, ABSOLUTE for a cluster, matching the `windows` key convention) gets an
+ * OPENING from 0→{@link DOOR_OPENING_H} with a SOLID header panel above it up to
+ * `fullH` — the INVERSE of a window (fixed 2100 mm opening, the panel grows on
+ * taller floors). No sill, no glazing. Doors are checked before windows; the two
+ * never coincide (windows are exterior-only, doors interior-only). A door onto a
+ * stair cuts only the room/cluster side — the caller simply never adds the
+ * stair side to `doors` (a stair has no shell wall).
  */
 export function buildBoundaryWalls(
   cells: Cell[],
@@ -209,7 +219,8 @@ export function buildBoundaryWalls(
   material: THREE.Material,
   edgeMaterial: THREE.Material,
   windows?: Map<string, WindowVariant>,
-  glassMaterial?: THREE.Material
+  glassMaterial?: THREE.Material,
+  doors?: Set<string>
 ): THREE.Mesh[] {
   const key = (x: number, z: number) => `${x},${z}`;
   const occupied = new Set(cells.map((c) => key(c.cx, c.cz)));
@@ -239,6 +250,12 @@ export function buildBoundaryWalls(
     xMin: number, xMax: number, zMin: number, zMax: number,
     thin: "x" | "z"
   ) => {
+    // Door wins the edge: a fixed 0→DOOR_OPENING_H opening, solid header above.
+    if (doors?.has(edgeKey(cx, cz, side as any))) {
+      const top = Math.min(DOOR_OPENING_H, fullH);
+      if (fullH - top > 0.001) solid.push(box(xMin, xMax, zMin, zMax, top, fullH));
+      return;
+    }
     const variant = windows?.get(edgeKey(cx, cz, side as any));
     if (!variant) {
       solid.push(box(xMin, xMax, zMin, zMax, 0, fullH));
@@ -376,7 +393,8 @@ function buildRoomShell(
  *
  * `windows` keys are LOCAL edge keys (cell coords relative to the room origin,
  * matching the mirrored+rotated local cells the walls are built from) → variant.
- * Omit for a plain (windowless) rebuild.
+ * Omit for a plain (windowless) rebuild. `doors` is the LOCAL edge-key set of
+ * interior openings to cut in this room's walls (same local-key convention).
  */
 export function rebuildRoomWalls(
   group: THREE.Group,
@@ -384,7 +402,8 @@ export function rebuildRoomWalls(
   rotation: number,
   wallHeight: number,
   windows?: Map<string, WindowVariant>,
-  mirrored = false
+  mirrored = false,
+  doors?: Set<string>
 ): void {
   const material = group.userData.material as THREE.Material;
   let glassMaterial = group.userData.glassMaterial as THREE.Material | undefined;
@@ -408,7 +427,8 @@ export function rebuildRoomWalls(
     material,
     edgeMaterial,
     windows,
-    glassMaterial
+    glassMaterial,
+    doors
   ))
     group.add(wall);
 }

@@ -4,7 +4,9 @@ import { ModuleStore } from "./store";
 import { GridView } from "../scene/gridView";
 import { HoleView } from "../scene/holeView";
 import { EntranceView } from "../scene/entranceView";
+import { DoorView } from "../scene/doorView";
 import type { Entrance } from "./entrance";
+import { doorId, doorOverlaps, type Door } from "./door";
 import { edgeKey, type Side } from "./exteriorEdges";
 import type { GlazingStat } from "./windows";
 
@@ -31,11 +33,18 @@ export class Floor {
   readonly holeView: HoleView;
   /** Renders ground-floor entrance markers (only floor 0 uses these). */
   readonly entranceView: EntranceView;
+  /** Renders interior-door threshold markers (any floor). */
+  readonly doorView: DoorView;
   /** Holds merged connector-cluster wall shells (Circulation / Outdoor). */
   readonly clusterGroup = new THREE.Group();
 
   /** Ground-floor entrances bound to exterior edges (entry roots). */
   readonly entrances: Entrance[] = [];
+
+  /** Authored interior doors bound to shared interior edges (any floor). Doors
+   *  gate reachability (see adjacencyGraph.ts / rules.ts) and are serialized;
+   *  stale ones are auto-removed by the FloorManager on layout change. */
+  readonly doors: Door[] = [];
 
   /** Derived glazing achieved-vs-target per ROOM instance id, recomputed on
    *  every wall rebuild by the FloorManager (windows ride the wall pass). Read
@@ -49,6 +58,7 @@ export class Floor {
     this.gridView = new GridView(this.group, this.grid);
     this.holeView = new HoleView(this.group, this.grid);
     this.entranceView = new EntranceView(this.group, this.grid);
+    this.doorView = new DoorView(this.group, this.grid);
     this.group.add(this.clusterGroup);
   }
 
@@ -104,6 +114,47 @@ export class Floor {
     this.entranceView.setSelectedId(id);
   }
 
+  /** Add an interior door anchored at (cell, side); rebuilds the markers.
+   *  Returns false (no-op) if it OVERLAPS an existing door on any physical
+   *  boundary edge — which covers both an exact duplicate placed from the other
+   *  side AND a collinear door sharing a middle edge (see {@link doorOverlaps}),
+   *  so a boundary never carries two doors. (Space validity — that both edges
+   *  bound the same two spaces — is the caller's responsibility.) */
+  addDoor(cell: Cell, side: Side): boolean {
+    const door: Door = { id: doorId(cell, side), cell: { cx: cell.cx, cz: cell.cz }, side };
+    if (doorOverlaps(door, this.doors)) return false;
+    this.doors.push(door);
+    this.doorView.rebuild(this.doors);
+    return true;
+  }
+
+  /** Replace the whole door list (used by load); rebuilds the markers. */
+  setDoors(list: Door[]): void {
+    this.doors.length = 0;
+    this.doors.push(...list);
+    this.doorView.rebuild(this.doors);
+  }
+
+  /** Remove the door with `id`; rebuilds the markers. Returns true if one was
+   *  removed. (The caller triggers the wall/opening rebuild.) */
+  removeDoor(id: string): boolean {
+    const i = this.doors.findIndex((d) => d.id === id);
+    if (i < 0) return false;
+    this.doors.splice(i, 1);
+    this.doorView.rebuild(this.doors);
+    return true;
+  }
+
+  /** Marker meshes for raycast picking (door selection). */
+  get doorMarkers(): THREE.Object3D[] {
+    return this.doorView.markers;
+  }
+
+  /** Apply the selection highlight to the door marker `id` (null clears). */
+  setDoorSelected(id: string | null): void {
+    this.doorView.setSelectedId(id);
+  }
+
   /** Set the stairwell-hole cells (from stairs on the floor below): updates both
    *  the occupancy block ({@link Grid.setHoles}) and the visual opening. */
   setHoles(cells: Cell[]): void {
@@ -133,6 +184,7 @@ export class Floor {
     this.gridView.setDimmed(dimmed);
     this.holeView.setDimmed(dimmed);
     this.entranceView.setDimmed(dimmed);
+    this.doorView.setDimmed(dimmed);
   }
 }
 

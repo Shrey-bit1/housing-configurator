@@ -5,6 +5,12 @@ import { MODULE_DEFS, occupiedCells, type ModuleDef } from "./modules";
 import type { ProjectFile } from "./projectIO";
 import { edgeKey, parseEdgeKey } from "./exteriorEdges";
 import { computeWindows, type WindowVariant } from "./windows";
+import {
+  buildSpaceTargets,
+  doorWallCuts,
+  resolveDoorSpaces,
+  type Door,
+} from "./door";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
 import type { GroupGhostPreview } from "../scene/groupGhostPreview";
@@ -96,8 +102,12 @@ export class FloorManager {
     // height — no post-build rescale (see rebuildWalls()).
     floor.store.wallHeightProvider = () => this.floorHeight(floor);
     floor.store.onChange = () => {
-      rebuildClusterShells(floor, floor.grid, this.floorHeight(floor)); // connector clusters may have changed
-      this.syncStairsAndHoles(); // also recomputes the vertical stack + stair rises
+      // syncStairsAndHoles → rebuildAllShells rebuilds BOTH connector clusters
+      // and room walls (with doors + windows) across every floor, prunes any
+      // door a layout change just invalidated, and recomputes the stack + stair
+      // rises. All synchronous, before the action's history commit — so a pruned
+      // stale door lands in the SAME undo snapshot as the move that stranded it.
+      this.syncStairsAndHoles();
       markCutawayDirty(); // walls may have been added/removed/rebuilt
       this.onLayoutChange?.(floor);
     };
@@ -110,6 +120,14 @@ export class FloorManager {
   floorAbove(floor: Floor): Floor | null {
     const i = this.floors.indexOf(floor);
     return i >= 0 && i + 1 < this.floors.length ? this.floors[i + 1] : null;
+  }
+
+  /** The floor directly below `floor` in the stack, or null if it's the ground.
+   *  A stair on the floor below projects a hole up into this floor, which upper
+   *  rooms can door onto — so door target/validity needs it. */
+  floorBelow(floor: Floor): Floor | null {
+    const i = this.floors.indexOf(floor);
+    return i > 0 ? this.floors[i - 1] : null;
   }
 
   /** Absolute cells occupied by all stairs on `floor` (their footprints). */
@@ -146,9 +164,10 @@ export class FloorManager {
       this.floors[j].setHoles(below ? this.stairCells(below) : []);
     }
 
+    this.pruneStaleDoors();
     this.recomputeStack();
     this.updateStairScales();
-    this.rebuildWalls();
+    this.rebuildAllShells();
 
     if (structureChanged) {
       this.applyDim(); // the new floor renders dimmed (inactive)
@@ -169,31 +188,37 @@ export class FloorManager {
     }
   }
 
-  /** Rebuild every ROOM shell's wall meshes (in place — floor slab and props
-   *  untouched, see {@link rebuildRoomWalls}) on each floor so they're
-   *  extruded directly at that floor's true floor-to-floor height
-   *  ({@link floorHeight}), not just their own room's nominal height —
-   *  closing the gap to the plate above with real geometry, not a scale
-   *  hack. Also (re)generates DERIVED WINDOWS on the same pass: which exterior
-   *  edges are glazed is recomputed from room type + exterior edges (see
-   *  {@link computeWindows}) and passed into the wall rebuild, and the
-   *  achieved-vs-target glazing stat is stashed on `floor.windowStats` for the
-   *  W1 rule. Merged cluster shells rebuild separately (`rebuildClusterShells`,
-   *  from `store.onChange`) and get no windows. Cheap; rerun on every layout
-   *  change alongside the stair rise. Stairs are intentionally excluded — their
-   *  scale-driven rise is unrelated (see {@link updateStairScales}). */
-  private rebuildWalls(): void {
+  /** Rebuild every floor's SHELLS — merged connector clusters AND per-room wall
+   *  meshes (in place — floor slab and props untouched, see
+   *  {@link rebuildRoomWalls}) — extruded directly at that floor's true
+   *  floor-to-floor height ({@link floorHeight}), not just their own room's
+   *  nominal height, closing the gap to the plate above with real geometry (no
+   *  scale hack). On the same pass it (re)generates:
+   *   - DERIVED WINDOWS: which exterior edges are glazed, recomputed from room
+   *     type + exterior edges ({@link computeWindows}), stashed on
+   *     `floor.windowStats` for the W1 rule.
+   *   - AUTHORED DOOR OPENINGS: each door cuts a 2100 mm opening in BOTH
+   *     adjacent spaces' wall segments — room segments via LOCAL door edges,
+   *     cluster segments via ABSOLUTE door edges ({@link doorWallCuts}).
+   *  Both room walls AND cluster shells rebuild across ALL floors on every
+   *  change (clusters are cheap) so a door referencing a stair on the floor
+   *  below re-cuts correctly when that stair moves. Stairs are intentionally
+   *  excluded — their scale-driven rise is unrelated (see
+   *  {@link updateStairScales}). */
+  private rebuildAllShells(): void {
     this.floors.forEach((floor, fi) => {
       const height = this.floorHeight(floor);
+      const { rooms: roomDoors, clusters: clusterDoors } = this.doorWallSets(floor);
 
-      // The floor's occupied set (rooms + clusters + stairs; furniture excluded)
-      // — what makes an edge "exterior" for both window and adjacency purposes.
-      const occupied = new Set<string>();
-      for (const inst of floor.store.instances.values()) {
-        if (inst.def.category === "module") continue;
-        for (const c of occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored))
-          occupied.add(cellKey(c.cx, c.cz));
-      }
+      // Merged connector clusters (Circulation / Outdoor), with any door openings.
+      rebuildClusterShells(floor, floor.grid, height, clusterDoors);
+
+      // The floor's occupied set — what makes an edge "exterior" (open sky) for
+      // window generation. Sourced from the SAME `buildSpaceTargets` map the door
+      // system + adjacency graph use (rooms + clusters + this-floor stairs + the
+      // stair-HOLE PROJECTIONS from the floor below), so a room bordering the
+      // stairwell void never windows onto it. One source of truth per convention.
+      const occupied = new Set(buildSpaceTargets(floor, this.floorBelow(floor)).keys());
       // Entrance edges (floor 0 only) are skipped by windows — a door wins there.
       const entranceEdges = new Set(
         fi === 0 ? floor.entrances.map((e) => edgeKey(e.cell.cx, e.cell.cz, e.side)) : []
@@ -218,16 +243,75 @@ export class FloorManager {
           const e = parseEdgeKey(absKey);
           localWindows.set(edgeKey(e.cx - inst.origin.cx, e.cz - inst.origin.cz, e.side), variant);
         }
-        rebuildRoomWalls(inst.group, inst.def, inst.rotation, height, localWindows, inst.mirrored);
+        rebuildRoomWalls(
+          inst.group, inst.def, inst.rotation, height, localWindows, inst.mirrored,
+          roomDoors.get(inst.id) // LOCAL door-edge keys for this room (or undefined)
+        );
       }
     });
   }
 
-  /** Public trigger for the wall+window rebuild pass, for changes that don't
-   *  go through the store's `onChange` (e.g. placing/removing an entrance,
-   *  which re-skips or re-enables windowing on that edge). */
+  /**
+   * The per-space door openings for `floor`, split into room (LOCAL edge keys,
+   * by instance id) and cluster (ABSOLUTE edge keys) sets, driving
+   * {@link rebuildRoomWalls} and {@link rebuildClusterShells}. Resolves each door
+   * edge's two sides via live grid occupancy; a door onto a stair cuts only the
+   * room/cluster side (a stair owner classifies as "other" → no shell wall).
+   */
+  private doorWallSets(floor: Floor): { rooms: Map<string, Set<string>>; clusters: Set<string> } {
+    return doorWallCuts(
+      floor.doors,
+      (cx, cz) => floor.grid.ownerAt(cx, cz),
+      (id) => {
+        const inst = floor.store.instances.get(id);
+        if (!inst) return null;
+        const kind = inst.def.cluster
+          ? "cluster"
+          : inst.def.category === "room"
+            ? "room"
+            : "other"; // stair / furniture — no shell wall to cut
+        return { kind, origin: inst.origin };
+      }
+    );
+  }
+
+  /** Cell → space-token map for a floor (incl. stair holes projected from the
+   *  floor below), the resolver door placement/validity and the adjacency graph
+   *  share. Public so the door-placement controller can test candidate edges. */
+  doorTargets(floor: Floor): Map<string, string> {
+    return buildSpaceTargets(floor, this.floorBelow(floor));
+  }
+
+  /** Whether `door` currently binds a valid shared interior boundary on `floor`
+   *  (both edges join the same two distinct spaces). */
+  isDoorValid(floor: Floor, door: Door): boolean {
+    const targets = this.doorTargets(floor);
+    return resolveDoorSpaces(door, (cx, cz) => targets.get(cellKey(cx, cz)) ?? null) !== null;
+  }
+
+  /** Remove any door whose edges no longer bind two distinct spaces (a space
+   *  moved/resized/was deleted, or the edge went exterior). Runs inside the
+   *  synchronous store-change pass so the removal shares the triggering action's
+   *  undo snapshot — one Ctrl+Z restores both the move and the door. Doors do
+   *  NOT travel with rooms; they are absolute edge-bound and simply vanish when
+   *  stranded. */
+  private pruneStaleDoors(): void {
+    for (const floor of this.floors) {
+      if (floor.doors.length === 0) continue;
+      const targets = this.doorTargets(floor);
+      const targetAt = (cx: number, cz: number) => targets.get(cellKey(cx, cz)) ?? null;
+      const stale = floor.doors.filter((d) => resolveDoorSpaces(d, targetAt) === null);
+      for (const d of stale) floor.removeDoor(d.id);
+    }
+  }
+
+  /** Public trigger for the shell rebuild pass, for changes that don't go
+   *  through the store's `onChange` (placing/removing an entrance — a freed edge
+   *  may regain a window — or placing/removing a door, which cuts/closes an
+   *  opening in both adjacent shells). Does NOT prune (those callers never
+   *  strand a door). */
   refreshWalls(): void {
-    this.rebuildWalls();
+    this.rebuildAllShells();
     markCutawayDirty();
   }
 
@@ -380,7 +464,7 @@ export class FloorManager {
 
     const floorsData = data.floors.length
       ? data.floors
-      : [{ cols: this.defaultCols, rows: this.defaultRows, instances: [], entrances: [] }];
+      : [{ cols: this.defaultCols, rows: this.defaultRows, instances: [], entrances: [], doors: [] }];
 
     // Create ALL floors first, THEN place instances — so a stair on floor N sees
     // the (saved) floor N+1 already present and doesn't spuriously auto-create a
@@ -396,11 +480,20 @@ export class FloorManager {
           inst.type, { cx: inst.cx, cz: inst.cz }, inst.rotation, inst.mirrored ?? false
         );
       }
-      // Entrances are derived only from save data (not the store); restore them.
+      // Entrances + doors are authored data (not in the store); restore them.
+      // Doors go on after all this floor's instances (and, by the create-all-
+      // floors-first order above, after the floor below's stair) so their two
+      // spaces already exist to bind.
       for (const ent of floorsData[k].entrances)
         floor.addEntrance({ cx: ent.cx, cz: ent.cz }, ent.side);
+      for (const d of floorsData[k].doors)
+        floor.addDoor({ cx: d.cx, cz: d.cz }, d.side);
     });
 
+    // Cut door openings (and prune any door that doesn't bind two live spaces —
+    // tolerant of hand-edited files) now that every floor is fully populated;
+    // the per-place onChange fired during the loop rebuilt walls doorless.
+    this.syncStairsAndHoles();
     this.setActive(0);
   }
 }

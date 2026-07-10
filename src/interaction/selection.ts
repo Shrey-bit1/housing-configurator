@@ -11,17 +11,22 @@ import { setSelected, setHovered } from "../scene/moduleMesh";
 const DRAG_THRESHOLD_PX = 4;
 
 /**
- * Adapter for entrance selection/deletion, injected so the selection controller
- * doesn't need to know entrance internals. `pick` returns the entrance id under
- * the cursor (or null; the concrete impl gates this to when floor 0 is active);
- * `setSelected` applies/clears the marker highlight; `remove` deletes the
- * entrance and refreshes its derived state.
+ * Adapter for edge-bound MARKER selection/deletion (entrances AND doors),
+ * injected so the selection controller doesn't need to know their internals.
+ * `pick` returns the marker id under the cursor (or null; the concrete impl gates
+ * where relevant — entrances to floor 0, doors to the active floor); `setSelected`
+ * applies/clears the marker highlight; `remove` deletes it and refreshes derived
+ * state. Entrances and doors share this shape but are separate, mutually-exclusive
+ * selections.
  */
-export interface EntranceSelectionAdapter {
+export interface MarkerSelectionAdapter {
   pick(clientX: number, clientY: number): string | null;
   setSelected(id: string | null): void;
   remove(id: string): void;
 }
+
+/** @deprecated Use {@link MarkerSelectionAdapter}; kept as the historical name. */
+export type EntranceSelectionAdapter = MarkerSelectionAdapter;
 
 /**
  * Handles everything you can do to already-placed modules — SINGLE or
@@ -74,15 +79,18 @@ export class SelectionController {
   /** Multi-selection of module instance ids, ACTIVE FLOOR only. */
   private selectedIds = new Set<string>();
   private selectedEntranceId: string | null = null;
+  private selectedDoorId: string | null = null;
   private hoveredId: string | null = null;
 
   // Pointer-drag state.
   private pressed: ModuleInstance | null = null;
+  /** True while an edge-bound marker (entrance or door) is pressed — it only
+   *  selects (no move), and locks orbit for the press so a nudge doesn't pan. */
+  private pressedMarker = false;
   /** The ids that will move together if this press turns into a drag — either
    *  the instance alone, or the whole multi-selection if the pressed instance
    *  was already part of one. Null when nothing is pressed. */
   private dragIds: Set<string> | null = null;
-  private pressedEntrance = false;
   private pressX = 0;
   private pressY = 0;
   private grabOffset: Cell = { cx: 0, cz: 0 };
@@ -112,11 +120,17 @@ export class SelectionController {
     /** Fired after a committed mutation (for undo/redo snapshots). */
     private onAfterAction?: () => void,
     /** Entrance select/delete adapter (entrances live on floor 0 only). */
-    private entrances?: EntranceSelectionAdapter,
+    private entrances?: MarkerSelectionAdapter,
     /** Fired whenever the selection (module set or entrance) changes. */
     private onSelectionChange?: () => void,
     /** Fired when R/M is pressed against a multi-selection (no-op). */
-    private onNoopHint?: (message: string) => void
+    private onNoopHint?: (message: string) => void,
+    /** Door select/delete adapter (doors live on any floor, active floor only). */
+    private doors?: MarkerSelectionAdapter,
+    /** True while a PLACEMENT tool (entrance/door mode) owns the canvas — the
+     *  selection controller then stays out of the way entirely (that gesture's
+     *  own click commits; a stray module select/move must not ride along). */
+    private isToolActive?: () => boolean
   ) {
     this.install();
   }
@@ -129,9 +143,9 @@ export class SelectionController {
     window.addEventListener("keydown", (e) => this.onKeyDown(e));
   }
 
-  /** True if anything (module(s) or an entrance) is currently selected. */
+  /** True if anything (module(s), an entrance, or a door) is currently selected. */
   get hasSelection(): boolean {
-    return this.selectedIds.size > 0 || this.selectedEntranceId !== null;
+    return this.selectedIds.size > 0 || this.selectedEntranceId !== null || this.selectedDoorId !== null;
   }
 
   /** The currently-selected module instances, resolved fresh from the store. */
@@ -146,6 +160,10 @@ export class SelectionController {
 
   get selectedEntranceIdValue(): string | null {
     return this.selectedEntranceId;
+  }
+
+  get selectedDoorIdValue(): string | null {
+    return this.selectedDoorId;
   }
 
   /** True while a Shift+D duplicate ghost is following the cursor, awaiting a
@@ -166,7 +184,23 @@ export class SelectionController {
       this.entrances?.setSelected(null);
       this.selectedEntranceId = null;
     }
+    if (this.selectedDoorId) {
+      this.doors?.setSelected(null);
+      this.selectedDoorId = null;
+    }
     this.onSelectionChange?.();
+  }
+
+  /** Clear any selected edge-bound marker (entrance or door). */
+  private clearMarkerSelection(): void {
+    if (this.selectedEntranceId) {
+      this.entrances?.setSelected(null);
+      this.selectedEntranceId = null;
+    }
+    if (this.selectedDoorId) {
+      this.doors?.setSelected(null);
+      this.selectedDoorId = null;
+    }
   }
 
   private clearModuleSelection(): void {
@@ -177,13 +211,10 @@ export class SelectionController {
     this.selectedIds.clear();
   }
 
-  /** Replace the module selection wholesale (clears any prior set/entrance). */
+  /** Replace the module selection wholesale (clears any prior set/marker). */
   private setSelection(ids: Iterable<string>): void {
     this.clearModuleSelection();
-    if (this.selectedEntranceId) {
-      this.entrances?.setSelected(null);
-      this.selectedEntranceId = null;
-    }
+    this.clearMarkerSelection();
     this.selectedIds = new Set(ids);
     for (const id of this.selectedIds) {
       const inst = this.store.instances.get(id);
@@ -200,10 +231,7 @@ export class SelectionController {
   /** Shift-click: toggle membership in the multi-selection (a pure selection
    *  edit — no drag/move is initiated by this gesture). */
   private toggleModuleSelection(id: string): void {
-    if (this.selectedEntranceId) {
-      this.entrances?.setSelected(null);
-      this.selectedEntranceId = null;
-    }
+    this.clearMarkerSelection();
     const inst = this.store.instances.get(id);
     if (this.selectedIds.has(id)) {
       this.selectedIds.delete(id);
@@ -218,8 +246,18 @@ export class SelectionController {
   private selectEntrance(id: string): void {
     if (this.selectedEntranceId === id && this.selectedIds.size === 0) return;
     this.clearModuleSelection();
+    this.clearMarkerSelection();
     this.selectedEntranceId = id;
     this.entrances?.setSelected(id);
+    this.onSelectionChange?.();
+  }
+
+  private selectDoor(id: string): void {
+    if (this.selectedDoorId === id && this.selectedIds.size === 0) return;
+    this.clearModuleSelection();
+    this.clearMarkerSelection();
+    this.selectedDoorId = id;
+    this.doors?.setSelected(id);
     this.onSelectionChange?.();
   }
 
@@ -250,22 +288,30 @@ export class SelectionController {
 
   private onPointerDown(e: PointerEvent): void {
     if (e.button !== 0 || this.dragDrop.isDragging) return;
+    if (this.isToolActive?.()) return; // entrance/door placement owns the canvas
     if (this.duplicating) return; // commits on release, see onPointerUp
+
+    // Edge-bound MARKERS first: entrance (gated to floor 0) then door (active
+    // floor). A door marker is a low strip sitting ON TOP of the room/cluster/
+    // stair slabs it straddles, so a module is ALWAYS under the cursor too —
+    // the marker is the intended click target, so it must win when the ray hits
+    // it (picked before modules). Both only SELECT; they never move.
+    const entId = this.entrances?.pick(e.clientX, e.clientY) ?? null;
+    const doorHit = entId ? null : this.doors?.pick(e.clientX, e.clientY) ?? null;
+    if (entId || doorHit) {
+      if (entId) this.selectEntrance(entId);
+      else this.selectDoor(doorHit!);
+      // Lock orbit for this press so a small drag doesn't nudge the camera;
+      // released on pointerup. No drag/move state.
+      this.pressedMarker = true;
+      this.controls.enabled = false;
+      this.canvas.setPointerCapture(e.pointerId);
+      return;
+    }
 
     const obj = this.picker.groupAt(e.clientX, e.clientY, this.store.groups);
     const inst = this.store.instanceFromObject(obj);
     if (!inst) {
-      // No module hit — try an entrance marker (adapter gates this to floor 0).
-      const entId = this.entrances?.pick(e.clientX, e.clientY) ?? null;
-      if (entId) {
-        this.selectEntrance(entId);
-        // Entrances don't move — lock orbit for this press so a small drag
-        // doesn't nudge the camera; released on pointerup. No drag/move state.
-        this.pressedEntrance = true;
-        this.controls.enabled = false;
-        this.canvas.setPointerCapture(e.pointerId);
-        return;
-      }
       // Empty space: deselect and let OrbitControls handle the drag (orbit —
       // see the class doc for why marquee-select isn't layered on top of this).
       this.deselect();
@@ -307,6 +353,7 @@ export class SelectionController {
   }
 
   private onPointerMove(e: PointerEvent): void {
+    if (this.isToolActive?.()) return; // placement tool owns the cursor
     if (this.duplicating) {
       this.refreshDuplicateGhost(this.picker.cellAt(e.clientX, e.clientY));
       return;
@@ -373,15 +420,16 @@ export class SelectionController {
   }
 
   private onPointerUp(e: PointerEvent): void {
+    if (this.isToolActive?.()) return; // placement tool's own onUp commits
     if (this.duplicating) {
       // A click (any pointerup while duplicating — there's no press-and-hold
       // gesture here) commits at the ghost's last valid cursor position.
       this.commitDuplicate();
       return;
     }
-    if (this.pressedEntrance) {
-      // Entrance click already selected on pointerdown; just release the lock.
-      this.pressedEntrance = false;
+    if (this.pressedMarker) {
+      // Marker (entrance/door) click already selected on pointerdown; release lock.
+      this.pressedMarker = false;
       this.canvas.releasePointerCapture?.(e.pointerId);
       this.controls.enabled = true;
       return;
@@ -593,6 +641,12 @@ export class SelectionController {
         const id = this.selectedEntranceId;
         this.selectedEntranceId = null;
         this.entrances?.remove(id); // deletes marker + refreshes derived state
+        this.onSelectionChange?.();
+        this.onAfterAction?.();
+      } else if (this.selectedDoorId && !this.moving) {
+        const id = this.selectedDoorId;
+        this.selectedDoorId = null;
+        this.doors?.remove(id); // deletes door + closes its opening
         this.onSelectionChange?.();
         this.onAfterAction?.();
       }

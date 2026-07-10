@@ -1,10 +1,10 @@
 # PROJECT_STATE.md
 
 Reference doc for reorienting after context loss. Reflects the actual code in
-the working tree on `main` (last commit `d191020`, plus this session's
-uncommitted mirroring feature and multi-select/group-ops/UI-polish feature —
-see §6 for the running list of what's still uncommitted). Reference-style, not
-prose. **Read the cited files to confirm before relying on any detail.**
+the working tree on `main` — the interior-doors feature (§2i) and rules batches
+①/②/③ (§8) are committed here alongside this doc (baseline `30bf5dd` = mirroring
++ multi-select/group-ops). Reference-style, not prose. **Read the cited files to
+confirm before relying on any detail.**
 
 ---
 
@@ -19,10 +19,13 @@ so chiral L-shapes and the dogleg stair reach both handednesses), moved, and
 deleted, singly or as a **multi-selection** (Shift-click, group move/delete —
 see §2h); the
 app renders rooms as hollow "dollhouse" shells with a camera-aware cutaway so
-interiors are visible. A whole-dwelling adjacency graph (rooms/clusters/stairs
-as nodes, touch + cross-floor stair edges) feeds an advisory, on-demand layout
-rules engine and a toggleable bubble-diagram view. Projects save/load to JSON.
-It is a work-in-progress research artifact, not a production app.
+interiors are visible. The user authors **entrances** (exterior edges) and
+**doors** (interior edges) — and **reachability is strictly door-based**:
+two spaces are connected only when a door joins them (see §2i). A whole-dwelling
+adjacency graph (rooms/clusters/stairs as nodes; physical TOUCH edges +
+authored-door ACCESS edges) feeds an advisory, on-demand layout rules engine and
+a toggleable bubble-diagram view. Projects save/load to JSON. It is a
+work-in-progress research artifact, not a production app.
 
 ---
 
@@ -33,28 +36,31 @@ It is a work-in-progress research artifact, not a production app.
 | Grid + occupancy + coordinate conversion | `src/core/grid.ts` | `Grid` class: dims, occupancy `Map<"cx,cz", instanceId>`, `holeCells` (stairwell voids), `gridToWorld`/`worldToGrid` (grid centred on world origin), `canPlace(cells, exclude?: string \| Set<string>)` (a Set excludes every id in it at once — the group-move self-exclusion primitive, §2h), `plateAvailable`/`occupy`/`free`/`setHoles`/`ownerAt`/`inBounds`/`resize`. `CELL_SIZE = 0.6`. |
 | Room / module / stair definitions + **THE central footprint transform** | `src/core/modules.ts` | `MODULE_DEFS` registry, `ModuleDef` (`category: "module" \| "room" \| "stair"`), `lShape()`/`rect()` footprint helpers, `ROOM_HEIGHT = 4`. Transform: `rotateCell`/`mirrorCell`/**`transformCell`**/`rotatedCells`/`occupiedCells` — **mirror THEN rotate**, see §2g. `MODULE_LIST` (furniture), `ROOM_LIST`, `STAIR_LIST`. |
 | Placed-instance store (place/move/rotate/**mirror**/delete, **group ops**) | `src/core/store.ts` | `ModuleStore`: single source mutating occupancy + scene together. `instances: Map<id, ModuleInstance>` (each carries `mirrored: boolean`), `onChange` hook, `extraPlacementCheck?` (cross-floor stair rule, set by FloorManager), `canPlaceInstance(def, cells, excludeId?: string \| Set<string>)`, `place(type,origin,rotation,mirrored)`, `move(id,origin,rotation,mirrored?)` (rebuilds the mesh when rotation OR mirror changes), `rotate(id)`/`mirror(id)` (both pivot on the origin cell, both collision-checked), `reconcileAfterResize`, `maxRoomHeightCells`. **Group ops** (§2h): `moveMany(moves)` (atomic rigid move, all-or-nothing, self-exclusion via a Set, never rebuilds meshes since rotation/mirror are untouched), `removeMany(ids)` (single `onChange`), `placeMany(items)` (atomic batch place — new ids, no exclusion needed — used by group duplicate). |
-| Mesh building: solid cubes, **room shells**, connector tiles, **concave-corner wall logic**, **window panel-kit + glazing** | `src/scene/moduleMesh.ts` | `buildModuleMesh()` routes: `category==="stair"` → `buildStairGroup` (stairMesh.ts); connector → tile; room → `buildRoomShell` (hollow open-top shell, walls built directly at the floor's true height — see §2b); else solid cubes. `buildBoundaryWalls()` is the shared clean-corner wall generator (exported; reused by clusters), and — given a per-edge `windows` map — replaces a windowed edge's solid segment with sill/lintel panels + a glazing pane (see §2d). `rebuildRoomWalls()` rebuilds just a room's wall+glazing meshes in place when height or windows change. `makeGlassMaterial()`, `setSelected()`, `setHovered(group, hovered, selected)` (subtler emissive intensity 0.15 vs selection's 0.35; no-ops when `selected` or when a rules-violation tint owns the material — §2h). `WALL_T = 0.1`, `FLOOR_H = 0.15`. |
+| Mesh building: solid cubes, **room shells**, connector tiles, **concave-corner wall logic**, **window panel-kit + glazing** | `src/scene/moduleMesh.ts` | `buildModuleMesh()` routes: `category==="stair"` → `buildStairGroup` (stairMesh.ts); connector → tile; room → `buildRoomShell` (hollow open-top shell, walls built directly at the floor's true height — see §2b); else solid cubes. `buildBoundaryWalls()` is the shared clean-corner wall generator (exported; reused by clusters), and — given a per-edge `windows` map — replaces a windowed edge's solid segment with sill/lintel panels + a glazing pane (see §2d), and — given a `doors` edge-key set — cuts a fixed 0→`DOOR_OPENING_H` opening with a solid header above (see §2i). `rebuildRoomWalls()` rebuilds just a room's wall+glazing meshes in place when height, windows, or doors change. `makeGlassMaterial()`, `setSelected()`, `setHovered(group, hovered, selected)` (subtler emissive intensity 0.15 vs selection's 0.35; no-ops when `selected` or when a rules-violation tint owns the material — §2h). `WALL_T = 0.1`, `FLOOR_H = 0.15`. |
 | **Rule-driven window generator** (derived, per room) | `src/core/windows.ts` | `computeWindows(cells, roomTypeId, floorHeight, occupied, entranceEdgeKeys) → WindowPlan`. Pure computation (no Three.js). `WINDOW_CONFIG` per-type table (target ratio + variant). See §2d. |
 | **Stair geometry** (180° dogleg, two floors) | `src/scene/stairMesh.ts` | `buildStairGroup(def, rotation, ghost, mirrored)`. See §2a; mirroring negates the lane x-centres only (winding-safe, §2g). |
 | Dynamic dollhouse **cutaway** | `src/scene/cutaway.ts` | `updateCutaway()` hides wall meshes whose `userData.wallNormal · viewDir > THRESHOLD (0.12)`; throttled (recompute on camera move or `markCutawayDirty()`). Unaffected by the §2b wall-height mechanism (walls are rebuilt, not scaled — `wallNormal` tags are untouched either way) or the top view (a straight-down `viewDir` dots to ~0 against every wall normal, which are always in the XZ plane — every wall stays visible, reading correctly as a plan). |
-| **Multi-floor** support, stacking, **wall/stair height reconciliation**, **window generation**, **floor visibility**, **zoom-to-extent box** | `src/core/floor.ts`, `src/core/floorManager.ts` | See §2b (height), §2d (windows), §5 (visibility/framing). `Floor` = own grid + `ModuleStore` + `GridView` + `HoleView` + `EntranceView` + `entrances[]` + `windowStats` + `clusterGroup`, all under one `group`. `FloorManager`: stack, active floor, vertical stacking offsets, dim inactive floors, stairwell holes, `rebuildWalls()` (walls + windows), floor visibility, content bounding box. `DEFAULT_FLOOR_CELLS = 4`, `CLEARANCE_CELLS = 1`. |
+| **Multi-floor** support, stacking, **wall/stair height reconciliation**, **window generation**, **floor visibility**, **zoom-to-extent box** | `src/core/floor.ts`, `src/core/floorManager.ts` | See §2b (height), §2d (windows), §5 (visibility/framing). `Floor` = own grid + `ModuleStore` + `GridView` + `HoleView` + `EntranceView` + `entrances[]` + `windowStats` + `clusterGroup`, all under one `group`. `FloorManager`: stack, active floor, vertical stacking offsets, dim inactive floors, stairwell holes, `rebuildAllShells()` (all floors' room walls + windows + DOOR OPENINGS + merged cluster shells), `pruneStaleDoors()` (auto-remove doors a mutation stranded, inside the same undo snapshot), `doorTargets()`/`isDoorValid()` (door placement/validity), floor visibility, content bounding box. `DEFAULT_FLOOR_CELLS = 4`, `CLEARANCE_CELLS = 1`. |
 | Grid dots / floor visual | `src/scene/gridView.ts` | Intersection dots + border; `setDimmed`. |
 | Stairwell **hole** rendering | `src/scene/holeView.ts` | `HoleView`: recessed dark panel + outline per stairwell opening (merged per connected component). Purely visual; occupancy blocking is `Grid.holeCells`. |
 | Ground-floor **entrance** marker rendering | `src/scene/entranceView.ts` | `EntranceView`: renders `Floor.entrances` as door markers on exterior edges; meshes tagged `userData.entranceId` for highlight lookup. |
 | **Entrance placement** interaction | `src/interaction/entranceController.ts`, `src/core/entrance.ts` | `EntranceController`: ghost preview + click-to-place (ground floor only). `isActive` getter + public `cancel()` — Escape is arbitrated centrally by main.ts (§2h), not handled internally here. `Entrance { id, cell, side }`. Entrances are also SELECTABLE/DELETABLE (via `SelectionController`, see §2f) but explicitly EXCLUDED from multi-select/group ops (§2h): click a marker to select, Delete to remove. `Floor.removeEntrance(id)`; `EntranceView.markers`/`setSelectedId`. |
+| **Interior door** model + validity + space-target resolver | `src/core/door.ts` | `Door { id, cell, side }` (2-edge span, edge-key bound); `DOOR_SPAN=2`, `DOOR_OPENING_H=2.1`, `BELOW_PREFIX`; `doorId`/`doorEdges`; **`resolveDoorSpaces(door, targetAt)`** (the one definition of door validity + connectivity — both edges must join the SAME two distinct spaces); **`buildSpaceTargets(floor, floorBelow?)`** (cell → space token: room/stair id, cluster node id, or `^stair` for a hole projected up from below — shared by placement, pruning, and the graph); `doorWallCuts` (per-door room-local + cluster-absolute opening edge sets). See §2i. |
+| Interior-door **marker rendering** | `src/scene/doorView.ts` | `DoorView` + `makeDoorMesh`: a violet floor-threshold strip across each door's opening (reads in plan view; the door's click target, `userData.doorId`). Renders `Floor.doors` on ANY floor. |
+| **Door placement** interaction | `src/interaction/doorController.ts` | `DoorController`: hover a shared interior boundary → a 2-edge ghost slides along the nearest wall, green/red per `FloorManager.isDoorValid`; click commits. `isActive`/public `cancel()`, Escape arbitrated centrally (§2h). Doors are SELECTABLE/DELETABLE via `SelectionController` (§2f, its second `MarkerSelectionAdapter`), on any floor. |
 | **Undo / redo history** (snapshot-based) | `src/core/history.ts` | `History`: undo/redo stacks of serialized-project snapshots (cap 20), commit-after-action model, restore via the import rebuild path. See §2f. |
 | **Exterior-edge detection** (reusable) | `src/core/exteriorEdges.ts` | `exteriorEdges(cells, occupied) → BoundaryEdge[]`. Standalone/generic: consumed by entrance placement/validity, the daylight rules (D1/D2 via `GraphNode.hasExteriorEdge`), and reserved for a future facade/window task. |
-| **Circulation / Outdoor cluster merging** | `src/scene/clusterShells.ts` (+ `src/core/cluster.ts`) | `rebuildClusterShells()` groups connector cells by `def.cluster`, flood-fills connected components (`connectedComponents`), draws ONE merged boundary shell per cluster (outer walls only) via `buildBoundaryWalls`. |
+| **Circulation / Outdoor cluster merging** | `src/scene/clusterShells.ts` (+ `src/core/cluster.ts`) | `rebuildClusterShells(floor, grid, wallHeight, doors?)` groups connector cells by `def.cluster`, flood-fills connected components (`connectedComponents`), draws ONE merged boundary shell per cluster (outer walls only) via `buildBoundaryWalls` — cutting any door openings (ABSOLUTE edge keys) on the cluster side of a room↔cluster / cluster↔cluster boundary. |
 | **Voxel furniture prop** system | `src/scene/props/*` | `voxelProp.ts` (format + library), `place.ts` (transform/tiling/clip/wall-clip + merged `InstancedMesh`; `buildPropsMesh(..., mirror)` negates emitted voxel x + mirrors the clip footprint, §2g), `kitchen.ts` (Kitchen layout, takes `mirrored`), `index.ts` (`PROP_BUILDERS: Record<string, (mirrored: boolean) => Group>`). Data in `src/scene/props/data/*.json`. |
 | **Whole-dwelling adjacency graph** (rules + bubble-diagram data) | `src/core/adjacencyGraph.ts` | `computeDwellingGraph(floors) → DwellingGraph`. See §2c. |
 | **Layout rules engine** (advisory, on-demand) | `src/core/rules.ts` | `RULES: Rule[]`, `validate(graph)`, `computeEntranceDepths(graph)`. See §8 for the full current rule table. |
 | Rules-violation **3D highlighting** | `src/scene/highlight.ts` | `applyRoomHighlights(floors, violations)` / `clearRoomHighlights(floors)`: emissive tint on implicated room/cluster/stair shells + entrance markers, across ALL floors, resolved via `parseDwellingNodeId`. |
-| Bubble-diagram **view** | `src/ui/graphView.ts` | Toggleable full-screen 2D force-directed node-edge diagram of the DwellingGraph; entry-node rings, cross-floor stair stubs, depth badges, highlight/depth overlays. |
+| Bubble-diagram **view** | `src/ui/graphView.ts` | Toggleable full-screen 2D force-directed node-edge diagram of the DwellingGraph; entry-node rings, cross-floor stair stubs, depth badges, highlight/depth overlays. **ACCESS (door) edges drawn SOLID, TOUCH-only edges faint DASHED** (a pair with both shows solid); cross-floor stubs solid violet (doored) vs dashed grey (touch); bottom-left legend. |
 | Validation report panel | `src/ui/validationPanel.ts` | `renderValidationPanel()`: grouped hard/soft/note issue list + the entrance-depth metric summary. |
-| **Project save / load** | `src/core/projectIO.ts` | `serializeProject(floors) → ProjectFile`, `parseProject(text) → ParsedProject` (tolerant/versioned). See §3. Camera state and floor visibility are deliberately excluded (view state, not design state). |
+| **Project save / load** | `src/core/projectIO.ts` | `serializeProject(floors) → ProjectFile`, `parseProject(text) → ParsedProject` (tolerant/versioned). Per-floor `entrances` AND `doors` are additive edge-bound lists (`normalizeEdgeBound` serves both). See §3. Camera state and floor visibility are deliberately excluded (view state, not design state). |
 | Sidebar palette / grid-size / floor tabs / floor-visibility toggles | `src/ui/palette.ts` | Rebuilt on floor-state change. |
 | Scene/camera/lights, **zoom-to-extent framing** | `src/scene/sceneSetup.ts` | Orthographic camera, `frameBox(box, direction)`. See §5. |
-| Interaction | `src/interaction/picker.ts`, `dragDrop.ts`, `selection.ts` | Raycast picking (scoped to the ACTIVE floor's store only — this is also why floor visibility needs no picker-side filtering, see §5), palette→canvas placement, select/**multi-select**/move/**group-move**/rotate/**mirror**/delete/**group-delete**/**Shift+D-duplicate** (any count) of modules, plus entrance select/delete. `R`/`M` work on the palette ghost, the move ghost, the duplicate ghost, and a SINGLE selected instance — no-op on 2+ (§2h). `dragDrop.cancelPlacement()`/`selection.cancelDuplicate()`/`entranceController.cancel()` are public, no-argument, and NOT wired to their own Escape listeners — Escape is arbitrated centrally by main.ts (§2h). `dragDrop`/`selection` take an `onAfterAction` callback (fires after a committed mutation → undo snapshot, see §2f); `selection` also takes `onSelectionChange`/`onNoopHint` callbacks and an `EntranceSelectionAdapter`. |
+| Interaction | `src/interaction/picker.ts`, `dragDrop.ts`, `selection.ts` | Raycast picking (`cellAt`/`groupAt`/`groundPoint`, scoped to the ACTIVE floor's store — this is also why floor visibility needs no picker-side filtering, see §5), palette→canvas placement, select/**multi-select**/move/**group-move**/rotate/**mirror**/delete/**group-delete**/**Shift+D-duplicate** (any count) of modules, plus entrance AND door select/delete (two `MarkerSelectionAdapter`s — mutually exclusive singletons, excluded from multi-select). `R`/`M` work on the palette ghost, the move ghost, the duplicate ghost, and a SINGLE selected instance — no-op on 2+ (§2h). `dragDrop.cancelPlacement()`/`selection.cancelDuplicate()`/`entranceController.cancel()` are public, no-argument, and NOT wired to their own Escape listeners — Escape is arbitrated centrally by main.ts (§2h). `dragDrop`/`selection` take an `onAfterAction` callback (fires after a committed mutation → undo snapshot, see §2f); `selection` also takes `onSelectionChange`/`onNoopHint` callbacks and an `EntranceSelectionAdapter`. |
 | **Group-move ghost** | `src/scene/groupGhostPreview.ts` | `GroupGhostPreview`: one translucent ghost mesh per selected member, positioned by its cell offset from the grabbed member's target origin, tinted green/red as ONE unit (mirrors `GhostPreview`'s shape/API). See §2h. |
 | Wiring / render loop / view-mode orchestration | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
 
@@ -160,13 +166,26 @@ just the active one). Node ids are namespaced `<floor>/<rawId>`
 (`dwellingNodeId`/`parseDwellingNodeId`) since per-floor instance/cluster ids
 collide across floors.
 
+**Two edge kinds** (`GraphEdge.viaDoor`, see §2i and §3):
+- **TOUCH** (`viaDoor: false`): footprints share a wall (orthogonal cells) —
+  physical adjacency. Also a cross-floor `viaStair` touch where a stair
+  physically underlies the floor above. Consumed ONLY by the proximity rules
+  (H4/S3/S4/S5) and drawn faint/dashed in the diagram.
+- **ACCESS** (`viaDoor: true`): an authored door binds the two spaces (§2i).
+  The ONLY edges that confer reachability — every reachability/connectivity
+  rule traverses these (see §2i, §8). Built by resolving each door to the two
+  spaces its edges bind, via the shared `buildSpaceTargets` map.
+
 **Stairs are graph nodes** (`kind: "stair"`), not a same-floor-to-next-floor
-shortcut: a stair gets ordinary same-floor ("bottom") edges from the generic
-touch-edge pass (whatever touches its footprint on its own floor) PLUS
-`viaStair: true` ("top") edges to whatever touches its footprint projected
-onto the floor above. A room on floor N reaching a room on floor N+1 routes
-THROUGH the stair node (one extra hop vs. the old direct-shortcut model) —
-same reachable set, but the stair itself becomes inspectable (ST1/ST2).
+shortcut. A stair gets TOUCH edges from the generic pass (bottom-side same-floor
+adjacency + a `viaStair` top-side touch to whatever overlies its footprint on the
+floor above), but those confer NO reachability. A stair connects for reachability
+ONLY where a door faces it: a door on the stair's own floor → a bottom ACCESS
+edge; a door on the floor above facing the stair's hole projection → a top
+`viaStair` ACCESS edge (the `^`-prefixed below-stair token in `buildSpaceTargets`).
+So a room on floor N reaches a room on floor N+1 only through a DOORED stair at
+both ends. The stair is inspectable via ST1 (door connections at top/bottom) and
+ST2 (door-reachable from an entrance).
 
 Entrances are floor-0-only, RE-VALIDATED on every graph build (not cached):
 `EntranceStatus.blocked` is true if the host cell no longer resolves to a
@@ -177,9 +196,14 @@ non-blocked entrance's host node id (multiple entrances allowed; "any one
 entrance reaches it" is sufficient for reachability, see rules.ts's doc
 comment).
 
-`GraphNode.hasExteriorEdge` is computed once per floor (post-pass, reusing
-`exteriorEdges` against the floor's full occupied set) and consumed by the
-daylight rules (D1/D2) rather than recomputed per-rule.
+`GraphNode.hasExteriorEdge` is computed once per floor (post-pass) and consumed
+by the daylight rules (D1/D2) rather than recomputed per-rule. Its occupied set
+is the **`buildSpaceTargets(floor, floorBelow)` key set** — the SAME source the
+door system uses — so it counts, beyond this floor's rooms/clusters/stairs, the
+**stair-hole projections from the floor below**. An edge facing the stairwell
+void (no sky) is therefore NOT exterior: without this, a floor-N+1 room bordering
+the hole would falsely pass D1 and window onto the void (a live bug, fixed —
+same-floor stairs were already covered as real occupants; the hole was the gap).
 
 `GraphNode.glazing?: GlazingStat` (rooms only) carries the derived window
 generator's achieved-vs-target glazing, read from `floor.windowStats` (§2d) —
@@ -191,8 +215,8 @@ Windows are **DERIVED, never stored** — regenerated from room type + exterior
 edges on every wall rebuild, exactly like cluster shells and stair holes.
 Nothing new is serialized; export/import reproduces identical windows because
 they're a pure function of placement (verified by round-trip). **Exterior
-edges only** — interior walls stay full solid; doors / interior openings are a
-deliberate LATER task.
+edges only** — interior openings are the separate, AUTHORED door system (§2i),
+not derived here.
 
 **Generator** (`computeWindows(cells, roomTypeId, floorHeight, occupied,
 entranceEdgeKeys) → WindowPlan`, pure, no Three.js):
@@ -229,8 +253,11 @@ wall mesh → they tint/dim/cutaway exactly like wall); glazing uses a per-room
 `userData.wallNormal` tag as solid walls, so the cutaway hides panels + glass
 together with their face (verified).
 
-**Integration**: `FloorManager.rebuildWalls()` computes the floor's occupied set
-(rooms + clusters + stairs) and floor-0 entrance edges, then per room calls
+**Integration**: `FloorManager.rebuildAllShells()` computes the floor's occupied
+set as the **`buildSpaceTargets(floor, floorBelow)` key set** (rooms + clusters +
+this-floor stairs + stair-HOLE PROJECTIONS from the floor below — one source of
+truth with the door system and `hasExteriorEdge`, so a room never windows onto
+the stairwell void) plus floor-0 entrance edges, then per room calls
 `computeWindows`, converts the ABSOLUTE windowed edges → LOCAL edge keys (abs −
 origin; side unchanged since the room group isn't rotated), and passes them into
 `rebuildRoomWalls(..., localWindows)`. The achieved-vs-target `GlazingStat` is
@@ -528,6 +555,7 @@ happens per keypress —
 dragDrop.isDragging         → dragDrop.cancelPlacement()   // palette placement
 selection.isDuplicating     → selection.cancelDuplicate()  // Shift+D ghost (own flag, not dragDrop's)
 entranceController.isActive → entranceController.cancel()
+doorController.isActive     → doorController.cancel()       // door-placement mode
 selection.hasSelection      → selection.deselect()
 planMode                    → exitPlanMode()
 ```
@@ -572,6 +600,114 @@ multi-select instead. (A Shift+drag-on-empty-ground variant would sidestep the
 conflict — shift+drag is currently unbound — and is a reasonable future
 extension; not implemented for v1, see §7.)
 
+### 2i. Interior doors — authored access, door-based reachability
+
+Doors are **authored, stored objects** (the OPPOSITE of derived windows; the
+SAME family as entrances). The user places them on shared interior edges, and
+**reachability is strictly door-based**: physical touch without a door is not a
+connection (the deliberate cutover — old/doorless layouts flag red until doored,
+explained by the DR1 note, §8).
+
+**Data model** (`core/door.ts`). `Door { id, cell, side }` — a marker bound to a
+shared interior edge, spanning EXACTLY 2 consecutive edges (1200 mm, fixed at 2
+for v1); the second edge is implied by the side's run (+x for north/south, +z for
+east/west). Stored per floor (`Floor.doors`, ANY floor — unlike floor-0-only
+entrances), rebuilt into markers via `DoorView`. `id` = the anchor `edgeKey`.
+- **`resolveDoorSpaces(door, targetAt)`** is the ONE definition of door validity
+  + connectivity: both of the door's edges must join the SAME two DISTINCT
+  spaces (else null → invalid). Caller supplies the token space, so the same
+  function serves placement validity and graph access edges.
+- **`buildSpaceTargets(floor, floorBelow?)`** maps each cell → an opaque space
+  token: a room/stair instance id, a cluster's `clusterNodeId` (all pieces of one
+  cluster read as ONE space), or `^`+id for a stair on the floor below projected
+  up onto this floor's stairwell hole (how an upper room doors onto the stair
+  arrival). Shared by placement validity, stale-door pruning, and the graph.
+- **Valid hosts**: room↔room, room↔cluster, cluster↔cluster, and room/cluster↔
+  stair (bottom, on the stair's floor; top, on the floor above via the hole
+  projection). NOT exterior edges (the entrance's job), interior-to-one-space, or
+  edges facing nothing (all verified rejected).
+
+**Geometry — the opening (`moduleMesh.buildBoundaryWalls`, `door.ts`
+`DOOR_OPENING_H = 2.1`).** A doored edge gets an OPENING 0→2100 mm with a SOLID
+header panel 2100→floorHeight above it. **The deliberate INVERSE of a window**:
+a window's sill/lintel panels are FIXED (900 mm) and the glazing GAP absorbs extra
+floor height; a door's OPENING is FIXED (2100 mm ergonomic constant) and the
+HEADER grows on taller floors. On a 3.0 m floor they coincide (2100 = 3000 − 900)
+— do NOT conflate them (verified: at a forced 4.0 m floor the opening stays 2.1 m
+and the header grows to fill 2.1→4.0). No sill, no glazing; doors are checked
+before windows in `emit` (the two never coincide — windows are exterior-only,
+doors interior-only).
+
+**Both wall segments cut.** A shared interior boundary carries TWO wall segments
+(each adjacent space builds its own, inset to its side — the concave-corner
+architecture). A door must cut BOTH: `FloorManager.doorWallSets` (via
+`door.doorWallCuts`) resolves each door edge's two sides through live grid
+occupancy and produces a per-room LOCAL opening-edge set (fed to
+`rebuildRoomWalls`) AND a cluster-wide ABSOLUTE opening-edge set (fed to
+`rebuildClusterShells`). A door onto a stair cuts only the room/cluster side (a
+stair/void owner is classified "other" → no shell wall) — verified openings cut
+in both a room↔room boundary AND the cluster side of a room↔cluster boundary.
+
+**Marker** (`DoorView`/`makeDoorMesh`). A violet floor-threshold strip across the
+opening (distinct from the entrance's magenta), sitting on the slab top so it
+reads unambiguously in **plan/top view** where the wall opening is invisible. It
+IS the door's click target (`userData.doorId`). Openings/headers inherit the
+`wallNormal` tag from the shared wall pass, so cutaway hides them with their face
+(same path as windows).
+
+**One door per physical boundary** (`door.doorOverlaps`, `Floor.addDoor`). A door
+is rejected if it shares ANY physical boundary edge with an existing door.
+`physEdgeKey` keys a unit edge by the unordered pair of cells it separates, so the
+TWO (cell, side) representations of one boundary (a door placed from either
+adjacent space) map to the same edges — this catches both an opposite-side
+duplicate AND two collinear doors overlapping on a shared middle edge (which would
+otherwise merge into an illegal 1800 mm opening). `addDoor` returns false on
+rejection; the `DoorController` also folds the overlap test into its green/red
+validity, so an already-doored boundary shows red and won't commit.
+
+**Placement + selection** (`DoorController`, `selection.ts`). A Door tool (palette
+"+ Door", Access panel) enters placement mode; hovering snaps a 2-edge ghost to
+the wall nearest the cursor (`picker.groundPoint` → nearest side → span extended
+toward the cursor), tinted green (valid) / red (exterior, off-boundary, or an
+already-doored boundary); click commits on the ACTIVE floor. Doors are
+selectable/deletable exactly like entrances — a second `MarkerSelectionAdapter`
+on `SelectionController` (`selectedDoorId`, mutually exclusive with modules +
+entrance, EXCLUDED from multi-select); marker click → highlight → Del. Escape
+folds into the central arbitrator (§2h). Place, delete, and auto-removal are all
+undo-covered. Two interaction-lifecycle guards make this robust:
+- **Markers picked before modules** (`selection.onPointerDown`): a door marker is
+  a low threshold strip sitting ON TOP of the room/cluster slabs it straddles, so
+  a module is always under the cursor too. The entrance/door marker picks run
+  FIRST (the marker IS the intended click target), else the underlying room would
+  always win and doors could never be selected/deleted.
+- **One armed placement mode at a time** (`isToolActive` guard + `main`'s
+  `cancelPlacementModes`): while an entrance/door tool is armed, `SelectionController`
+  no-ops entirely (its pointer handlers early-return) so a door click never also
+  grabs/moves the room under it; and every placement entry point (palette grab,
+  +Entrance, +Door) disarms all the others first, so a single pointer release can
+  never drive two window-level placement handlers at once.
+
+**Auto-removal of stale doors** (`FloorManager.pruneStaleDoors`, inside
+`syncStairsAndHoles` → the store-change pass). Whenever a layout change makes a
+door's edges no longer bind two distinct spaces (either side moved/deleted/
+changed, or the edge went exterior), the door is removed automatically — in the
+SAME synchronous mutation, BEFORE the action's history commit, so ONE Ctrl+Z
+restores both the move and the door (verified: moving a room away drops its door
+in one snapshot; undo brings back move + door). Doors do NOT travel with rooms —
+they are absolute edge-bound and simply vanish when stranded.
+
+**Serialization** — additive per-floor `doors` list (`DoorData`, same wire shape
+as `EntranceData`; `normalizeEdgeBound` serves both). Tolerant loader → old files
+load doorless; no version bump (`APP_PROJECT_VERSION` stays 1). Round-trip
+verified. `loadProject` restores doors after all instances + entrances, then runs
+one `syncStairsAndHoles()` to cut the openings.
+
+**`connectionEdges` retired.** The dormant per-room-type `ConnectionEdge`
+scaffolding on `ModuleDef` (with its unresolved rotation/mirror semantics) is
+SUPERSEDED by authored doors — a user-placed door IS the access specification it
+was a proxy for — and was removed from `modules.ts` (reduced to a one-line
+historical note). `GraphEdge.viaDoor` is now live, not reserved.
+
 ---
 
 ## 3. Key data structures / formats (written out)
@@ -588,10 +724,7 @@ const CELL_SIZE = 0.6;                       // metres per cell
 type ModuleType = string;                       // id; rooms/furniture/stairs share one type-space
 type Category = "module" | "room" | "stair";
 
-interface ConnectionEdge {           // SCAFFOLDING ONLY — unused by any logic
-  side: "north" | "south" | "east" | "west";
-  allowed: boolean;
-}
+// (ConnectionEdge scaffolding removed — superseded by authored doors, §2i.)
 
 interface ModuleDef {
   type: ModuleType;
@@ -602,7 +735,6 @@ interface ModuleDef {
   color: number;           // hex int (also used as room-type colour everywhere)
   cells: Cell[];           // footprint relative to origin (0,0) at rotation 0
   height: number;          // in cells: furniture = 1, rooms = ROOM_HEIGHT (4), stair = 1 (nominal — see §2a)
-  connectionEdges?: ConnectionEdge[];  // scaffolding, unused
   cluster?: string;        // "circulation" | "outdoor" for connector merging
 }
 // ROOM_HEIGHT = 4 cells = 2.4 m — the def's OWN nominal height, used as the
@@ -638,6 +770,18 @@ function edgeKey(cx, cz, side): string;  parseEdgeKey(key): BoundaryEdge;
 interface Entrance { id: string; cell: Cell; side: Side }  // floor 0 only
 ```
 
+### Door (`door.ts`) — authored interior access, see §2i
+```ts
+interface Door { id: string; cell: Cell; side: Side }  // ANY floor; id = anchor edgeKey
+const DOOR_SPAN = 2;            // consecutive edges (fixed at 2 for v1)
+const DOOR_OPENING_H = 2.1;     // FIXED opening height; header above grows on taller floors
+const BELOW_PREFIX = "^";       // space token: a stair on the floor below (hole projection)
+function doorEdges(door): [BoundaryEdge, BoundaryEdge];  // the 2 edges (run +x for N/S, +z for E/W)
+function resolveDoorSpaces(door, targetAt): { a; b } | null;   // the one validity+connectivity check
+function buildSpaceTargets(floor, floorBelow?): Map<cellKey, token>;  // cell → space token
+function doorWallCuts(doors, ownerAt, resolveOwner): { rooms: Map<id,Set<localKey>>; clusters: Set<absKey> };
+```
+
 ### Windows (`windows.ts`) — derived, see §2d
 ```ts
 type WindowVariant = "framed" | "full-height";
@@ -668,7 +812,7 @@ interface GraphNode {
 }
 interface GraphEdge {
   a: string; b: string;
-  viaDoor?: boolean;      // RESERVED for future door-based adjacency; always undefined now
+  viaDoor: boolean;       // false = physical TOUCH edge; true = authored-door ACCESS edge (§2c/§2i)
   viaStair?: boolean;     // a cross-floor link made by a stair, vs. a same-floor wall touch
 }
 interface EntranceStatus {
@@ -679,10 +823,11 @@ interface EntranceStatus {
 }
 interface DwellingGraph {
   nodes: GraphNode[];
-  edges: GraphEdge[];
+  edges: GraphEdge[];      // both TOUCH (viaDoor:false) and ACCESS (viaDoor:true) edges
   entryIds: string[];      // non-blocked entrance host node ids
   entrances: EntranceStatus[];
   floorCount: number;
+  doorCount: number;       // total authored doors (drives the DR1 cutover note)
 }
 ```
 
@@ -708,13 +853,17 @@ const DEEP_ROOM_THRESHOLD_HOPS = 5;
 lookups, `degree()`, `is.{circulation,outdoor,bathroom,bedroom,kitchen,living,
 recreation,room,stair,roomOrStair,public,habitable}` type predicates,
 `entryIds`, `hasEntrance`, `reachableFrom(seeds, blocked?)` (multi-source BFS,
-the reachability primitive every H*/G*/ST* rule uses).
+the reachability primitive every H*/G*/ST* rule uses). **`adj`/`viaStairAdj`/
+`degree`/`reachableFrom` traverse ONLY ACCESS (door) edges** (`viaDoor:true`) —
+reachability + connectivity are door-based; the proximity rules read TOUCH edges
+straight off `graph.edges` via `edgeViolations` (which skips `viaDoor` edges).
 
 ### Project file (`projectIO.ts`)
 ```ts
 interface InstanceData { type: string; cx: number; cz: number; rotation: number; mirrored?: boolean }
 interface EntranceData { cx: number; cz: number; side: Side }
-interface FloorData { cols: number; rows: number; instances: InstanceData[]; entrances: EntranceData[] }
+interface DoorData { cx: number; cz: number; side: Side }   // additive; same shape as EntranceData
+interface FloorData { cols; rows; instances: InstanceData[]; entrances: EntranceData[]; doors: DoorData[] }
 interface ProjectFile { format: string; version: number; floors: FloorData[] }
 ```
 `PROJECT_FORMAT = "flat-configurator-project"`, `APP_PROJECT_VERSION = 1`.
@@ -748,8 +897,10 @@ load unchanged — no version bump, no migration step.
 - **One central footprint transform: MIRROR FIRST, THEN ROTATE** (§2g). `transformCell`/`rotatedCells`/`occupiedCells` in `modules.ts` are the only place a `(rotation, mirrored)` pose becomes cells. Mirror-then-rotate ≠ rotate-then-mirror, so no consumer may reimplement it. Everything downstream (exterior edges, windows, clusters, holes, graph, props, stair geometry) derives from the transformed cells.
 - **Mirroring NEVER uses negative scale** (§2g). `scale.x = -1` inverts triangle winding and normals (the stair-wedge bug class, §2a). Mirror the DATA and rebuild the geometry: mirrored cells for walls, negated voxel x for props, negated lane centres for the stair. Verified scene-wide: no negative scale, no non-positive `matrixWorld` determinant. Stairs remain the only scale-stretched element — and only in **y** (rise).
 - **Clusters: full rebuild from occupancy.** Circulation/Outdoor cluster shells (and the adjacency graph) are recomputed from scratch on every change (`store.onChange`), not incrementally. Same-type only, orthogonal (4-neighbour) adjacency; corner-only contact does not connect (`connectedComponents` in `core/cluster.ts` is the single definition, shared by clusters and the graph).
-- **Touch-based adjacency, not door-based.** Graph edges connect rooms/clusters/stairs whose footprints share a wall (orthogonally adjacent cells). Door/opening-based adjacency is deferred (`viaDoor` reserved).
-- **Windows: derived, not stored** (§2d). Regenerated from room type + exterior edges on every wall rebuild (they ride the wall pass), on EXTERIOR edges only. Nothing serialized — export/import reproduces identical windows. Panel/glazing heights are absolute (fixed on taller floors), which is why walls must be true-height geometry (§2b). Doors / interior openings are a deliberate LATER task; where an entrance coincides with a windowed edge the door wins (that edge is skipped).
+- **Reachability is DOOR-based; adjacency has two edge kinds** (§2c/§2i). The graph emits TOUCH edges (`viaDoor:false`, physical shared-wall adjacency) AND ACCESS edges (`viaDoor:true`, an authored door). All reachability/connectivity rules (H1/H2/H3/H6/G1/ST1/ST2/C1/C2/DP1, entrance-rooted) traverse ONLY access edges — physical touch without a door is not a connection. Only the proximity rules (H4/S3/S4/S5) read touch edges. Stair links (bottom + top) are door-gated too. This was a deliberate CUTOVER: old/doorless layouts flag red until doored (DR1 note explains it).
+- **Windows: derived, not stored** (§2d). Regenerated from room type + exterior edges on every wall rebuild (they ride the wall pass), on EXTERIOR edges only. Nothing serialized — export/import reproduces identical windows. Panel/glazing heights are absolute (fixed on taller floors), which is why walls must be true-height geometry (§2b). Where an entrance coincides with a windowed edge the door wins (that edge is skipped).
+- **Doors: authored, STORED — the inverse of windows** (§2i). User-placed on interior edges, serialized (additive per-floor list), and NEVER derived. They ride the same wall-rebuild pass (cutting a fixed 2100 mm opening in BOTH adjacent wall segments), but a door's opening is FIXED and its header GROWS on taller floors (inverse of a window, whose panels are fixed and gap grows). Stale doors auto-remove inside the stranding mutation's undo snapshot; doors do not travel with rooms.
+- **`connectionEdges` scaffolding removed** (§2i) — superseded by authored doors. Do not reintroduce a per-def access-metadata field; author a door instead.
 - **The adjacency graph spans the whole dwelling** (all floors), not just the active one — cross-floor reachability is carried by `viaStair` edges (§2c). Entrances are floor-0-only and re-validated every build (never cached/stale).
 - **Graph view recomputes per-frame while open** (cheap at this scale) → live updates; node positions persist by id across recomputes.
 - **Rule validation is on-demand and advisory** (never blocks placement) — click "Check Layout" to run `validate()`; results surface in the text panel, the bubble diagram, and 3D shell tinting simultaneously. Any layout change drops the (now possibly stale) report (`floors.onLayoutChange`).
@@ -922,6 +1073,76 @@ screenshots):**
   final placed instance's `rotation`/`mirrored` match the ghost's rotated/
   mirrored pose exactly, not just the ghost's transient state).
 
+- **Interior doors + door-based reachability (§2i):** verified (via state/geometry
+  dumps — screenshot tooling stayed unreliable in this env) that two adjacent
+  rooms produce a TOUCH edge with no door and gain an ACCESS edge only when
+  doored; an entrance-rooted room reaches green through a door while a touching-
+  but-undoored neighbour flags H1, and the DR1 note appears on a doorless
+  dwelling; the opening is cut in BOTH wall segments (room↔room, and the cluster
+  side of a room↔cluster boundary — min-Y 2.1 at doored cells, full-height
+  elsewhere); the opening stays fixed at 2100 mm while the header grows on a
+  forced 4.0 m floor (window inversion, distinct from windows); a stair with
+  doors at BOTH ends carries an upper room to green (bottom + top `viaStair`
+  access edges), and removing the top door orphans the upper room (H1) and flags
+  ST1; a corridor's C1/C2 degree counts DOOR connections (undoored → C1 orphaned,
+  one door → C2); H4 fires on touch regardless of doors; 2-edge minimum + exterior
+  rejection enforced by `resolveDoorSpaces`; a rotated+mirrored room hosts doors
+  (absolute edge-bound); moving a room away auto-removes its door in the same
+  snapshot and one undo restores move + door; markers render violet on the slab
+  (plan-readable, pickable) and deleting a door re-closes exactly its own opening;
+  round-trip with doors is faithful and an old doorless file loads doorless.
+- **Doors — adversarial review + interaction fixes (§2i):** a multi-agent review
+  caught 5 confirmed INTERACTION-layer defects the API-level tests missed (they
+  exercise the store/graph, not real pointer events): (1) a boundary could hold
+  two doors placed from opposite sides, and (2) two collinear doors could merge
+  into an 1800 mm opening — both now rejected by `doorOverlaps` (physical-edge
+  dedup; verified opposite-side + collinear + disjoint cases via `addDoor`); (3)
+  door markers were unselectable because module picking ran first — fixed by
+  picking markers before modules (verified: door selected with a module under the
+  cursor); (4) `SelectionController` acted during door/entrance placement, grabbing
+  the room under a door click — fixed with an `isToolActive` guard (verified: no
+  module selected while the tool is armed); (5) two placement modes could be armed
+  at once so one release drove both — fixed with `cancelPlacementModes` (verified
+  it disarms door + entrance). The pointer-flow fixes were verified by stubbing the
+  private pick sources, since this headless preview's canvas has zero size and
+  can't raycast real screen coordinates.
+- **`connectionEdges` retired (§2i):** removed from `modules.ts` (one-line
+  historical note kept); `tsc`/build clean with it gone.
+- **Rules-additions batch ③ (post-doors, §8):** verified via state dumps —
+  **N1** circulation fraction reads 4.3% on a normal layout (unchanged when an
+  outdoor balcony is added — excluded both sides) and 64% on a corridor-palace,
+  firing the soft flag past 25% (percentages sanity-checked: 2/47, 16/25); **PG1**
+  fires on an inverted layout (public mean depth 2 > bedroom 1) and stays silent
+  on the standard genotype (public 0 ≤ bedroom 2); **MB1** flags a sleeping floor
+  with no bathroom, clears when one is added, and stays silent (no double-fire)
+  when P1 already owns a bathroom-less flat; **DR2** notes a bedroom at 3 doors
+  (silent at 2); **C1 is now soft** (amber, matching O1). Both report info-lines
+  render ("Circulation: 5% of interior area", "Public mean depth 2.0 · Bedroom
+  mean depth 1.0"). Rule count 29 → 33.
+- **Rules-recalibration batch ② (post-doors, §8):** verified via state dumps —
+  (1) **H4 is now ACCESS-based** (a DOOR between bathroom↔kitchen fires H4/hard);
+  a shared WALL with no door fires the new **S6** (note, efficient services) —
+  both directions confirmed, and the two never co-fire on one boundary. (2) **DP1
+  stair-hop weighting**: room→stair→room now costs ONE hop (verified stair depth 1,
+  upper room depth 1, was 2). (3) **S4 removed** (two touching bedrooms no longer
+  flagged); new **AC1** (soft) fires on a bedroom↔stair touch (SIA 181). (5)
+  **H3 en-suite exemption**: two en-suites + no guest bath → 2× **S7** (note) + G1
+  (soft), ZERO H3; adding a guest bathroom doored to circulation clears G1 and
+  leaves S7 only on the en-suites. Rule count 27 → 29. (4) Tier taxonomy added to
+  `rules.ts`; consistency-pass finding (C1-vs-O1 tier mismatch) recorded in §8.
+- **Rules-correctness batch ① (post-doors, §8):** verified via state dumps —
+  (1) **edge classification**: a floor-above room whose only open side faces the
+  stairwell hole now has `hasExteriorEdge=false` (was true), D1 flags it, no glass
+  generates onto the void, and W1 does NOT double-fire (gated on `hasExteriorEdge`);
+  same-floor stair-facing edges were already correct; an entrance can no longer be
+  placed on a stair cell and a stair-facing entrance flags E2. Both the window and
+  graph occupied sets now source from `buildSpaceTargets`. (2) **blocked-seed**: a
+  studio flat with the entrance ON the bedroom fires only G2 (soft) — H3 no longer
+  detonates every room (seed exempt from blocking). (3/4) **S1/O1**: an undoored
+  outdoor cluster flags O1 (unreachable), clears at 1 door, and flags S1 at >2
+  doors — both on access degree, distinct. (5) **S5**: fires only on a DOORED
+  kitchen↔living pair, not a sealed touching wall.
+
 **Also built (from earlier sessions, still current):**
 - Grid, occupancy, placement, rotate, **mirror**, move, delete; grid resize with reconcile.
 - All room presets render as clean hollow shells; concave corners z-fight-free.
@@ -940,10 +1161,12 @@ screenshots):**
 - **Undo / redo** (§2e): snapshot-based (cap 20), Ctrl+Z / Ctrl+Shift+Z /
   Ctrl+Y + bottom-left buttons; covers place/move/rotate/delete, entrance
   add/delete, floor add/delete, grid resize, import; view state excluded.
-- **Whole-dwelling adjacency graph** (all floors, cross-floor stair edges) +
+- **Whole-dwelling adjacency graph** (all floors; TOUCH + door ACCESS edges) +
   toggleable bubble-diagram view (per-floor, entry rings, stair stubs, depth
-  badges, highlight overlays).
-- **Layout rules engine**: 25 rules (see §8), advisory/on-demand, surfaced in
+  badges, highlight overlays; ACCESS edges solid vs TOUCH-only dashed + legend).
+- **Interior doors** (§2i): authored, serialized, door-based reachability;
+  2-edge openings cut in both wall segments; plan-view markers; auto-removal.
+- **Layout rules engine**: 33 rules (see §8), advisory/on-demand, surfaced in
   a text report, the diagram, and 3D shell/marker tinting.
 - **Rule-driven windows** (§2d): derived sill/lintel panels + glazing on
   exterior edges, per-type ratio targets, W1 shortfall rule.
@@ -959,42 +1182,36 @@ screenshots):**
 **Not built:**
 - Furniture for rooms other than Kitchen — all other rooms are empty shells
   (only `kitchen` has a `PROP_BUILDERS` entry).
-- Door/opening system — doors and INTERIOR openings are a deliberate later
-  task (windows §2d cover exterior edges only; interior walls stay full
-  solid). `GraphEdge.viaDoor` and `ModuleDef.connectionEdges` remain reserved
-  scaffolding, unread by any logic (the latter now documents the mirror
-  east↔west swap it will have to honour — §2g, §7).
+- 1-edge (narrow) doors — v1 doors are fixed at a 2-edge (1200 mm) span.
+- Group re-pose (rotate/mirror a multi-selection) — still out of scope (§7).
 
 **Known minor issue (deferred):** connector pieces are selected by clicking
 their floor tile; their merged cluster walls live in a shared `clusterGroup`
 and are not individually pickable — clicking a cluster wall doesn't select a
 specific piece.
 
-**Uncommitted at time of writing:** the mirroring feature (§2g) AND the
-multi-select/group-ops/UI-polish feature (§2h) — modified `PROJECT_STATE.md`,
-`index.html`, `src/style.css`, `src/core/adjacencyGraph.ts`,
-`src/core/floorManager.ts`, `src/core/grid.ts`, `src/core/modules.ts`,
-`src/core/projectIO.ts`, `src/core/store.ts`, `src/interaction/dragDrop.ts`,
-`src/interaction/entranceController.ts`, `src/interaction/selection.ts`,
-`src/main.ts`, `src/scene/clusterShells.ts`, `src/scene/ghostPreview.ts`,
-`src/scene/moduleMesh.ts`, `src/scene/props/index.ts`,
-`src/scene/props/kitchen.ts`, `src/scene/props/place.ts`,
-`src/scene/stairMesh.ts`; new `src/scene/groupGhostPreview.ts`.
-(Everything through undo/redo + entrance deletion is committed as `d191020`.)
-Run `git status` to confirm before assuming this list is still current.
+**Committed in this change** (interior doors §2i + rules batches ①/②/③ §8): new
+`src/core/door.ts`, `src/scene/doorView.ts`, `src/interaction/doorController.ts`;
+modified `PROJECT_STATE.md`, `src/core/floor.ts`, `src/core/floorManager.ts`,
+`src/core/modules.ts`, `src/core/projectIO.ts`, `src/core/adjacencyGraph.ts`,
+`src/core/rules.ts`, `src/scene/moduleMesh.ts`, `src/scene/clusterShells.ts`,
+`src/interaction/picker.ts`, `src/interaction/selection.ts`,
+`src/interaction/entranceController.ts`, `src/ui/palette.ts`,
+`src/ui/graphView.ts`, `src/ui/validationPanel.ts`, `src/style.css`,
+`src/main.ts`. Run `git status`/`git log` to confirm.
+(The mirroring + multi-select/group-ops/UI-polish features are committed as
+`30bf5dd`.) Run `git status` to confirm before assuming this list is current.
 
 ---
 
 ## 7. Future extension points (scaffolding already in place)
 
-- **Door-based adjacency:** `GraphEdge.viaDoor?: boolean` is reserved; a later
-  pass can set it without redesigning the edge model. `ConnectionEdge` on
-  `ModuleDef` (per-side, `allowed`, future entry point/span) is scaffolded but
-  unused. **When it grows real per-side behaviour it must respect mirroring**
-  (§2g): a mirrored instance swaps its `east`/`west` edges (the two sides
-  perpendicular to the mirror axis; north/south unchanged), applied BEFORE
-  rotation — exactly as the cells transform. This is documented in the
-  `ConnectionEdge` doc comment in `modules.ts`; nothing reads it yet.
+- **Door-based adjacency: DONE** (§2i) — authored doors drive `GraphEdge.viaDoor`
+  ACCESS edges; the `ConnectionEdge` scaffolding it was reserved for is removed.
+  Remaining door extensions: variable-width (1-edge / wider) doors — v1 is fixed
+  at a 2-edge span; and door swing/handedness metadata (doors are undirected
+  openings now). Doors are absolute edge-bound, so they inherit mirror/rotation
+  for free (they don't store per-side data on the def).
 - **Facade/window placement:** reuse `exteriorEdges()` (already the shared
   primitive for entrance placement, entrance validity, and D1/D2) to place
   windows/doors on a room's exterior edges.
@@ -1021,9 +1238,17 @@ Run `git status` to confirm before assuming this list is still current.
 ## 8. Layout rules — current table (`src/core/rules.ts`)
 
 All rules are **advisory** (never block placement), run on-demand via
-"Check Layout", and read the whole-dwelling graph (§2c/§3). Severity: 🔴 hard,
-🟡 soft, 🟢 note. This table must match `RULES` in `rules.ts` exactly — if
-you add/remove/reword a rule, update this table in the same change.
+"Check Layout", and read the whole-dwelling graph (§2c/§3). This table must match
+`RULES` in `rules.ts` exactly — if you add/remove/reword a rule, update this table
+in the same change.
+
+**Tier taxonomy** (the definitive meaning of each severity, at the top of
+`rules.ts` — classify new rules by it): 🔴 **hard** = renders the dwelling
+uninhabitable or violates near-universal code (expert failure modes, program
+completeness, daylight physics, direct hygiene access); 🟡 **soft** = deviates
+from empirical practice or comfort norms (House-GAN frequency data, SIA comfort/
+acoustic practice); 🟢 **note** = characterization, not judgment (a recognised
+typology — open-plan, en-suite, efficient services).
 
 **Entrance validity**
 | ID | Severity | Description |
@@ -1031,44 +1256,53 @@ you add/remove/reword a rule, update this table in the same change.
 | E1 | 🟢 note | Place an entrance to validate circulation/reachability. |
 | E2 | 🔴 hard | Entrance is blocked — its edge no longer faces outside. |
 
+**Doors (reachability prerequisite — the door-based cutover)**
+| ID | Severity | Description |
+|---|---|---|
+| DR1 | 🟢 note | No doors placed — reachability requires doors. (Fires only when rooms exist but `doorCount === 0`; explains the H1 flood on a doorless dwelling, shown ALONGSIDE the real flags.) |
+| DR2 | 🟢 note | Bedroom has ≥3 doors (access edges) — unusual for a private room (erodes furnishability/privacy). |
+
 **Program completeness**
 | ID | Severity | Description |
 |---|---|---|
 | P1 | 🔴 hard | A dwelling needs a bathroom. |
 | P2 | 🔴 hard | A dwelling needs a kitchen. |
 | P3 | 🟢 note | More than one kitchen — atypical, but not a problem. |
+| MB1 | 🟡 soft | A floor has bedrooms but no bathroom (nighttime stair trip). GATED on P1 silent (a bathroom exists somewhere) — never double-fires with P1 on a bathroom-less flat. Per-floor. |
 
-**Reachability** (entrance-rooted, whole dwelling, across stairs — corridors NOT required)
+**Reachability** (entrance-rooted, whole dwelling, DOOR-BASED — traverses ACCESS/`viaDoor` edges only, across door-gated stairs; corridors NOT required). The blocked-BFS family (H2/H3/H6/G1) EXEMPTS the seed/root node from blocking — you enter *through* the host by definition, so an entrance ON a bedroom/bathroom/outdoor space doesn't detonate every room; G2 is the gentle signal for that typology.
 | ID | Severity | Description |
 |---|---|---|
-| H1 | 🔴 hard | Orphaned room — no path of adjacencies (including stairs) reaches an entrance. |
-| H2 | 🔴 hard | A room or stair reachable from an entrance only by passing through a bathroom. |
-| H3 | 🔴 hard | A room or stair reachable from an entrance only by passing through a bedroom. |
-| H6 | 🔴 hard | A room or stair reachable from an entrance only by passing through an outdoor space. |
-| ST2 | 🔴 hard | Stair not reachable from any entrance. |
+| H1 | 🔴 hard | Orphaned room — no path of DOORS (including door-gated stairs) reaches an entrance. |
+| H2 | 🔴 hard | A room or stair reachable from an entrance only by passing through a bathroom (host bathroom exempt). |
+| H3 | 🔴 hard | A room or stair reachable from an entrance only by passing through a bedroom (host bedroom exempt). BATHROOM targets are ALSO exempt — that's the en-suite typology → S7, not a failure; H3 still fires for other rooms + stairs. |
+| H6 | 🔴 hard | A room or stair reachable from an entrance only by passing through an outdoor space (host exempt). |
+| ST2 | 🔴 hard | Stair not reachable from any entrance (via doors). |
 
 *(H5 does not exist — ids are not contiguous; do not add one without a reason.)*
 
-**Adjacency / privacy**
+**Adjacency / privacy** (H4 reads the door ACCESS edge — hygiene is about access, not masonry; S3 reads PHYSICAL touch; S5/S6/S7 are typology NOTES; G1 door-based reachability; G2 entrance-host)
 | ID | Severity | Description |
 |---|---|---|
-| H4 | 🔴 hard | Bathroom directly adjacent to a kitchen. |
-| S3 | 🟡 soft | Bedroom directly adjacent to a kitchen, living room, or recreation room. |
-| S4 | 🟡 soft | Two bedrooms directly adjacent. |
-| S5 | 🟢 note | Kitchen and living room adjacent — open-plan; noted, not a problem. |
+| H4 | 🔴 hard | Direct DOOR between a bathroom and a kitchen — food prep opening onto a toilet. (Was touch-based; a shared WALL is now the positive S6.) |
+| S6 | 🟢 note | Shared wet wall between kitchen and bathroom (touch, no door) — efficient services / stacked plumbing. Excludes any H4-doored pair. |
+| S3 | 🟡 soft | Bedroom directly adjacent to a kitchen, living room, or recreation room (physical touch). |
+| S5 | 🟢 note | Kitchen and living room connected by a DOOR — open-plan; noted, not a problem. (A sealed touching wall earns no note.) |
+| S7 | 🟢 note | En-suite bathroom (accessed via bedroom) — the typology H3 exempts; acknowledged, not flagged. |
 | G1 | 🟡 soft | No bathroom is reachable without passing through a bedroom (guest access). |
 | G2 | 🟡 soft | Entrance opens directly into a private room (bedroom or bathroom). |
+| AC1 | 🟡 soft | Bedroom shares a wall (touch) with a stair — stair noise against a sleeping room (SIA 181). Scoped to stairs only (bedroom↔public is S3). Replaces the old ungrounded S4 (two bedrooms touching). |
 
-**Corridor justification** (circulation clusters)
+**Corridor justification** (circulation clusters; degree counts DOOR connections)
 | ID | Severity | Description |
 |---|---|---|
-| C1 | 🔴 hard | Orphaned corridor — connects to nothing (dead space). |
-| C2 | 🟡 soft | Under-used corridor — connects to only one space. |
+| C1 | 🟡 soft | Orphaned corridor — connects to nothing via doors (dead space). SOFT (was hard) — matches O1, the identical degree-0-cluster condition; dead space is a design flaw, not uninhabitability. |
+| C2 | 🟡 soft | Under-used corridor — reached by only one door, so it doesn't circulate. |
 
 **Stairs**
 | ID | Severity | Description |
 |---|---|---|
-| ST1 | 🟡 soft | Stair connects to nothing on one or both floors it should link. |
+| ST1 | 🟡 soft | Stair has no DOOR connection on one or both floors it should link (top/bottom). |
 | ST2 | 🔴 hard | (see Reachability above) |
 
 **Daylight / ventilation / glazing** (D1/D2 reuse `GraphNode.hasExteriorEdge`, §2c; W1 reuses `GraphNode.glazing`, §2d)
@@ -1076,19 +1310,42 @@ you add/remove/reword a rule, update this table in the same change.
 |---|---|---|
 | D1 | 🔴 hard | Habitable room (bedroom, living room, or recreation room) has no exterior wall. |
 | D2 | 🟡 soft | Kitchen has no exterior wall. |
-| W1 | 🟡 soft | Room's glazing is below its daylight target (incl. zero windows because no ≥2-edge straight exterior run exists). |
+| W1 | 🟡 soft | Room's glazing is below its daylight target (too little glazing on the exterior walls it HAS). GATED on `hasExteriorEdge` — a room with no exterior wall is D1/D2's (avoids a double-flag on the same void-facing room). |
 
-**Room-count / connectivity balance**
+**Room-count / connectivity balance** (S1/S2 count ACCESS/door degree — a *connected* hub; House-GAN anchors were proximity-based, so approximate under door semantics)
 | ID | Severity | Description |
 |---|---|---|
-| S1 | 🟡 soft | Outdoor/balcony over-connected (>2 adjacencies) — usually a leaf space. |
-| S2 | 🟡 soft | Living room under-connected (≤1 adjacency) — typically a social hub. |
+| S1 | 🟡 soft | Outdoor/balcony over-connected (>2 doors) — usually a leaf space. |
+| S2 | 🟡 soft | Living room under-connected (≤1 door) — typically a social hub. |
+| O1 | 🟡 soft | Outdoor space is unreachable — no door connects it to the dwelling (the outdoor analogue of C1; distinct from S1's over-connection). |
 
-**Space-syntax depth** (informational metric, `computeEntranceDepths`, §3)
+**Space-syntax depth + efficiency metrics** (informational lines in the report; `computeEntranceDepths` / `computeCirculationFraction` / `publicVsBedroomDepth` in rules.ts, §3)
 | ID | Severity | Description |
 |---|---|---|
 | DP1 | 🟡 soft | Room is unusually deep in the layout (≥`DEEP_ROOM_THRESHOLD_HOPS` = 5 hops from the entrance). |
+| N1 | 🟡 soft | Circulation-heavy layout — whole-dwelling circulation fraction > `CIRCULATION_FRACTION_MAX` = 0.25. Fraction = (circulation-cluster + stair-footprint cells) ÷ all occupied cells, OUTDOOR excluded from BOTH sides. The % is ALSO surfaced as an always-on report line ("Circulation: N% of interior area"). |
+| PG1 | 🟡 soft | Inverted privacy gradient — mean depth of PUBLIC rooms (Living/Recreation) exceeds mean depth of BEDROOMS (bedrooms shallower than social rooms). Silent if either set is empty; gated on an entrance. Both means are surfaced as a report line ("Public mean depth X · Bedroom mean depth Y"). Hillier & Hanson genotype. |
+
+**Depth STAIR-HOP weighting** (`computeEntranceDepths`): a stair is a graph NODE,
+so a naïve BFS makes a floor transition room→stair→room cost TWO hops and drifts
+upper rooms toward DP1's threshold by merely existing. A floor transition should
+cost ONE hop, so ENTERING a stair costs 1 and LEAVING one costs 0 — a 0-1 BFS over
+a deque (0-cost relaxations to the front). `DEEP_ROOM_THRESHOLD_HOPS = 5` is
+UNCHANGED; this restores its single-floor meaning across floors. Verified:
+room→stair→room = +1 hop (was +2); depth badges / the report's depth section
+shift on multi-floor layouts, intended.
 
 Recreation Room is classified as **public/social** (`ctx.is.public`, same
 category as Living Room) for the privacy rules, and as **habitable**
 (`ctx.is.habitable`, same category as Bedroom + Living Room) for D1.
+
+**Consistency-pass finding — RESOLVED (batch ③):** C1 (orphaned corridor) was
+🔴 hard while O1 (unreachable outdoor) is 🟡 soft, though both flag the identical
+degree-0-cluster condition. **C1 is now 🟡 soft** — dead space is a design flaw,
+not uninhabitability — so the two are consistent.
+
+**Report info-lines** (`validationPanel.ts`, computed from the graph like the
+depth summary, always shown when available): "Circulation: N% of interior area"
+(N1's metric, `.vp-metric`) and "Public mean depth X · Bedroom mean depth Y"
+(PG1's metric, in the depth section). Both surface the raw figure whether or not
+the corresponding soft rule fires.

@@ -547,6 +547,14 @@ button.primary:hover {
   color: var(--text-dim);
 }
 
+/* ---- Circulation efficiency (informational net-to-gross line) ---- */
+.vp-metric {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+
 .vp-depth-list {
   margin: 0 10px 8px;
   border: 1px solid var(--line-soft);

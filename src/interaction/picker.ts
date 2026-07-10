@@ -34,6 +34,16 @@ export class Picker {
     return this.grid.worldToGrid(hit.point.x, hit.point.z);
   }
 
+  /** The world XZ point under the cursor on the ground plane, or null. Used by
+   *  door placement to find which edge (and sub-cell side) the cursor is nearest,
+   *  which `cellAt` alone (integer cell) can't express. */
+  groundPoint(clientX: number, clientY: number): { x: number; z: number } | null {
+    this.setPointer(clientX, clientY);
+    const hit = this.raycaster.intersectObject(this.groundPlane, false)[0];
+    if (!hit) return null;
+    return { x: hit.point.x, z: hit.point.z };
+  }
+
   /** The top-most module group hit under the cursor, or null. */
   groupAt(clientX: number, clientY: number, groups: THREE.Object3D[]): THREE.Object3D | null {
     if (groups.length === 0) return null;

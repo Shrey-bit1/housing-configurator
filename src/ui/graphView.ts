@@ -24,6 +24,9 @@ interface StairStub {
   localId: string;
   dir: "up" | "down";
   otherFloor: number;
+  /** True when a door gates this cross-floor link (solid); false = physical
+   *  stair-over touch only (dashed). */
+  viaDoor: boolean;
 }
 
 /** Unordered node-id pair key, for matching highlighted adjacencies to edges. */
@@ -32,9 +35,11 @@ function edgeKey(a: string, b: string): string {
 }
 
 const BG = "#e4e0d6"; // matches the 3D canvas background
-const LINE = "#1a1a1a";
+const LINE = "#1a1a1a"; // ACCESS (doored) edge — solid, reads as "connected"
+const TOUCH = "#b9b3a7"; // TOUCH-only edge — faint dashed, reads as "adjacent, no door"
 const ENTRY = "#2e7d32"; // entry-node marker (green, reads as "in")
 const STAIR = "#5a5a5a";
+const DOOR_STAIR = "#7c4dff"; // door-gated cross-floor stub (matches the 3D door marker)
 
 // Force-layout tuning (CSS-pixel space). Doesn't need to be physically perfect.
 const REPULSION = 12000;
@@ -132,9 +137,11 @@ export class GraphView {
     this.floorLabelEl.textContent = `Floor ${active} — adjacency diagram`;
   }
 
-  /** Stair edges that cross from the active floor to another floor → stubs. */
+  /** Stair edges that cross from the active floor to another floor → stubs.
+   *  Deduped per (node, direction, other floor); a door-gated (access) link
+   *  wins over a touch-only one so a doored connection always reads as solid. */
   private stairStubs(graph: DwellingGraph, activeIds: Set<string>, active: number): StairStub[] {
-    const out: StairStub[] = [];
+    const byKey = new Map<string, StairStub>();
     for (const e of graph.edges) {
       if (!e.viaStair) continue;
       const aIn = activeIds.has(e.a);
@@ -143,9 +150,17 @@ export class GraphView {
       const localId = aIn ? e.a : e.b;
       const otherId = aIn ? e.b : e.a;
       const otherFloor = parseDwellingNodeId(otherId).floor;
-      out.push({ localId, dir: otherFloor > active ? "up" : "down", otherFloor });
+      const stub: StairStub = {
+        localId,
+        dir: otherFloor > active ? "up" : "down",
+        otherFloor,
+        viaDoor: !!e.viaDoor,
+      };
+      const key = `${localId}|${stub.dir}|${otherFloor}`;
+      const existing = byKey.get(key);
+      if (!existing || (stub.viaDoor && !existing.viaDoor)) byKey.set(key, stub);
     }
-    return out;
+    return [...byKey.values()];
   }
 
   // ---- Canvas sizing -------------------------------------------------------
@@ -260,22 +275,45 @@ export class GraphView {
       return;
     }
 
-    // Same-floor adjacency edges; flagged ones drawn thick + coloured.
+    // Same-floor edges: ACCESS (doored) solid, TOUCH-only faint dashed, flagged
+    // ones thick + coloured. Where a pair has BOTH a door and a physical touch,
+    // the solid access line represents it — skip the redundant dashed touch line
+    // (unless the touch edge itself is flagged, which must still show).
+    const accessPairs = new Set(
+      edges.filter((e) => e.viaDoor).map((e) => edgeKey(e.a, e.b))
+    );
     for (const e of edges) {
       const a = this.positions.get(e.a);
       const b = this.positions.get(e.b);
       if (!a || !b) continue;
-      const sev = this.edgeHi.get(edgeKey(e.a, e.b));
+      const k = edgeKey(e.a, e.b);
+      const sev = this.edgeHi.get(k);
+      if (!e.viaDoor && !sev && accessPairs.has(k)) continue;
       g.beginPath();
       g.moveTo(a.x, a.y);
       g.lineTo(b.x, b.y);
-      g.strokeStyle = sev ? hex(SEVERITY_COLORS[sev]) : LINE;
-      g.lineWidth = sev ? 5 : 2;
+      if (sev) {
+        g.strokeStyle = hex(SEVERITY_COLORS[sev]);
+        g.lineWidth = 5;
+        g.setLineDash([]);
+      } else if (e.viaDoor) {
+        g.strokeStyle = LINE;
+        g.lineWidth = 2.4;
+        g.setLineDash([]);
+      } else {
+        g.strokeStyle = TOUCH;
+        g.lineWidth = 1.5;
+        g.setLineDash([5, 4]);
+      }
       g.stroke();
+      g.setLineDash([]);
     }
 
     // Stair stubs (grouped per node + direction so multiples fan out).
     this.drawStubs(stubs);
+
+    // Legend — what solid vs dashed means (drawn last so it sits on top).
+    this.drawLegend(h);
 
     // Nodes.
     g.textAlign = "center";
@@ -353,18 +391,21 @@ export class GraphView {
         const fan = (i - (list.length - 1) / 2) * 26;
         const ex = p.x + fan;
         const ey = p.y + sign * (r + 22);
+        // Door-gated cross-floor link → solid violet; physical stair-over touch
+        // (no door yet) → dashed grey.
+        const color = s.viaDoor ? DOOR_STAIR : STAIR;
         g.beginPath();
         g.moveTo(p.x, p.y + sign * 6);
         g.lineTo(ex, ey);
-        g.strokeStyle = STAIR;
-        g.lineWidth = 2;
-        g.setLineDash([4, 3]);
+        g.strokeStyle = color;
+        g.lineWidth = s.viaDoor ? 2.4 : 2;
+        g.setLineDash(s.viaDoor ? [] : [4, 3]);
         g.stroke();
         g.setLineDash([]);
         const label = `${s.dir === "up" ? "↑" : "↓"} F${s.otherFloor}`;
         g.font = "800 11px 'Helvetica Neue', Helvetica, Arial, sans-serif";
         const tw = g.measureText(label).width + 10;
-        g.fillStyle = STAIR;
+        g.fillStyle = color;
         g.fillRect(ex - tw / 2, ey - 9, tw, 18);
         g.fillStyle = "#f4f1ea";
         g.textAlign = "center";
@@ -372,6 +413,35 @@ export class GraphView {
         g.fillText(label, ex, ey);
       });
     }
+  }
+
+  /** Bottom-left key: solid = door (connected), dashed = touching (no door). */
+  private drawLegend(h: number): void {
+    const g = this.g;
+    const x = 20;
+    let y = h - 46;
+    const sample = 26;
+    g.save();
+    g.textAlign = "left";
+    g.textBaseline = "middle";
+    g.font = "600 12px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+
+    const row = (color: string, dash: number[], label: string) => {
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + sample, y);
+      g.strokeStyle = color;
+      g.lineWidth = 2.4;
+      g.setLineDash(dash);
+      g.stroke();
+      g.setLineDash([]);
+      g.fillStyle = "#5a5a5a";
+      g.fillText(label, x + sample + 8, y);
+      y += 20;
+    };
+    row(LINE, [], "Door — connected");
+    row(TOUCH, [5, 4], "Touching — no door");
+    g.restore();
   }
 }
 

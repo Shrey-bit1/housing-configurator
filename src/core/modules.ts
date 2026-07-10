@@ -13,29 +13,11 @@ export type ModuleType = string;
  */
 export type Category = "module" | "room" | "stair";
 
-/**
- * Connection-edge scaffolding (SECTION 1).
- *
- * Per-room-type metadata describing which sides of the footprint may host a
- * connection to an adjacent room. This is *scaffolding only* for a future
- * adjacency-rules feature — nothing reads or enforces it yet. It is shaped so
- * it can later grow an explicit entry point along an edge, e.g.
- *   { side: "north", allowed: true, entry?: { cx, cz }, span?: number }
- * `side` is relative to the footprint's own bounding box at rotation 0;
- * rotation handling would be layered on when rules are implemented.
- *
- * MIRRORING NOTE (for the future doors task): the footprint transform mirrors
- * across the local X axis (negates cx) BEFORE rotating (see {@link transformCell}).
- * That reflection swaps the two sides perpendicular to the mirror axis —
- * east ↔ west — while leaving north/south alone, all measured BEFORE the
- * subsequent rotation. So when this scaffolding grows real per-side behaviour,
- * a mirrored instance must swap its `east`/`west` edges (then apply rotation),
- * exactly as the cells do. No behaviour depends on this yet.
- */
-export interface ConnectionEdge {
-  side: "north" | "south" | "east" | "west";
-  allowed: boolean;
-}
+// Historical note: `ConnectionEdge` per-room-type scaffolding once lived here as
+// a placeholder for authored adjacency/access metadata. It was SUPERSEDED by
+// user-placed interior doors (see core/door.ts) — an authored door IS the access
+// specification the scaffolding was a proxy for — and removed. Door-based
+// reachability is now the model (adjacencyGraph.ts `viaDoor` edges, rules.ts).
 
 /**
  * Static, data-driven description of a placeable shape. New modules/rooms are
@@ -59,8 +41,6 @@ export interface ModuleDef {
   cells: Cell[];
   /** Height in cells. Furniture = 1 (0.6 m); rooms = {@link ROOM_HEIGHT}. */
   height: number;
-  /** Scaffolding for future adjacency rules (rooms only). Currently unused. */
-  connectionEdges?: ConnectionEdge[];
   /**
    * Connector cluster key (Circulation / Outdoor). Pieces sharing this key are
    * chained into one merged shell when adjacent (see clusterShells.ts), instead
@@ -91,14 +71,6 @@ function lShape(w: number, d: number, nw: number, nd: number): Cell[] {
     (c) => !(c.cx >= w - nw && c.cz < nd)
   );
 }
-
-/** All four sides open — the default scaffold for every room. */
-const OPEN_EDGES: ConnectionEdge[] = [
-  { side: "north", allowed: true },
-  { side: "south", allowed: true },
-  { side: "east", allowed: true },
-  { side: "west", allowed: true },
-];
 
 // ---- Definitions -------------------------------------------------------------
 
@@ -167,9 +139,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     group: "Living Room",
     color: 0xd32f2f,
     cells: lShape(7, 6, 3, 2),
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-  },
+    height: ROOM_HEIGHT,  },
   kitchen: {
     type: "kitchen",
     name: "Kitchen",
@@ -178,9 +148,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     group: "Kitchen",
     color: 0xf5c400,
     cells: lShape(5, 4, 2, 2),
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-  },
+    height: ROOM_HEIGHT,  },
   bedroom_small: {
     type: "bedroom_small",
     name: "Bedroom — Small",
@@ -189,9 +157,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     group: "Bedroom",
     color: 0x1565c0,
     cells: rect(5, 4),
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-  },
+    height: ROOM_HEIGHT,  },
   bedroom_large: {
     type: "bedroom_large",
     name: "Bedroom — Large",
@@ -200,9 +166,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     group: "Bedroom",
     color: 0x0d2c54,
     cells: lShape(6, 6, 2, 3),
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-  },
+    height: ROOM_HEIGHT,  },
   bathroom_small: {
     type: "bathroom_small",
     name: "Bathroom — Small",
@@ -211,9 +175,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     group: "Bathroom",
     color: 0xede7da,
     cells: rect(3, 3),
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-  },
+    height: ROOM_HEIGHT,  },
   bathroom_large: {
     type: "bathroom_large",
     name: "Bathroom — Large",
@@ -222,9 +184,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     group: "Bathroom",
     color: 0x9b9690,
     cells: rect(4, 4),
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-  },
+    height: ROOM_HEIGHT,  },
   recreation: {
     type: "recreation",
     name: "Recreation Room",
@@ -233,9 +193,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     group: "Recreation Room",
     color: 0xc68a1e,
     cells: lShape(6, 5, 2, 2),
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-  },
+    height: ROOM_HEIGHT,  },
   circulation_single: {
     type: "circulation_single",
     name: "Circulation — Single",
@@ -244,9 +202,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     group: "Circulation",
     color: 0x1a1a1a,
     cells: rect(1, 1),
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-    cluster: "circulation",
+    height: ROOM_HEIGHT,    cluster: "circulation",
   },
   circulation_double: {
     type: "circulation_double",
@@ -259,9 +215,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
       { cx: 0, cz: 0 },
       { cx: 1, cz: 0 },
     ],
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-    cluster: "circulation",
+    height: ROOM_HEIGHT,    cluster: "circulation",
   },
   outdoor_single: {
     type: "outdoor_single",
@@ -271,9 +225,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     group: "Outdoor",
     color: 0x4a7c59,
     cells: rect(1, 1),
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-    cluster: "outdoor",
+    height: ROOM_HEIGHT,    cluster: "outdoor",
   },
   outdoor_double: {
     type: "outdoor_double",
@@ -286,9 +238,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
       { cx: 0, cz: 0 },
       { cx: 1, cz: 0 },
     ],
-    height: ROOM_HEIGHT,
-    connectionEdges: OPEN_EDGES,
-    cluster: "outdoor",
+    height: ROOM_HEIGHT,    cluster: "outdoor",
   },
 };
 

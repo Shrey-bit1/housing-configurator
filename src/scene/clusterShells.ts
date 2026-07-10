@@ -26,8 +26,18 @@ const EDGE_COLOR = 0x1a1a1a;
  * cells to world XZ via `gridToWorld`), extruded directly to `wallHeight` —
  * the floor's true floor-to-floor height (`FloorManager.floorHeight`), passed
  * in by the caller. No post-build rescale.
+ *
+ * `doors` is the ABSOLUTE edge-key set of interior door openings to cut in the
+ * cluster's outer walls (a door on a room↔cluster or cluster↔cluster boundary —
+ * the cluster side of that boundary). A floor-wide set is safe: an absolute edge
+ * key only ever matches the one component whose cell + side it names.
  */
-export function rebuildClusterShells(floor: Floor, grid: Grid, wallHeight: number): void {
+export function rebuildClusterShells(
+  floor: Floor,
+  grid: Grid,
+  wallHeight: number,
+  doors?: Set<string>
+): void {
   const group = floor.clusterGroup;
   disposeChildren(group);
 
@@ -68,7 +78,10 @@ export function rebuildClusterShells(floor: Floor, grid: Grid, wallHeight: numbe
         centerZ,
         wallHeight,
         material,
-        edgeMaterial
+        edgeMaterial,
+        undefined, // clusters never get windows
+        undefined,
+        doors
       )) {
         wall.userData.clusterNodeId = nodeId;
         group.add(wall);

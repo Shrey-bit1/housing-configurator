@@ -26,6 +26,8 @@ export interface PaletteCallbacks {
   onToggleFloorVisibility: (index: number) => void;
   /** Enter entrance-placement mode (ground floor only). */
   onPlaceEntrance: () => void;
+  /** Enter door-placement mode (interior boundaries, any floor). */
+  onPlaceDoor: () => void;
   /** Download the whole project as a .json file. */
   onExport: () => void;
   /** Open the native file picker to import a project .json. */
@@ -59,22 +61,35 @@ const EYE_OPEN_ICON =
 const EYE_CLOSED_ICON =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8C1 8 4 3 8 3s7 5 7 5-3 5-7 5-7-5-7-5Z"/><line x1="1.5" y1="14" x2="14.5" y2="2"/></svg>';
 
-/** Entrance placement tool (ground floor only). */
+/** Access tools: entrance (ground floor) + interior door (any floor). */
 function buildAccessPanel(cb: PaletteCallbacks): HTMLElement {
   const section = document.createElement("div");
   section.appendChild(heading("Access"));
 
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "secondary";
-  btn.textContent = "+ Entrance";
-  btn.addEventListener("click", () => cb.onPlaceEntrance());
-  section.appendChild(btn);
+  const row = document.createElement("div");
+  row.className = "floor-actions";
+
+  const entranceBtn = document.createElement("button");
+  entranceBtn.type = "button";
+  entranceBtn.className = "secondary";
+  entranceBtn.textContent = "+ Entrance";
+  entranceBtn.addEventListener("click", () => cb.onPlaceEntrance());
+  row.appendChild(entranceBtn);
+
+  const doorBtn = document.createElement("button");
+  doorBtn.type = "button";
+  doorBtn.className = "secondary";
+  doorBtn.textContent = "+ Door";
+  doorBtn.addEventListener("click", () => cb.onPlaceDoor());
+  row.appendChild(doorBtn);
+
+  section.appendChild(row);
 
   const note = document.createElement("p");
   note.className = "hint-text";
   note.textContent =
-    "Click just outside a ground-floor room's exterior wall to add an entrance (the reachability root).";
+    "Entrance: click just outside a ground-floor exterior wall (the reachability root). " +
+    "Door: hover an interior wall between two spaces to open a doorway — reachability is door-based.";
   section.appendChild(note);
   return section;
 }

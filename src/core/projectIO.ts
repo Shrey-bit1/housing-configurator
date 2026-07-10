@@ -40,12 +40,23 @@ export interface EntranceData {
   side: Side;
 }
 
+/** An interior door: anchor cell + the side it binds to (2-edge span implied by
+ *  the side's run direction). Same wire shape as an entrance. */
+export interface DoorData {
+  cx: number;
+  cz: number;
+  side: Side;
+}
+
 export interface FloorData {
   cols: number;
   rows: number;
   instances: InstanceData[];
   /** Entrances bound to exterior edges (floor 0 only, in practice). */
   entrances: EntranceData[];
+  /** Interior doors bound to shared interior edges (any floor). ADDITIVE:
+   *  absent in older files → empty, so pre-doors files load doorless. */
+  doors: DoorData[];
 }
 
 export interface ProjectFile {
@@ -85,6 +96,7 @@ export function serializeProject(floors: Floor[]): ProjectFile {
         mirrored: i.mirrored,
       })),
       entrances: f.entrances.map((e) => ({ cx: e.cell.cx, cz: e.cell.cz, side: e.side })),
+      doors: f.doors.map((d) => ({ cx: d.cell.cx, cz: d.cell.cz, side: d.side })),
     })),
   };
 }
@@ -169,6 +181,7 @@ function normalizeFloor(raw: unknown): FloorData {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const instRaw = Array.isArray(o.instances) ? o.instances : [];
   const entRaw = Array.isArray(o.entrances) ? o.entrances : [];
+  const doorRaw = Array.isArray(o.doors) ? o.doors : [];
   return {
     cols: clampDim(num(o.cols, DEFAULT_DIM)),
     rows: clampDim(num(o.rows, DEFAULT_DIM)),
@@ -176,12 +189,17 @@ function normalizeFloor(raw: unknown): FloorData {
       .map(normalizeInstance)
       .filter((i): i is InstanceData => i !== null),
     entrances: entRaw
-      .map(normalizeEntrance)
+      .map(normalizeEdgeBound)
       .filter((e): e is EntranceData => e !== null),
+    doors: doorRaw
+      .map(normalizeEdgeBound)
+      .filter((d): d is DoorData => d !== null),
   };
 }
 
-function normalizeEntrance(raw: unknown): EntranceData | null {
+/** Both entrances and doors are (cell, side) edge-bound records with the same
+ *  wire shape, so one tolerant reader serves both. */
+function normalizeEdgeBound(raw: unknown): { cx: number; cz: number; side: Side } | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   if (!SIDES.includes(o.side as Side)) return null;

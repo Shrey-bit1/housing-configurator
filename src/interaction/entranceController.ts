@@ -55,8 +55,11 @@ export class EntranceController {
     const floor = this.getFloor();
     const cell = this.picker.cellAt(clientX, clientY);
     if (!cell) return null;
-    // Clicked cell must not itself be a room/cluster (we attach from outside).
-    if (this.roomClusterOwner(floor, cell.cx, cell.cz)) return null;
+    // Clicked cell must be truly OUTSIDE — empty of ANY occupant, not just rooms/
+    // clusters. A stair cell isn't a room/cluster but it isn't "outside" either;
+    // allowing it would bind an entrance to a room's stair-FACING edge (no sky),
+    // which the graph then flags blocked anyway. Reject any occupied cell.
+    if (floor.grid.ownerAt(cell.cx, cell.cz)) return null;
 
     for (const side of ["north", "south", "east", "west"] as Side[]) {
       const [dx, dz] = SIDE_DELTA[side];

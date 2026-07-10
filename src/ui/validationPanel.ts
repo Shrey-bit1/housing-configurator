@@ -1,5 +1,10 @@
 import type { DwellingGraph } from "../core/adjacencyGraph";
-import type { Severity, Violation } from "../core/rules";
+import {
+  computeCirculationFraction,
+  publicVsBedroomDepth,
+  type Severity,
+  type Violation,
+} from "../core/rules";
 
 /**
  * Renders the on-demand "Check Layout" report into a viewport panel: a grouped,
@@ -68,10 +73,23 @@ export function renderValidationPanel(
   appendGroup(panel, "Soft — atypical, not wrong", soft, labelById);
   appendGroup(panel, "Notes", notes, labelById);
 
+  // ---- Circulation efficiency (informational net-to-gross line, always shown) ----
+  appendCirculation(panel, graph);
+
   // ---- Depth-from-entrance metric (informational, not a pass/fail list) ----
   appendDepthSection(panel, graph, depths, multi);
 
   panel.style.display = "block";
+}
+
+/** One informational line: what share of the interior is circulation (N1's metric,
+ *  always surfaced even when under the flag threshold). */
+function appendCirculation(panel: HTMLElement, graph: DwellingGraph): void {
+  const frac = computeCirculationFraction(graph);
+  if (frac === null) return;
+  const line = el("div", "vp-metric");
+  line.textContent = `Circulation: ${Math.round(frac * 100)}% of interior area.`;
+  panel.appendChild(line);
 }
 
 /** Space-syntax depth-from-entrance: a summary line + a compact per-room list.
@@ -101,6 +119,15 @@ function appendDepthSection(
   const summary = el("div", "vp-depth-summary");
   summary.textContent = `Max ${max} hop${max === 1 ? "" : "s"} · Mean ${mean.toFixed(1)} hops · ${rooms.length} room${rooms.length === 1 ? "" : "s"}`;
   panel.appendChild(summary);
+
+  // Privacy gradient means (PG1's metric): public should sit shallower than
+  // bedrooms; shown only when both sets have a reachable member.
+  const pg = publicVsBedroomDepth(graph, depths);
+  if (pg) {
+    const line = el("div", "vp-depth-summary");
+    line.textContent = `Public mean depth ${pg.publicMean.toFixed(1)} · Bedroom mean depth ${pg.bedroomMean.toFixed(1)}`;
+    panel.appendChild(line);
+  }
 
   const list = el("div", "vp-depth-list");
   for (const r of rooms) {
