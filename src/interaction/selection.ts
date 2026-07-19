@@ -619,12 +619,18 @@ export class SelectionController {
         this.onNoopHint?.("Mirror works with a single selection only.");
       }
     } else if (e.key === "d" || e.key === "D") {
-      // Shift+D (not Ctrl/Cmd+D — reserved by the browser for bookmarking; the
-      // keydown often never even reaches page JS, so preventDefault can't help,
-      // matching Blender's own "duplicate" convention which fits this app's
-      // R/M single/shift-key style). Works for the WHOLE selection, one or many.
-      if (!e.shiftKey) return;
-      e.preventDefault();
+      // Duplicate the WHOLE selection (one instance or many). Bound to BOTH
+      // Ctrl/Cmd+D and Shift+D:
+      //  - Ctrl/Cmd+D is the requested binding; its keydown DOES reach page JS
+      //    and `preventDefault()` DOES suppress the browser's bookmark shortcut
+      //    (Ctrl+D is interceptable, unlike the OS-level Ctrl+T/N/W). Verified
+      //    in a real browser (§6).
+      //  - Shift+D stays as a guaranteed-reliable fallback (matches Blender's
+      //    duplicate convention and this app's R/M single-key style), for any
+      //    environment where a Ctrl+D keydown is swallowed before the page.
+      // A bare 'd' with no modifier does nothing.
+      if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return;
+      e.preventDefault(); // must win over the browser bookmark shortcut
       if (this.selectedIds.size >= 1 && !this.moving && !this.dragDrop.isDragging && !this.duplicating) {
         const insts = this.selectedInstances;
         if (insts.length > 0) this.startDuplicate(insts);

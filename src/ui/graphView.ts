@@ -2,6 +2,7 @@ import type { DwellingGraph, GraphEdge, GraphNode } from "../core/adjacencyGraph
 import {
   SEVERITY_COLORS,
   worstSeverity,
+  computeEntranceDepths,
   type Severity,
   type Violation,
 } from "../core/rules";
@@ -157,13 +158,6 @@ export class GraphView {
     this.hoverEdge = null;
   }
 
-  /** Install the depth-from-entrance metric (node id → hop count) so each
-   *  node can show a small depth badge (when the depth toggle is on).
-   *  Purely informational — unrelated to pass/fail severity. */
-  setDepths(depths: Map<string, number>): void {
-    this.depths = depths;
-  }
-
   /** Report-card hover: emphasize `v`'s target node(s)/edge on top of the
    *  normal tier highlight (never replaces it — see `draw()`). Pass null on
    *  unhover. A dwelling-level violation (empty `nodeIds`, no `edge`)
@@ -178,7 +172,13 @@ export class GraphView {
     this.canvas.style.display = "block";
     this.titleEl.style.display = "block";
     this.legendEl.style.display = "block";
-    this.relayoutBtn.style.display = "";
+    // Explicit "inline-block", NOT "" — the button's stylesheet rule is
+    // `#graph-relayout { display: none }` (hidden by default outside diagram
+    // mode), so clearing the inline style would fall back to that `none` and
+    // the button would never appear. Set a real value to override it (this is
+    // the same inline-style-vs-stylesheet-default pitfall noted for
+    // #selection-readout in §2h — a class toggle is the alternative).
+    this.relayoutBtn.style.display = "inline-block";
   }
 
   hide(): void {
@@ -198,6 +198,17 @@ export class GraphView {
     this.floorCount = Math.max(1, graph.floorCount);
     this.colWidth = w / this.floorCount;
     this.canvasH = h;
+
+    // Depth-from-entrance for the badges: computed HERE (per frame, from the
+    // live graph) whenever the depth toggle is on — NOT dependent on Check
+    // Layout having run. (Historically depths only arrived via Check Layout's
+    // `setDepths`, so opening the diagram and toggling depth on showed no
+    // badges until you also ran Check Layout — a silent hidden prerequisite.
+    // The graph is already recomputed every frame, so this BFS is negligible;
+    // it also keeps badges LIVE as the layout changes.) An empty entrance set
+    // yields an empty map → no badges, which reads correctly ("nothing to
+    // measure depth from yet").
+    if (this.showDepth) this.depths = computeEntranceDepths(graph);
 
     const nodes = graph.nodes;
     this.lastNodes = nodes;

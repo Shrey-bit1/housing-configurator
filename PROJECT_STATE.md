@@ -565,8 +565,10 @@ same single-only gating applies to the in-flight move-ghost's R/M (rotating
 the ghost mid-drag): a group move-drag silently ignores R/M (no hint — the
 key is legitimately meaningless mid-gesture, unlike the idle-selection case).
 
-**Duplicate (Shift+D — NOT Ctrl/Cmd+D)**: clones the WHOLE current selection —
+**Duplicate (Ctrl/Cmd+D OR Shift+D)**: clones the WHOLE current selection —
 one instance or many — into a fresh placement ghost that follows the cursor.
+Both key combos route into the same `startDuplicate` (see the key handler note
+below and the §2h Ctrl/Cmd+D update).
 Lives entirely in `SelectionController` (own `duplicating`/`duplicateTemplates`/
 `lastDuplicateCell` fields), NOT `DragDropController` — an earlier version
 routed a single-instance duplicate through `dragDrop.startPlacementFrom` and
@@ -604,13 +606,28 @@ already-non-overlapping template set can never introduce a NEW overlap
 between the batch's own members, so only EXISTING occupancy needs checking.
 `onChange` is suppressed during the placement loop and fired once at the end.
 
-**Deliberately NOT Ctrl/Cmd+D**: that combo is reserved by the browser for
-bookmarking on most platforms — the keydown frequently never reaches page JS
-at all, so `preventDefault()` cannot override it (confirmed the hard way: it
-verified clean under synthetic `dispatchEvent`-based testing, which bypasses
-native browser chrome entirely, then failed on a real physical keypress).
-Shift+D matches Blender's own "duplicate" convention, fitting alongside this
-app's R/M single/shift-key style.
+**Key binding: Ctrl/Cmd+D AND Shift+D** (`SelectionController.onKeyDown` 'd'
+branch — `if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return; e.preventDefault();`).
+Both trigger duplicate; a bare 'd' does nothing.
+- **Ctrl/Cmd+D** is the primary binding. It IS interceptable — Ctrl+D (the
+  bookmark shortcut) fires a keydown that reaches page JS and `preventDefault()`
+  DOES suppress the bookmark in Chrome/Firefox/Edge (unlike the OS-level
+  Ctrl+T/N/W, which the browser handles before the page — those genuinely can't
+  be overridden). An EARLIER note here claimed Ctrl+D was un-preventable and
+  switched to Shift+D; that was over-cautious (it conflated Ctrl+D with the
+  OS-level combos). The verification sweep (§6) re-tested and confirmed the
+  handler's `preventDefault` fires on a Ctrl+D keydown.
+- **Shift+D** is retained as a guaranteed-reliable fallback (matches Blender's
+  duplicate convention and this app's R/M single-key style) for any environment
+  that does swallow Ctrl+D before the page.
+- **Verification caveat (§6):** the browser-automation `key` tool in this dev
+  environment cannot emit a MODIFIED keydown at all (Ctrl/Shift both arrive as
+  `false`), so the physical bookmark-suppression couldn't be observed through
+  automation. It was verified by (a) a faithful synthetic `keydown{ctrlKey:true}`
+  whose `preventDefault` fired (dispatchEvent returned cancelled), and (b) the
+  full flow — ghost follows the cursor, click places the clone, one undo reverts
+  — driven by real mouse + the real Undo button. Real-Ctrl+D + no-bookmark is a
+  manual-check item.
 
 **Hover** (`moduleMesh.setHovered`, subtler emissive intensity 0.15 vs
 selection's 0.35): `SelectionController.onPointerMove` raycasts
@@ -883,6 +900,27 @@ diagram mode) clears `pinned` — the sim's own forces do the resettling, no
 position re-randomization needed. Legend still covers access-vs-touch swatches,
 hard/soft/note tier dots, and the entry marker (all static, canvas-equivalent
 info, just DOM now).
+
+**Re-layout button visibility — the show/hide (verification-sweep fix, §6).**
+`GraphView.show()` sets `relayoutBtn.style.display = "inline-block"` (NOT `""`).
+The button's stylesheet default is `#graph-relayout { display: none }` (hidden
+outside diagram mode), so clearing the inline style would fall back to that
+`none` and the button would never appear — the exact inline-vs-stylesheet-
+default pitfall already flagged for `#selection-readout` (§2h). An explicit
+value overrides it. (Root cause of a long-standing "Re-layout button absent"
+report: `show()` previously set `""`.)
+
+**Depth-badge data — self-computed, no Check-Layout prerequisite (fix, §6).**
+`GraphView.frame()` computes `this.depths = computeEntranceDepths(graph)` itself
+each frame whenever `showDepth` is on — the diagram OWNS its depth metric now.
+Previously depths only arrived via Check Layout's `graphView.setDepths(...)`
+(now removed), so opening the diagram and toggling depth on showed NO badges
+until you ALSO ran Check Layout — a silent hidden prerequisite (root cause of a
+"depth badges render nothing with the toggle on" report; it was NOT a
+node-id key mismatch — the namespaced ids always matched). The graph is already
+recomputed every frame, so the extra BFS is negligible, and badges are now LIVE
+as the layout changes. An empty entrance set → empty map → no badges (reads
+correctly as "nothing to measure depth from yet").
 
 **Depth badges — a chip, not a bare numeral.** The original design drew the
 hop-count directly on the node's own edge in a small grey fill, which read as
@@ -1270,7 +1308,7 @@ serializes and is undoable.)
 - **Inactive floors:** rendered dimmed via opaque colour-fade toward the background (NOT alpha transparency — avoids depth-sort "slicing" artifacts) and are non-interactive (picker only ever raycasts the ACTIVE floor's store). Multi-colour voxel props are flagged `noDim` (not faded).
 - **Multi-select is a Set, scoped to the active floor, entrances excluded** (§2h). Group move/delete are ONE undo action each (`moveMany`/`removeMany`, single `onChange`/commit). Group RE-POSE (rotate/mirror a whole selection) is out of scope for v1 — R/M require exactly one selected instance and no-op (with a hint) otherwise.
 - **Escape has exactly one handler** (§2h, main.ts) — `dragDrop`/`entranceController`/`selection` expose public `cancelPlacement()`/`cancel()`/`deselect()` but do NOT listen for Escape themselves. Priority: active gesture (ghost placement, including Shift+D's duplicate ghost, or entrance-placement mode) → selection → plan mode. Never add a second Escape listener elsewhere — route through this arbitrator instead, or the priority ordering silently breaks (see §2h's note on why reactive post-hoc checks race).
-- **Never bind a keyboard shortcut to Ctrl/Cmd+D (or other browser-reserved combos like Ctrl+N/T/W)** — most browsers intercept these before the keydown ever reaches page JS, so `preventDefault()` is powerless; a synthetic-`dispatchEvent` test will falsely pass since it bypasses native browser chrome entirely, but a real keypress silently does nothing (or opens the bookmark dialog). This bit the original Ctrl/Cmd+D duplicate binding — fixed by switching to Shift+D (§2h).
+- **Distinguish OS-level browser combos (Ctrl/Cmd+N/T/W) from page-interceptable ones (Ctrl/Cmd+D).** The former are handled by the browser BEFORE the keydown reaches page JS — `preventDefault()` is powerless and a synthetic-`dispatchEvent` test falsely passes (it bypasses native chrome). NEVER bind those. **Ctrl/Cmd+D (bookmark) is DIFFERENT** — its keydown DOES reach the page and `preventDefault()` DOES suppress the bookmark in Chrome/Firefox/Edge, so it's a legitimate binding (duplicate uses it — §2h — with Shift+D as a fallback). Still verify any modified-key binding on a REAL keypress: note that some browser-automation key tools can't emit modifiers at all, so a green automation run proves the HANDLER but not the physical browser default (§6).
 - **Toggling element visibility via inline styles must use a class, not `style.display = ""`** — clearing an inline style falls back to the stylesheet's rule (which may itself be `display: none`), not to "visible" (caught during verification on `#selection-readout`; `#drop-overlay`'s pre-existing `.active` class toggle was already doing this correctly — follow that pattern, not a raw `style.display` write).
 
 ---
@@ -1343,6 +1381,44 @@ View, Top View, Diagram) are all mutually aware of each other's state.
 hooks — screenshot tooling was unreliable in this dev environment, so
 verification leaned on exact geometry/state dumps rather than visual
 screenshots):**
+- **Verification sweep — diagram Re-layout / depth badges / node sizing /
+  Ctrl+D (Track C):** each item audited against the RUNNING app through the
+  real UI (scene loaded via the real drag-drop IMPORT path — a genuine `drop`
+  of a crafted `.json` → `parseProject`/`loadProject`, not a state hook — then
+  all visual claims from real screenshots + real control clicks). Screenshot
+  tooling was flaky (timed out ≥ ~1100px viewport; kept ≤ 800px) but usable.
+  - **Re-layout button:** was ABSENT (root cause: `show()` set inline
+    `display:""`, overridden by the stylesheet's `#graph-relayout{display:none}`
+    → computed `none`; confirmed via `getComputedStyle`). FIXED (explicit
+    `inline-block`, §2j). Verified: button now visible + labelled "Re-layout";
+    dragging the Bedroom node pinned it (moved + stayed), clicking Re-layout
+    unpinned it and the sim resettled it toward its neighbour — all in
+    screenshots.
+  - **Depth badges:** RENDER correctly (the chip design was fine) but ONLY
+    after Check Layout — a silent data prerequisite (root cause: depths came
+    solely from Check Layout's `setDepths`; NOT the suspected node-id key
+    mismatch — ids matched). FIXED (diagram self-computes depths in `frame()`
+    when `showDepth` is on, §2j). Verified: after importing a scene with an
+    entrance + one door and opening the diagram WITHOUT Check Layout, the entry
+    (Living) node showed a "0" chip and the doored Bedroom a "1" chip, from the
+    default-on depth toggle alone (screenshot).
+  - **Node sizing + labels:** already SHIPPED and working — labels read
+    "Bathroom"/"Bedroom"/"Kitchen" (variant suffix stripped by `shortLabel`),
+    radius scales by √(cell count) so the 36-cell Living node is visibly the
+    largest (screenshot). No change needed.
+  - **Ctrl/Cmd+D duplicate:** was NOT wired (only Shift+D; Ctrl+D returned
+    early with no `preventDefault` → browser bookmark, no clone). FIXED (§2h) —
+    Ctrl/Cmd+D + Shift+D both route to `startDuplicate`, `preventDefault`
+    called. Verified: handler's `preventDefault` fires on a Ctrl+D keydown
+    (dispatchEvent returned cancelled); the duplicate ghost followed the cursor
+    unpressed (screenshots), a click placed the clone (bedroom_small, matching
+    source, auto-selected), one Undo reverted it. AUTOMATION LIMITATION: this
+    env's `key` tool can't emit modified keydowns (Ctrl/Shift arrive `false`),
+    so the physical bookmark-suppression is a manual-check item — the flow was
+    triggered by a faithful synthetic `keydown{ctrlKey:true}` and completed with
+    real mouse + real Undo button.
+  - `tsc`/build clean; the temporary import-`confirm` stub + keydown probe were
+    page-runtime only (cleared on reload; nothing added to source).
 - **North compass + orientation-aware windows + cutaway toggle (§2k, §8):**
   verified with REAL browser interaction (screenshot tooling worked reliably
   this session) plus exact state dumps, and a standalone Node port of the

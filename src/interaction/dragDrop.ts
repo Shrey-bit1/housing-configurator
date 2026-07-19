@@ -49,9 +49,11 @@ export class DragDropController {
   }
 
   /** Begin placing a NEW instance of `type`, pre-posed at `rotation`/`mirrored`
-   *  instead of resetting to the identity pose — used by Ctrl/Cmd+D duplicate
-   *  (`SelectionController`) to clone a selected instance's pose into a fresh
-   *  placement ghost that follows the cursor until clicked down. */
+   *  instead of the identity pose. Currently only reached via
+   *  {@link startPlacement} (identity pose); kept parameterised for a pre-posed
+   *  palette placement. (Duplicate — Ctrl/Cmd+D / Shift+D — no longer routes
+   *  through here; it uses `GroupGhostPreview`/`store.placeMany` in
+   *  `SelectionController` so one or many instances clone uniformly.) */
   startPlacementFrom(type: ModuleType, rotation: number, mirrored: boolean): void {
     this.activeType = type;
     this.rotation = rotation;

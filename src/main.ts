@@ -518,7 +518,9 @@ function runCheck(): void {
   clearHoverEmphasis();
   renderValidationPanel(validationPanel, graph, violations, depths, "Dwelling", clearValidation, onHoverViolation);
   graphView.setHighlights(violations);
-  graphView.setDepths(depths);
+  // (Diagram depth badges are computed by GraphView itself each frame from the
+  // live graph when its depth toggle is on — no longer pushed from here, so
+  // they no longer require Check Layout to appear. See GraphView.frame().)
   applyRoomHighlights(floors.floors, violations);
   validated = true;
 }
