@@ -314,26 +314,58 @@ export function computeEntranceDepths(graph: DwellingGraph): Map<string, number>
  *  habitable benefit, so a quarter of the interior is a generous ceiling. */
 export const CIRCULATION_FRACTION_MAX = 0.25;
 
+/** Per-floor {circulation cells, interior cells} tally — OUTDOOR cells excluded
+ *  from both, exactly like the whole-dwelling figure below (a balcony/terrace
+ *  is neither served area nor circulation). Shared by the whole-dwelling and
+ *  per-floor circulation-fraction functions so the two can never disagree
+ *  about what counts. */
+function circulationCellCounts(graph: DwellingGraph): Map<number, { circ: number; denom: number }> {
+  const byFloor = new Map<number, { circ: number; denom: number }>();
+  for (const n of graph.nodes) {
+    if (n.kind === "cluster" && n.roomTypeId === "outdoor") continue; // excluded both sides
+    const entry = byFloor.get(n.floor) ?? { circ: 0, denom: 0 };
+    entry.denom += n.cells.length;
+    const isCirculation = n.kind === "cluster" && n.roomTypeId === "circulation";
+    if (isCirculation || n.kind === "stair") entry.circ += n.cells.length;
+    byFloor.set(n.floor, entry);
+  }
+  return byFloor;
+}
+
 /**
  * Whole-dwelling circulation fraction: (circulation-cluster cells + stair
  * footprint cells) ÷ (all occupied interior cells). OUTDOOR cells are excluded
  * from BOTH numerator and denominator — a balcony/terrace is neither served
  * (habitable) area nor circulation, so it must not dilute the ratio either way.
  * Furniture isn't a graph node, so it's naturally out. Null if there's no
- * interior area yet. (Per-floor fractions aren't surfaced — only the
- * whole-dwelling figure drives the report line + N1; noted as an intentional
- * scope choice.)
+ * interior area yet.
  */
 export function computeCirculationFraction(graph: DwellingGraph): number | null {
   let circ = 0;
   let denom = 0;
-  for (const n of graph.nodes) {
-    if (n.kind === "cluster" && n.roomTypeId === "outdoor") continue; // excluded both sides
-    denom += n.cells.length;
-    const isCirculation = n.kind === "cluster" && n.roomTypeId === "circulation";
-    if (isCirculation || n.kind === "stair") circ += n.cells.length;
+  for (const { circ: c, denom: d } of circulationCellCounts(graph).values()) {
+    circ += c;
+    denom += d;
   }
   return denom > 0 ? circ / denom : null;
+}
+
+/**
+ * The SAME fraction {@link computeCirculationFraction} computes, broken out per
+ * floor — a single circulation-heavy storey can hide behind efficient others in
+ * the whole-dwelling figure. Floors with no interior area yet are simply absent
+ * from the map (nothing to report, like the whole-dwelling `null` case). Keyed
+ * by `GraphNode.floor` (0-indexed); consumed by the N1 rider (soft-flag) and
+ * the report's per-floor info line — never surfaced on a single-floor dwelling,
+ * where it would just duplicate the whole-dwelling figure (both callers gate on
+ * `graph.floorCount > 1`).
+ */
+export function computeCirculationFractionByFloor(graph: DwellingGraph): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const [floor, { circ, denom }] of circulationCellCounts(graph)) {
+    if (denom > 0) out.set(floor, circ / denom);
+  }
+  return out;
 }
 
 // ---- Privacy gradient (space syntax) ---------------------------------------
@@ -741,6 +773,24 @@ export const RULES: Rule[] = [
         .map((n) => violation("W1", "soft", n));
     },
   },
+  {
+    // Orientation: a habitable room (or kitchen) whose glazing all faces within
+    // NORTH_SECTOR_HALF_WIDTH of due north gets no meaningful direct sun. Reads
+    // the derived `glazing.northLit` flag (computed under the project northAngle
+    // in windows.ts), which is TRUE only when the room HAS glazing and every
+    // windowed edge is north-facing — so a room with NO glazing can't trip OR1
+    // (its daylight is D1/W1's concern, never double-fired here). SOFT / a
+    // heuristic: it's solar-access practice at this latitude (south-facing glass
+    // for winter gain), not a code failure — some north-lit rooms are fine.
+    id: "OR1",
+    severity: "soft",
+    description: "Room is lit only from the north (no direct sun).",
+    check(graph, ctx) {
+      return graph.nodes
+        .filter((n) => (ctx.is.habitable(n) || ctx.is.kitchen(n)) && n.glazing?.northLit === true)
+        .map((n) => violation("OR1", "soft", n));
+    },
+  },
 
   // ===== Privacy / access refinements =====
   {
@@ -894,19 +944,48 @@ export const RULES: Rule[] = [
     // Net-to-gross efficiency. The whole-dwelling circulation % is ALWAYS surfaced
     // as an informational line in the report (validationPanel, like the depth
     // summary); this rule adds the SOFT flag past CIRCULATION_FRACTION_MAX.
+    //
+    // PER-FLOOR RIDER: the whole-dwelling figure can average away a single
+    // circulation-heavy storey against efficient ones elsewhere, so each floor
+    // is ALSO checked independently (different granularity from the
+    // whole-dwelling flag above — both may fire together on the same dwelling,
+    // e.g. one bloated floor dragging its own fraction over the line while
+    // still averaging under it dwelling-wide, or vice versa). Suppressed on a
+    // single-floor dwelling, where the per-floor figure is identical to (and
+    // would just duplicate) the whole-dwelling one.
     id: "N1",
     severity: "soft",
     description: "Circulation-heavy layout — too much of the interior is circulation.",
     check(graph) {
+      const out: Violation[] = [];
       const f = computeCirculationFraction(graph);
-      if (f === null || f <= CIRCULATION_FRACTION_MAX) return [];
-      return [{
-        ruleId: "N1",
-        severity: "soft",
-        description: `Circulation-heavy layout (${Math.round(f * 100)}% of interior area).`,
-        nodeIds: [],
-        layout: true,
-      }];
+      if (f !== null && f > CIRCULATION_FRACTION_MAX) {
+        out.push({
+          ruleId: "N1",
+          severity: "soft",
+          description: `Circulation-heavy layout (${Math.round(f * 100)}% of interior area).`,
+          nodeIds: [],
+          layout: true,
+        });
+      }
+      if (graph.floorCount > 1) {
+        const perFloor = [...computeCirculationFractionByFloor(graph)].sort((a, b) => a[0] - b[0]);
+        for (const [floor, frac] of perFloor) {
+          if (frac <= CIRCULATION_FRACTION_MAX) continue;
+          const offenders = graph.nodes.filter(
+            (n) =>
+              n.floor === floor &&
+              (n.kind === "stair" || (n.kind === "cluster" && n.roomTypeId === "circulation"))
+          );
+          out.push({
+            ruleId: "N1",
+            severity: "soft",
+            description: `Floor ${floor} is circulation-heavy (${Math.round(frac * 100)}% of interior area).`,
+            nodeIds: offenders.map((n) => n.id),
+          });
+        }
+      }
+      return out;
     },
   },
   {

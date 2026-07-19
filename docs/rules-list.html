@@ -62,7 +62,7 @@
 <div class="sheet">
 
 <h1>Layout Validation Rules</h1>
-<p class="sub">All 35 rules in <code>src/core/rules.ts</code> — why each exists, and how it's computed.</p>
+<p class="sub">All 36 rules in <code>src/core/rules.ts</code> — why each exists, and how it's computed.</p>
 
 <!-- ============================ CONCEPTS ============================ -->
 <h2>Core concepts</h2>
@@ -85,7 +85,7 @@
 
 <div class="index">
 <b class="idx-hard">Hard (10)</b> — D1, E2, H1, H2, H3, H4, H6, P1, P2, ST2<br>
-<b class="idx-soft">Soft (18)</b> — A1, AC1, C1, C2, D2, DP1, F1, G1, G2, MB1, N1, O1, PG1, S1, S2, S3, ST1, W1<br>
+<b class="idx-soft">Soft (19)</b> — A1, AC1, C1, C2, D2, DP1, F1, G1, G2, MB1, N1, O1, OR1, PG1, S1, S2, S3, ST1, W1<br>
 <b class="idx-note">Note (7)</b> — DR1, DR2, E1, P3, S5, S6, S7
 </div>
 
@@ -227,7 +227,13 @@
 <div class="rule">
   <h3><span class="rid soft">W1</span><span class="name">Glazing below daylight target</span><span class="tier soft">Soft</span></h3>
   <p><b>Why</b> A room's actual glazing area falls short of its type's target, even though it does have exterior wall.</p>
-  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; n.hasExteriorEdge &amp;&amp; n.glazing?.belowTarget)</code>. <code>node.glazing</code> is a <code>GlazingStat</code> populated from <code>floor.windowStats</code>, itself the output of <code>computeWindows()</code> in <code>windows.ts</code> — W1 never recomputes windows, it just reads the flag. That function looks up <code>WINDOW_CONFIG[roomTypeId]</code> (living/recreation <code>1/6</code> full-height; bedroom/kitchen <code>1/10</code> framed; kitchen additionally fixed at <code>fixedEdges: 2</code>), computes <code>floorArea = cells.length * 0.36</code>, computes <code>perEdge = perEdgeGlazing(variant, floorHeight)</code> (<code>0.6 * (floorHeight - 0.9)</code> full-height, minus another <code>0.9</code> for a framed lintel), derives <code>edgesNeeded = ceil(floorArea * targetRatio / perEdge)</code> clamped up to <code>MIN_WINDOW_EDGES = 2</code>, then greedily bands the longest available exterior runs first. <code>belowTarget = placed &lt; targetEdges</code>. The <code>hasExteriorEdge</code> guard keeps W1 from double-firing on a room D1/D2 already own.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; n.hasExteriorEdge &amp;&amp; n.glazing?.belowTarget)</code>. <code>node.glazing</code> is a <code>GlazingStat</code> populated from <code>floor.windowStats</code>, itself the output of <code>computeWindows()</code> in <code>windows.ts</code> — W1 never recomputes windows, it just reads the flag. That function looks up <code>WINDOW_CONFIG[roomTypeId]</code> (living/recreation <code>1/6</code> full-height; bedroom/kitchen <code>1/10</code> framed; kitchen additionally fixed at <code>fixedEdges: 2</code>), computes <code>floorArea = cells.length * 0.36</code>, computes <code>perEdge = perEdgeGlazing(variant, floorHeight)</code> (<code>0.6 * (floorHeight - 0.9)</code> full-height, minus another <code>0.9</code> for a framed lintel), derives <code>edgesNeeded = ceil(floorArea * targetRatio / perEdge)</code> clamped up to <code>MIN_WINDOW_EDGES = 2</code>, then bands the exterior runs SOUTHERNMOST-first (under the project north; length as the tie-break). <code>belowTarget = placed &lt; targetEdges</code>. The <code>hasExteriorEdge</code> guard keeps W1 from double-firing on a room D1/D2 already own.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid soft">OR1</span><span class="name">Lit only from the north</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A habitable room or kitchen whose every window faces north gets no meaningful direct sun. Solar-access practice at this latitude wants living-hours rooms glazed toward the south; a purely northern room is worth flagging — as a heuristic, not a code failure.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; (ctx.is.habitable(n) || ctx.is.kitchen(n)) &amp;&amp; n.glazing?.northLit)</code>. <code>northLit</code> is derived in <code>computeWindows()</code> (which now takes <code>northAngle</code>): each windowed edge's side becomes a compass bearing via <code>orientation.ts</code> (convention: north is world −Z rotated clockwise, viewed from above, by <code>northAngle</code>), and the flag is true only when the room HAS glazing AND every windowed edge lies within <code>NORTH_SECTOR_HALF_WIDTH = 45°</code> of due north. Because a no-glazing room is <code>northLit === false</code>, OR1 can never double-fire with D1/W1 (which own the no-daylight cases). The generator biases glazing toward south, so OR1 only fires when a room's sole exterior walls face north.</p>
 </div>
 
 <div class="rule">
@@ -286,8 +292,8 @@
 
 <div class="rule">
   <h3><span class="rid soft">N1</span><span class="name">Circulation-heavy layout</span><span class="tier soft">Soft</span></h3>
-  <p><b>Why</b> Too much of the interior given over to circulation is inefficient — every circulation m² is cost without habitable benefit.</p>
-  <p><b>Code</b> <code>computeCirculationFraction(graph)</code> sums each node's <code>cells.length</code> into <code>denom</code>, skipping outdoor clusters entirely (<code>continue</code>, excluded from both sides), and additionally into <code>circ</code> when the node is a circulation cluster or a stair. Returns <code>circ/denom</code>, or <code>null</code> if <code>denom === 0</code>. The rule compares that against <code>CIRCULATION_FRACTION_MAX</code> (= 0.25). The same function backs the always-on "Circulation: N%" line in <code>validationPanel.ts</code>, so the flag and the printed number can never disagree.</p>
+  <p><b>Why</b> Too much of the interior given over to circulation is inefficient — every circulation m² is cost without habitable benefit. Checked whole-dwelling AND per floor, since one bloated storey can otherwise hide behind efficient others in the average.</p>
+  <p><b>Code</b> <code>computeCirculationFraction(graph)</code> sums each node's <code>cells.length</code> into <code>denom</code>, skipping outdoor clusters entirely (<code>continue</code>, excluded from both sides), and additionally into <code>circ</code> when the node is a circulation cluster or a stair. Returns <code>circ/denom</code>, or <code>null</code> if <code>denom === 0</code>. The rule compares that against <code>CIRCULATION_FRACTION_MAX</code> (= 0.25). <code>computeCirculationFractionByFloor(graph)</code> shares the same per-node tally (factored into <code>circulationCellCounts()</code>) but keyed by <code>GraphNode.floor</code>; on a multi-floor dwelling (<code>graph.floorCount &gt; 1</code>) the rule additionally flags any floor whose own fraction crosses the same threshold, naming the floor and pointing at that floor's circulation/stair nodes — suppressed on a single floor, where it would just repeat the whole-dwelling figure. Both functions back the report's always-on "Circulation: N%" line and its per-floor breakdown line in <code>validationPanel.ts</code>, so the flags and the printed numbers can never disagree.</p>
 </div>
 
 <div class="rule">

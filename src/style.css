@@ -331,7 +331,8 @@ button.primary:hover {
 }
 
 #view-toggle,
-#top-view-toggle {
+#top-view-toggle,
+#graph-relayout {
   padding: 9px 16px;
   background: var(--accent);
   color: var(--text);
@@ -347,18 +348,21 @@ button.primary:hover {
 }
 
 #view-toggle:hover,
-#top-view-toggle:hover {
+#top-view-toggle:hover,
+#graph-relayout:hover {
   background: transparent;
   color: var(--accent);
 }
 
-#top-view-toggle {
+#top-view-toggle,
+#graph-relayout {
   background: transparent;
   color: var(--text);
   border-color: var(--line-soft);
 }
 
-#top-view-toggle:hover {
+#top-view-toggle:hover,
+#graph-relayout:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -374,6 +378,12 @@ button.primary:hover {
   color: var(--paper);
 }
 
+/* Re-layout only makes sense in diagram mode — hidden otherwise, shown by
+   GraphView.show()/hide() the same way the floor label / legend are. */
+#graph-relayout {
+  display: none;
+}
+
 #graph-floor-label {
   display: none;
   position: absolute;
@@ -386,6 +396,98 @@ button.primary:hover {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--black);
+}
+
+/* ---- Bubble-diagram legend + toggles (bottom-right, over graph-canvas) ---- */
+#graph-legend {
+  display: none;
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 2;
+  min-width: 172px;
+  background: var(--black);
+  border: 2px solid var(--line-soft);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 11px;
+}
+
+.gl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.gl-swatch {
+  width: 22px;
+  height: 0;
+  border-top: 2px solid var(--text);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.gl-swatch.gl-touch {
+  border-top: 2px dashed var(--text-dim);
+}
+
+.gl-tiers {
+  gap: 6px;
+}
+
+.gl-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.gl-dot.gl-hard {
+  background: var(--accent);
+}
+
+.gl-dot.gl-soft {
+  background: #e6a100;
+}
+
+.gl-dot.gl-note {
+  background: #2e7d32;
+}
+
+.gl-entry-mark {
+  color: #2e7d32;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.gl-toggles {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gl-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.gl-toggle input {
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
 }
 
 /* ---- Check Layout button (top-right, above Reset) ---- */
@@ -499,6 +601,17 @@ button.primary:hover {
 
 .vp-item.note {
   border-left-color: #2e7d32;
+}
+
+/* Only cards with a resolvable target (a room/edge to emphasize) get the
+   hover affordance — a dwelling-level card (no nodeIds/edge) stays plain. */
+.vp-item.hoverable {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.vp-item.hoverable:hover {
+  background: #292929;
 }
 
 .vp-tag {
@@ -744,6 +857,160 @@ button.primary:hover {
   color: var(--text);
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* ---- View controls: cutaway toggle + compass dial (bottom-right) ---- */
+#view-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+#cutaway-toggle {
+  padding: 9px 16px;
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--line-soft);
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+#cutaway-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ON = current dollhouse behaviour (default). Filled = active, like Top View. */
+#cutaway-toggle.active {
+  background: var(--paper);
+  color: var(--black);
+  border-color: var(--paper);
+}
+
+#cutaway-toggle.active:hover {
+  background: transparent;
+  color: var(--paper);
+}
+
+/* Compass dial — the north-setting control. Top-down frame (up = grid north). */
+#compass-dial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 8px 6px;
+  background: var(--black);
+  border: 2px solid var(--line-soft);
+}
+
+#compass-dial svg {
+  display: block;
+  cursor: grab;
+  touch-action: none; /* let the pointer drag rotate instead of scrolling */
+}
+
+#compass-dial svg:active {
+  cursor: grabbing;
+}
+
+.cd-ring {
+  fill: var(--black-2);
+  stroke: var(--line-soft);
+  stroke-width: 2;
+}
+
+.cd-tick {
+  stroke: var(--text-dim);
+  stroke-width: 1.4;
+}
+
+.cd-ref {
+  fill: var(--text-dim);
+}
+
+.cd-arrow {
+  fill: var(--accent); /* Bauhaus red north pointer */
+}
+
+.cd-tail {
+  stroke: var(--text-dim);
+  stroke-width: 2;
+}
+
+.cd-n {
+  fill: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.cd-caption {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ---- Camera-aware north arrow badge (bottom-left, above history) ---- */
+#north-badge {
+  position: absolute;
+  bottom: 64px;
+  left: 16px;
+  z-index: 2;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  background: var(--black);
+  border: 2px solid var(--line-soft);
+  pointer-events: none;
+}
+
+#north-badge svg {
+  display: block;
+}
+
+.nb-ring {
+  fill: none;
+  stroke: var(--line-soft);
+  stroke-width: 1.5;
+}
+
+/* The rotated group — main.ts sets `transform: rotate(<screen-north>deg)`,
+   pivoting on the badge centre (20,20). */
+.nb-rot {
+  transform-box: view-box;
+  transform-origin: 20px 20px;
+}
+
+.nb-arrow {
+  fill: var(--accent);
+}
+
+.nb-tail {
+  stroke: var(--text-dim);
+  stroke-width: 1.6;
+}
+
+.nb-n {
+  fill: var(--text);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
 }
 
 /* ---- Selection readout (bottom-centre, just above the hint bar) ---- */

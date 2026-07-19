@@ -58,6 +58,12 @@ export class FloorManager {
   /** Fired after any floor's contents change (place/move/rotate/delete/reconcile).
    *  Used to invalidate a stale rules-validation report. */
   onLayoutChange?: (floor: Floor) => void;
+  /** Project-level north direction, in degrees (see core/orientation.ts): the
+   *  north vector is world −Z rotated clockwise (viewed from above) by this.
+   *  Serialized (design state — it moves windows); biases window generation
+   *  toward south and drives OR1 + the orientation report. Mutate via
+   *  {@link setNorthAngle} so windows re-derive. */
+  northAngle = 0;
   /** Fired when the floor STACK changes structurally (a stair auto-created a
    *  floor above). Lets main rebuild the sidebar floor tabs. */
   onStructureChange?: () => void;
@@ -228,11 +234,13 @@ export class FloorManager {
       for (const inst of floor.store.instances.values()) {
         if (inst.def.category !== "room" || inst.def.cluster) continue; // shells only
         const cells = occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored); // absolute
-        const plan = computeWindows(cells, inst.def.type, height, occupied, entranceEdges);
+        const plan = computeWindows(cells, inst.def.type, height, occupied, entranceEdges, this.northAngle);
         floor.windowStats.set(inst.id, {
           targetRatio: plan.targetRatio,
           achievedRatio: plan.achievedRatio,
           belowTarget: plan.belowTarget,
+          sectors: plan.sectors, // derived glazing orientation (OR1 + report)
+          northLit: plan.northLit,
         });
         // Absolute windowed edges → LOCAL edge keys (walls are built from the
         // mirrored+rotated LOCAL cells = absolute − origin; side is unchanged
@@ -313,6 +321,17 @@ export class FloorManager {
   refreshWalls(): void {
     this.rebuildAllShells();
     markCutawayDirty();
+  }
+
+  /** Set the project north (degrees) and re-derive windows against it (they ride
+   *  the wall pass). No-op if unchanged, so a click-without-drag on the dial
+   *  costs nothing. Normalizes to [0,360). The caller commits history + syncs the
+   *  dial/arrow display; this only owns the geometry re-derivation. */
+  setNorthAngle(deg: number): void {
+    const a = ((deg % 360) + 360) % 360;
+    if (a === this.northAngle) return;
+    this.northAngle = a;
+    this.refreshWalls(); // seed-run south-bias re-scores → windows move
   }
 
   /** Add a floor above the topmost one, inheriting its grid size; activate it. */
@@ -458,6 +477,13 @@ export class FloorManager {
    * normalized by {@link import("./projectIO").parseProject}.
    */
   loadProject(data: ProjectFile): void {
+    // North is project-level design state — restore it BEFORE any rebuild so the
+    // window generator (which reads this.northAngle) re-derives against the
+    // loaded angle. Tolerant: a pre-north file has no field → default 0.
+    const rawNorth =
+      typeof data.northAngle === "number" && Number.isFinite(data.northAngle) ? data.northAngle : 0;
+    this.northAngle = ((rawNorth % 360) + 360) % 360;
+
     for (const f of [...this.floors]) this.disposeFloor(f);
     this.floors.length = 0;
     this.activeIndex = 0;

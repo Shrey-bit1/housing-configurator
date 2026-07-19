@@ -202,6 +202,29 @@ export function makeGlassMaterial(): THREE.MeshStandardMaterial {
  * gap absorbs the extra height). Windows are only ever passed for room shells;
  * cluster shells call without them.
  *
+ * CORNER-WRAPPED WINDOWS (the window generator, windows.ts, may glaze BOTH of
+ * a convex corner's perpendicular edges — an L or U band in plan): sill/lintel
+ * need no special handling here at all — they're solid boxes using the exact
+ * same (xMin,xMax,zMin,zMax) footprint a plain wall segment would, so they
+ * already wrap the corner cleanly via the ordinary corner-ownership trim below
+ * (N/S "owns" the square; E/W is trimmed away from it) — the same mechanism
+ * that already closes a plain solid wall's corners. Only the GLAZING needs an
+ * explicit fix: it's normally a thin `GLASS_T` sliver centred in the wall
+ * thickness, INSET from the trim boundary, so two independent wrapped panes
+ * would otherwise fall short of each other by half a wall thickness each,
+ * leaving a gap. Fix: when this cell's OWN perpendicular edge is ALSO
+ * windowed (only possible at a convex corner — see windows.ts's
+ * `cornerCheckSide` doc comment for why), the E/W pane's glazing extends past
+ * its usual trim boundary to the TRUE corner (matching the N/S pane, which
+ * already spans the full untrimmed width and needs no change) — the two
+ * panes now overlap slightly right at the corner instead of falling short,
+ * closing with no gap. Deliberately asymmetric (extend E/W only, leave N/S
+ * alone) rather than meeting exactly at the shared centreline: it means EACH
+ * leg still fully covers its own face on its own, so cutaway hiding one leg
+ * (camera-facing) never exposes a hole at the seam through the OTHER leg's
+ * now-orphaned corner — the remaining leg was never shrunk. No corner post —
+ * true glass-to-glass.
+ *
  * DOORS: a doored INTERIOR edge (its `edgeKey` present in `doors` — LOCAL for a
  * room, ABSOLUTE for a cluster, matching the `windows` key convention) gets an
  * OPENING from 0→{@link DOOR_OPENING_H} with a SOLID header panel above it up to
@@ -242,13 +265,20 @@ export function buildBoundaryWalls(
    * Emit one boundary edge into the given solid + glass arrays. Non-windowed →
    * one full-height box. Windowed → sill (+ optional lintel) as solid, plus a
    * glazing pane (thinner, centred in the wall thickness along `thin`).
+   *
+   * `glassZMin`/`glassZMax` (E/W panes only, `thin === "x"`) override the
+   * glazing pane's z-extent to reach a wrapped corner's true edge instead of
+   * the ordinary trim boundary — see the corner-wrapped-windows doc comment
+   * above. Omit (or pass `zMin`/`zMax`) for the untouched, non-wrapped extent.
    */
   const emit = (
     side: string,
     cx: number, cz: number,
     solid: THREE.BufferGeometry[], glazing: THREE.BufferGeometry[],
     xMin: number, xMax: number, zMin: number, zMax: number,
-    thin: "x" | "z"
+    thin: "x" | "z",
+    glassZMin = zMin,
+    glassZMax = zMax
   ) => {
     // Door wins the edge: a fixed 0→DOOR_OPENING_H opening, solid header above.
     if (doors?.has(edgeKey(cx, cz, side as any))) {
@@ -261,7 +291,10 @@ export function buildBoundaryWalls(
       solid.push(box(xMin, xMax, zMin, zMax, 0, fullH));
       return;
     }
-    // Sill (always) + lintel (framed only) — solid wall.
+    // Sill (always) + lintel (framed only) — solid wall. Uses the SAME
+    // (xMin,xMax,zMin,zMax) a plain wall box would, so it already wraps a
+    // corner cleanly via the ordinary trim (see the corner-wrapped-windows
+    // doc comment above) — no wrap-specific handling needed here.
     solid.push(box(xMin, xMax, zMin, zMax, 0, SILL_H));
     const glassTop = variant === "framed" ? fullH - LINTEL_H : fullH;
     if (variant === "framed") solid.push(box(xMin, xMax, zMin, zMax, fullH - LINTEL_H, fullH));
@@ -272,6 +305,8 @@ export function buildBoundaryWalls(
         const cxm = (xMin + xMax) / 2;
         gxMin = cxm - GLASS_T / 2;
         gxMax = cxm + GLASS_T / 2;
+        gzMin = glassZMin;
+        gzMax = glassZMax;
       } else {
         const czm = (zMin + zMax) / 2;
         gzMin = czm - GLASS_T / 2;
@@ -290,12 +325,23 @@ export function buildBoundaryWalls(
     const emptyW = !occupied.has(key(c.cx - 1, c.cz)); // -x edge (west)
     const emptyE = !occupied.has(key(c.cx + 1, c.cz)); // +x edge (east)
 
+    // Convex-corner glazing wrap (see the doc comment above): this cell's OWN
+    // north/south edge being ALSO windowed means the E/W pane below meets a
+    // perpendicular pane at that end — extend the glazing (only) to the true
+    // corner there instead of the ordinary trim boundary.
+    const wrapN = emptyN && !!windows?.get(edgeKey(c.cx, c.cz, "north"));
+    const wrapS = emptyS && !!windows?.get(edgeKey(c.cx, c.cz, "south"));
+
     // E/W walls run in z, inset in x, trimmed in z at convex ends so the
     // perpendicular N/S wall of this cell owns the corner.
     const zMin = z - H + (emptyN ? WALL_T : 0);
     const zMax = z + H - (emptyS ? WALL_T : 0);
-    if (emptyW) emit("west", c.cx, c.cz, walls.nx, glass.nx, x - H, x - H + WALL_T, zMin, zMax, "x");
-    if (emptyE) emit("east", c.cx, c.cz, walls.px, glass.px, x + H - WALL_T, x + H, zMin, zMax, "x");
+    const glassZMin = wrapN ? z - H : zMin;
+    const glassZMax = wrapS ? z + H : zMax;
+    if (emptyW)
+      emit("west", c.cx, c.cz, walls.nx, glass.nx, x - H, x - H + WALL_T, zMin, zMax, "x", glassZMin, glassZMax);
+    if (emptyE)
+      emit("east", c.cx, c.cz, walls.px, glass.px, x + H - WALL_T, x + H, zMin, zMax, "x", glassZMin, glassZMax);
 
     // N/S walls run in x at full cell length (own the corners), inset in z.
     if (emptyN) emit("north", c.cx, c.cz, walls.nz, glass.nz, x - H, x + H, z - H, z - H + WALL_T, "z");

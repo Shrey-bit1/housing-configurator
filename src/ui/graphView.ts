@@ -1,9 +1,4 @@
-import {
-  parseDwellingNodeId,
-  type DwellingGraph,
-  type GraphEdge,
-  type GraphNode,
-} from "../core/adjacencyGraph";
+import type { DwellingGraph, GraphEdge, GraphNode } from "../core/adjacencyGraph";
 import {
   SEVERITY_COLORS,
   worstSeverity,
@@ -19,16 +14,6 @@ interface NodePos {
   vy: number;
 }
 
-/** A cross-floor stair connection shown as a stub on the active floor. */
-interface StairStub {
-  localId: string;
-  dir: "up" | "down";
-  otherFloor: number;
-  /** True when a door gates this cross-floor link (solid); false = physical
-   *  stair-over touch only (dashed). */
-  viaDoor: boolean;
-}
-
 /** Unordered node-id pair key, for matching highlighted adjacencies to edges. */
 function edgeKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
@@ -38,8 +23,14 @@ const BG = "#e4e0d6"; // matches the 3D canvas background
 const LINE = "#1a1a1a"; // ACCESS (doored) edge — solid, reads as "connected"
 const TOUCH = "#b9b3a7"; // TOUCH-only edge — faint dashed, reads as "adjacent, no door"
 const ENTRY = "#2e7d32"; // entry-node marker (green, reads as "in")
-const STAIR = "#5a5a5a";
-const DOOR_STAIR = "#7c4dff"; // door-gated cross-floor stub (matches the 3D door marker)
+const SEPARATOR = "#cfc9bc"; // faint column-boundary rule
+const HEADER_ACTIVE = "#d32f2f"; // active-floor column header (Bauhaus accent)
+const HEADER_DIM = "#8a857c";
+const HOVER_RING = "#ffffff"; // report-card hover emphasis (node ring + edge overlay)
+const HOVER_OUTLINE = "#141414"; // dark outline under the white so it reads on any bg/node colour
+const BADGE_BG = "#1e1e1e"; // depth-badge chip — fixed colours, independent of node fill
+const BADGE_TEXT = "#ffffff";
+const BADGE_BORDER = "#f4f1ea";
 
 // Force-layout tuning (CSS-pixel space). Doesn't need to be physically perfect.
 const REPULSION = 12000;
@@ -48,19 +39,35 @@ const SPRING_K = 0.02;
 const GRAVITY = 0.012;
 const DAMPING = 0.86;
 const MAX_V = 30;
+const MARGIN_Y = 60; // top/bottom keep-out, all columns
+const COL_PAD = 60; // left/right keep-out from a column's own boundaries
+const HEADER_H = 34; // column-header row height, reserved at the bottom
 
 /**
- * Full-screen 2D bubble-diagram view. The dwelling graph spans all floors; this
- * shows ONE floor at a time (the active floor) with:
- *  - room/cluster nodes + their same-floor adjacencies,
- *  - entry markers on nodes that carry an entrance,
- *  - "↑/↓ Floor N" stubs where a stair links a node to another floor.
- * Recomputed each frame while open; node positions persist by id and settle
- * under a hand-rolled force-directed layout.
+ * Full-screen 2D bubble-diagram view of the WHOLE dwelling: one column per
+ * floor (0 leftmost), all floors' nodes force-laid-out simultaneously but
+ * each room/cluster clamped to its own floor's column. A stair — the only
+ * node kind that spans two floors — renders ON the boundary line between its
+ * own floor's column and the floor above's, its bottom (same-floor) edges
+ * reaching left and its top (`viaStair`) edges reaching right; this is why
+ * cross-floor edges need no special routing, just a normally-drawn line
+ * between two normally-positioned nodes (see `computeDwellingGraph`'s doc
+ * comment on why every cross-floor edge has exactly one stair endpoint).
+ *
+ * Nodes are draggable: pointer-drag pins a node (fixes its position; the
+ * force sim still lets its unpinned neighbours respond to it as an anchor).
+ * Room/cluster drag is free within its column; stair drag is vertical-only,
+ * locked to its boundary line. "Re-layout" unpins everything.
+ *
+ * Recomputed each frame while open; node positions (and pin state) persist
+ * by id across frames/resizes — pure view state, never serialized (matches
+ * camera/active-floor/visibility, which are likewise excluded from project
+ * JSON).
  */
 export class GraphView {
   visible = false;
   private positions = new Map<string, NodePos>();
+  private pinned = new Set<string>();
   private g: CanvasRenderingContext2D;
   /** Validation overlay (set by Check Layout): node id → worst severity. */
   private nodeHi = new Map<string, Severity>();
@@ -68,14 +75,61 @@ export class GraphView {
   private edgeHi = new Map<string, Severity>();
   /** Space-syntax depth-from-entrance (set by Check Layout): node id → hops. */
   private depths = new Map<string, number>();
+  /** Report-card hover emphasis (set by hovering a violation card): the
+   *  hovered violation's target node(s) and/or edge, or empty/null when
+   *  nothing is hovered. Layered on top of `nodeHi`/`edgeHi` at draw time —
+   *  never mutates them, so unhover needs no re-derivation. */
+  private hoverIds = new Set<string>();
+  private hoverEdge: [string, string] | null = null;
+
+  // Toggles (view state, default per spec: touch off, depth on).
+  private showTouch = false;
+  private showDepth = true;
+
+  // Column-layout metrics, refreshed every `frame()` — cached so pointer
+  // handlers (which fire outside the animation loop) can clamp consistently
+  // with whatever was last drawn.
+  private colWidth = 0;
+  private canvasH = 0;
+  private floorCount = 1;
+
+  // Latest frame's nodes, for pointer hit-testing.
+  private lastNodes: GraphNode[] = [];
+  private nodesById = new Map<string, GraphNode>();
+
+  private dragId: string | null = null;
 
   constructor(
     private canvas: HTMLCanvasElement,
     private getGraph: () => DwellingGraph,
     private getActiveFloor: () => number,
-    private floorLabelEl: HTMLElement
+    private titleEl: HTMLElement,
+    private legendEl: HTMLElement,
+    touchToggleEl: HTMLInputElement,
+    depthToggleEl: HTMLInputElement,
+    private relayoutBtn: HTMLButtonElement
   ) {
     this.g = canvas.getContext("2d")!;
+
+    touchToggleEl.checked = this.showTouch;
+    depthToggleEl.checked = this.showDepth;
+    touchToggleEl.addEventListener("change", () => {
+      this.showTouch = touchToggleEl.checked;
+    });
+    depthToggleEl.addEventListener("change", () => {
+      this.showDepth = depthToggleEl.checked;
+    });
+    relayoutBtn.addEventListener("click", () => this.pinned.clear());
+
+    // pointerdown is canvas-scoped (only starts a drag when the diagram is the
+    // thing under the cursor); move/up are window-scoped so a drag survives
+    // the pointer leaving canvas bounds mid-gesture. Both no-op immediately
+    // when nothing is being dragged, so they're inert whenever the diagram
+    // isn't visible (a hidden canvas never receives pointerdown to begin with).
+    canvas.addEventListener("pointerdown", this.onPointerDown);
+    window.addEventListener("pointermove", this.onPointerMove);
+    window.addEventListener("pointerup", this.onPointerUp);
+    canvas.addEventListener("dblclick", this.onDblClick);
   }
 
   toggle(): void {
@@ -99,68 +153,64 @@ export class GraphView {
     this.nodeHi.clear();
     this.edgeHi.clear();
     this.depths.clear();
+    this.hoverIds.clear();
+    this.hoverEdge = null;
   }
 
   /** Install the depth-from-entrance metric (node id → hop count) so each
-   *  node can show a small depth badge. Purely informational — unrelated to
-   *  pass/fail severity. */
+   *  node can show a small depth badge (when the depth toggle is on).
+   *  Purely informational — unrelated to pass/fail severity. */
   setDepths(depths: Map<string, number>): void {
     this.depths = depths;
+  }
+
+  /** Report-card hover: emphasize `v`'s target node(s)/edge on top of the
+   *  normal tier highlight (never replaces it — see `draw()`). Pass null on
+   *  unhover. A dwelling-level violation (empty `nodeIds`, no `edge`)
+   *  naturally emphasizes nothing — no fake target is invented. */
+  setHover(v: Violation | null): void {
+    this.hoverIds = new Set(v?.nodeIds ?? []);
+    this.hoverEdge = v?.edge ?? null;
   }
 
   show(): void {
     this.visible = true;
     this.canvas.style.display = "block";
-    this.floorLabelEl.style.display = "block";
+    this.titleEl.style.display = "block";
+    this.legendEl.style.display = "block";
+    this.relayoutBtn.style.display = "";
   }
 
   hide(): void {
     this.visible = false;
     this.canvas.style.display = "none";
-    this.floorLabelEl.style.display = "none";
+    this.titleEl.style.display = "none";
+    this.legendEl.style.display = "none";
+    this.relayoutBtn.style.display = "none";
+    this.dragId = null;
   }
 
   /** Run one layout step and redraw. Call each frame while {@link visible}. */
   frame(): void {
     const { w, h } = this.fitCanvas();
     const graph = this.getGraph();
-    const active = this.getActiveFloor();
 
-    const nodes = graph.nodes.filter((n) => n.floor === active);
-    const ids = new Set(nodes.map((n) => n.id));
-    const edges = graph.edges.filter((e) => !e.viaStair && ids.has(e.a) && ids.has(e.b));
-    const stubs = this.stairStubs(graph, ids, active);
+    this.floorCount = Math.max(1, graph.floorCount);
+    this.colWidth = w / this.floorCount;
+    this.canvasH = h;
 
-    this.syncPositions(nodes, w, h);
-    this.step(nodes, edges, w, h);
-    this.draw(nodes, edges, stubs, w, h);
-    this.floorLabelEl.textContent = `Floor ${active} — adjacency diagram`;
-  }
+    const nodes = graph.nodes;
+    this.lastNodes = nodes;
+    this.nodesById = new Map(nodes.map((n) => [n.id, n]));
+    // All edges (same-floor AND cross-floor) — a stair sitting on its column
+    // boundary makes a cross-floor edge just an ordinary line to a normally-
+    // positioned node; no stub/routing logic needed.
+    const edges = graph.edges;
 
-  /** Stair edges that cross from the active floor to another floor → stubs.
-   *  Deduped per (node, direction, other floor); a door-gated (access) link
-   *  wins over a touch-only one so a doored connection always reads as solid. */
-  private stairStubs(graph: DwellingGraph, activeIds: Set<string>, active: number): StairStub[] {
-    const byKey = new Map<string, StairStub>();
-    for (const e of graph.edges) {
-      if (!e.viaStair) continue;
-      const aIn = activeIds.has(e.a);
-      const bIn = activeIds.has(e.b);
-      if (aIn === bIn) continue; // both on/both off the active floor
-      const localId = aIn ? e.a : e.b;
-      const otherId = aIn ? e.b : e.a;
-      const otherFloor = parseDwellingNodeId(otherId).floor;
-      const stub: StairStub = {
-        localId,
-        dir: otherFloor > active ? "up" : "down",
-        otherFloor,
-        viaDoor: !!e.viaDoor,
-      };
-      const key = `${localId}|${stub.dir}|${otherFloor}`;
-      const existing = byKey.get(key);
-      if (!existing || (stub.viaDoor && !existing.viaDoor)) byKey.set(key, stub);
-    }
-    return [...byKey.values()];
+    this.syncPositions(nodes, h);
+    this.step(nodes, edges, h);
+    this.draw(nodes, edges, w, h);
+    this.titleEl.textContent = "Adjacency diagram";
   }
 
   // ---- Canvas sizing -------------------------------------------------------
@@ -177,19 +227,60 @@ export class GraphView {
     return { w, h };
   }
 
+  // ---- Column geometry -------------------------------------------------------
+  // The single source of truth for "where does floor N's column live" —
+  // consumed by layout (step), drawing (headers/separators), and pointer
+  // handlers alike, so a drag clamps to exactly the band a node is drawn in.
+
+  private columnX0(floor: number): number {
+    return floor * this.colWidth;
+  }
+
+  private columnCenterX(floor: number): number {
+    return this.columnX0(floor) + this.colWidth / 2;
+  }
+
+  /** The vertical boundary line between floor `floor` and floor `floor+1` —
+   *  where a stair rooted on `floor` (whose hole always projects onto
+   *  `floor+1`; FloorManager guarantees a stair never lacks a floor above)
+   *  renders and drags. */
+  private stairBoundaryX(floor: number): number {
+    return (floor + 1) * this.colWidth;
+  }
+
+  /** Inner keep-out band for a room/cluster node in floor `floor`'s column. */
+  private columnBand(floor: number): { lo: number; hi: number } {
+    const pad = clamp(COL_PAD, 4, this.colWidth / 2);
+    const x0 = this.columnX0(floor);
+    return { lo: x0 + pad, hi: x0 + this.colWidth - pad };
+  }
+
+  /** Clamp a candidate x for `node` into whatever it's allowed to occupy:
+   *  a stair is pinned to its boundary line (x is not a range), a room or
+   *  cluster is free within its own column's band. */
+  private clampX(node: GraphNode, x: number): number {
+    return node.kind === "stair"
+      ? this.stairBoundaryX(node.floor)
+      : clamp(x, this.columnBand(node.floor).lo, this.columnBand(node.floor).hi);
+  }
+
   // ---- Layout --------------------------------------------------------------
 
-  private syncPositions(nodes: GraphNode[], w: number, h: number): void {
+  private syncPositions(nodes: GraphNode[], h: number): void {
     const present = new Set(nodes.map((n) => n.id));
     for (const id of [...this.positions.keys()])
-      if (!present.has(id)) this.positions.delete(id);
+      if (!present.has(id)) {
+        this.positions.delete(id);
+        this.pinned.delete(id);
+      }
 
     for (const node of nodes) {
       if (this.positions.has(node.id)) continue;
       const a = (hash(node.id) % 360) * (Math.PI / 180);
-      const r = 60 + (hash(node.id) % 80);
+      const r = 30 + (hash(node.id) % 40);
+      const cx = node.kind === "stair" ? this.stairBoundaryX(node.floor) : this.columnCenterX(node.floor);
       this.positions.set(node.id, {
-        x: w / 2 + Math.cos(a) * r,
+        x: this.clampX(node, cx + (node.kind === "stair" ? 0 : Math.cos(a) * r)),
         y: h / 2 + Math.sin(a) * r,
         vx: 0,
         vy: 0,
@@ -197,8 +288,11 @@ export class GraphView {
     }
   }
 
-  private step(nodes: GraphNode[], edges: GraphEdge[], w: number, h: number): void {
+  private step(nodes: GraphNode[], edges: GraphEdge[], h: number): void {
     const pos = this.positions;
+    // Same-floor AND cross-floor edges all contribute springs uniformly —
+    // spring length has no special-casing for a stair's fixed x, it just
+    // pulls toward its (possibly off-column) other endpoint like any edge.
 
     for (let i = 0; i < nodes.length; i++) {
       const a = pos.get(nodes[i].id)!;
@@ -241,54 +335,135 @@ export class GraphView {
 
     for (const node of nodes) {
       const p = pos.get(node.id)!;
-      p.vx += (w / 2 - p.x) * GRAVITY;
-      p.vy += (h / 2 - p.y) * GRAVITY;
-      p.vx = clamp(p.vx * DAMPING, -MAX_V, MAX_V);
-      p.vy = clamp(p.vy * DAMPING, -MAX_V, MAX_V);
-      p.x += p.vx;
-      p.y += p.vy;
-      const m = 60;
-      p.x = clamp(p.x, m, w - m);
-      p.y = clamp(p.y, m, h - m);
+      const isStair = node.kind === "stair";
+      const pinned = this.pinned.has(node.id);
+
+      if (!pinned) {
+        // Gravity pulls toward the node's OWN column centre (not the whole-
+        // canvas centre) so floors don't all collapse toward the middle
+        // column. A stair has no meaningful x-gravity — its x is a hard
+        // constraint below, never velocity-driven — so only y is applied.
+        if (!isStair) p.vx += (this.columnCenterX(node.floor) - p.x) * GRAVITY;
+        p.vy += (h / 2 - p.y) * GRAVITY;
+        p.vx = clamp(p.vx * DAMPING, -MAX_V, MAX_V);
+        p.vy = clamp(p.vy * DAMPING, -MAX_V, MAX_V);
+        if (!isStair) p.x += p.vx;
+        p.y += p.vy;
+      } else {
+        // No velocity buildup while pinned (dragged or drag-released) — a
+        // future unpin (Re-layout / double-click) should resume from rest,
+        // not fling off with stale accumulated force.
+        p.vx = 0;
+        p.vy = 0;
+      }
+
+      // Hard positional constraint, every frame, pinned or not — the same
+      // clamp a resize or a floor-count change must re-snap into, and the
+      // same one drag input is clamped through (see onPointerMove).
+      p.x = this.clampX(node, p.x);
+      p.y = clamp(p.y, MARGIN_Y, h - MARGIN_Y);
     }
   }
 
+  // ---- Pointer interaction (drag to pin) ------------------------------------
+
+  private toCanvasXY(e: PointerEvent): { x: number; y: number } {
+    const r = this.canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  /** Topmost node under (x,y), or null. Iterates latest-drawn-first (reverse
+   *  of draw order) so overlapping circles hit the one visually on top. */
+  private hitTest(x: number, y: number): GraphNode | null {
+    for (let i = this.lastNodes.length - 1; i >= 0; i--) {
+      const node = this.lastNodes[i];
+      const p = this.positions.get(node.id);
+      if (!p) continue;
+      const r = nodeRadius(node);
+      if ((x - p.x) ** 2 + (y - p.y) ** 2 <= r * r) return node;
+    }
+    return null;
+  }
+
+  private onPointerDown = (e: PointerEvent): void => {
+    if (!this.visible || e.button !== 0) return;
+    const { x, y } = this.toCanvasXY(e);
+    const node = this.hitTest(x, y);
+    if (!node) return;
+    e.preventDefault();
+    this.dragId = node.id;
+    this.pinned.add(node.id);
+    const p = this.positions.get(node.id)!;
+    p.x = this.clampX(node, x);
+    p.y = clamp(y, MARGIN_Y, this.canvasH - MARGIN_Y);
+    p.vx = 0;
+    p.vy = 0;
+  };
+
+  private onPointerMove = (e: PointerEvent): void => {
+    if (!this.dragId) return;
+    const node = this.nodesById.get(this.dragId);
+    const p = this.positions.get(this.dragId);
+    if (!node || !p) return;
+    const { x, y } = this.toCanvasXY(e);
+    // Stair: x is ignored entirely — vertical drag only, locked to its
+    // boundary line. Room/cluster: x free within its own column band.
+    p.x = this.clampX(node, x);
+    p.y = clamp(y, MARGIN_Y, this.canvasH - MARGIN_Y);
+    p.vx = 0;
+    p.vy = 0;
+  };
+
+  private onPointerUp = (): void => {
+    // The node stays pinned after release (that's the point) — only the
+    // drag gesture itself ends.
+    this.dragId = null;
+  };
+
+  private onDblClick = (e: MouseEvent): void => {
+    if (!this.visible) return;
+    const r = this.canvas.getBoundingClientRect();
+    const node = this.hitTest(e.clientX - r.left, e.clientY - r.top);
+    if (node) this.pinned.delete(node.id);
+  };
+
   // ---- Drawing -------------------------------------------------------------
 
-  private draw(
-    nodes: GraphNode[],
-    edges: GraphEdge[],
-    stubs: StairStub[],
-    w: number,
-    h: number
-  ): void {
+  private draw(nodes: GraphNode[], edges: GraphEdge[], w: number, h: number): void {
     const g = this.g;
     g.fillStyle = BG;
     g.fillRect(0, 0, w, h);
+
+    this.drawColumns(h);
 
     if (nodes.length === 0) {
       g.fillStyle = "#8a857c";
       g.font = "600 15px 'Helvetica Neue', Helvetica, Arial, sans-serif";
       g.textAlign = "center";
       g.textBaseline = "middle";
-      g.fillText("No rooms on this floor yet — place some to see the diagram.", w / 2, h / 2);
+      g.fillText("No rooms placed yet — place some to see the diagram.", w / 2, h / 2);
       return;
     }
 
-    // Same-floor edges: ACCESS (doored) solid, TOUCH-only faint dashed, flagged
-    // ones thick + coloured. Where a pair has BOTH a door and a physical touch,
-    // the solid access line represents it — skip the redundant dashed touch line
-    // (unless the touch edge itself is flagged, which must still show).
-    const accessPairs = new Set(
-      edges.filter((e) => e.viaDoor).map((e) => edgeKey(e.a, e.b))
-    );
+    // Edges: ACCESS (doored) solid, TOUCH-only faint dashed and hidden unless
+    // the "Show touching" toggle is on — UNLESS the touch edge itself carries
+    // a violation, which must always be visible regardless of the toggle.
+    // Where a pair has BOTH a door and a physical touch, the solid access
+    // line already represents it, so the redundant dashed line is skipped
+    // (again, unless flagged) whether or not touch edges are shown — this
+    // applies uniformly to same-floor AND cross-floor (stair) edges, so the
+    // old "could door here" stub's toggle behaviour just falls out of it.
+    const accessPairs = new Set(edges.filter((e) => e.viaDoor).map((e) => edgeKey(e.a, e.b)));
     for (const e of edges) {
       const a = this.positions.get(e.a);
       const b = this.positions.get(e.b);
       if (!a || !b) continue;
       const k = edgeKey(e.a, e.b);
       const sev = this.edgeHi.get(k);
-      if (!e.viaDoor && !sev && accessPairs.has(k)) continue;
+      if (!e.viaDoor) {
+        if (!this.showTouch && !sev) continue;
+        if (!sev && accessPairs.has(k)) continue;
+      }
       g.beginPath();
       g.moveTo(a.x, a.y);
       g.lineTo(b.x, b.y);
@@ -307,13 +482,29 @@ export class GraphView {
       }
       g.stroke();
       g.setLineDash([]);
+
+      // Report-card hover emphasis for an edge-based violation (H4/S3/S5/S6/
+      // AC1...) — an outlined white overlay on the SAME path, drawn right
+      // after the edge's normal stroke so it reads as "this edge" regardless
+      // of which style (solid/dashed/severity) the base line used. Works
+      // identically for cross-floor edges — they're drawn with the same
+      // moveTo/lineTo as any other edge, just between a stair's boundary
+      // position and a node in the neighbouring column.
+      if (this.hoverEdge && edgeMatches(e, this.hoverEdge)) {
+        g.beginPath();
+        g.moveTo(a.x, a.y);
+        g.lineTo(b.x, b.y);
+        g.strokeStyle = HOVER_OUTLINE;
+        g.lineWidth = 7;
+        g.stroke();
+        g.beginPath();
+        g.moveTo(a.x, a.y);
+        g.lineTo(b.x, b.y);
+        g.strokeStyle = HOVER_RING;
+        g.lineWidth = 3.5;
+        g.stroke();
+      }
     }
-
-    // Stair stubs (grouped per node + direction so multiples fan out).
-    this.drawStubs(stubs);
-
-    // Legend — what solid vs dashed means (drawn last so it sits on top).
-    this.drawLegend(h);
 
     // Nodes.
     g.textAlign = "center";
@@ -355,98 +546,108 @@ export class GraphView {
         g.fillText("▶ ENTRY", p.x, p.y - r - 9);
       }
 
+      // Report-card hover emphasis: an outlined white halo layered on top of
+      // the tier ring/border above — it never replaces the severity colour,
+      // just adds a "look here" glow, so hover can't fight the normal
+      // post-check highlighting (see `setHover`'s doc comment).
+      if (this.hoverIds.has(node.id)) {
+        g.save();
+        g.shadowColor = HOVER_RING;
+        g.shadowBlur = 10;
+        g.beginPath();
+        g.arc(p.x, p.y, r + 9, 0, Math.PI * 2);
+        g.strokeStyle = HOVER_OUTLINE;
+        g.lineWidth = 7;
+        g.stroke();
+        g.beginPath();
+        g.arc(p.x, p.y, r + 9, 0, Math.PI * 2);
+        g.strokeStyle = HOVER_RING;
+        g.lineWidth = 3.5;
+        g.stroke();
+        g.restore();
+      }
+
       g.fillStyle = "#1a1a1a";
       g.font = "700 12px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-      g.fillText(node.label, p.x, p.y + r + 12);
+      g.fillText(shortLabel(node.label), p.x, p.y + r + 12);
 
-      // Depth-from-entrance badge (space-syntax hop count) — small, top-right
-      // of the node circle. Purely informational, so it never affects colour.
+      // Depth-from-entrance badge (space-syntax hop count): a small solid
+      // chip with its OWN fixed colours (independent of the node's fill), so
+      // it reads on every node colour — the old plain grey numeral drawn
+      // directly on the node's edge was low-contrast and half-clipped by the
+      // circle on light node colours (cream bathroom, white-ish walls).
+      // Centred ON the node's rim at the bottom-right (45°) so it overlaps
+      // the node slightly rather than floating free; drawn AFTER the
+      // severity/hover rings above so it's never buried under either, even
+      // on a flagged node. Governed by the same `showDepth` toggle as before.
       const depth = this.depths.get(node.id);
-      if (depth !== undefined) {
+      if (this.showDepth && depth !== undefined) {
+        const br = clamp(r * 0.32, 9, 13);
+        const bx = p.x + r * Math.SQRT1_2;
+        const by = p.y + r * Math.SQRT1_2;
         g.save();
-        g.textAlign = "left";
+        g.beginPath();
+        g.arc(bx, by, br, 0, Math.PI * 2);
+        g.fillStyle = BADGE_BG;
+        g.fill();
+        g.lineWidth = 1.5;
+        g.strokeStyle = BADGE_BORDER;
+        g.stroke();
+        g.textAlign = "center";
         g.textBaseline = "middle";
-        g.font = "800 10px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-        g.fillStyle = "#5a5a5a";
-        g.fillText(`${depth}`, p.x + r * 0.55, p.y - r * 0.6);
+        g.font = `800 ${Math.round(br * 1.15)}px 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+        g.fillStyle = BADGE_TEXT;
+        g.fillText(`${depth}`, bx, by + 0.5);
         g.restore();
       }
     }
   }
 
-  private drawStubs(stubs: StairStub[]): void {
+  /** Column separators + "Floor N" headers at the BOTTOM of each column. The
+   *  active floor's header gets a cheap accent-colour emphasis (no other
+   *  behaviour keys off "active" any more — the diagram always shows every
+   *  floor). */
+  private drawColumns(h: number): void {
     const g = this.g;
-    // Group by node + direction so multiple stairs fan out instead of overlapping.
-    const groups = new Map<string, StairStub[]>();
-    for (const s of stubs) {
-      const k = `${s.localId}|${s.dir}`;
-      (groups.get(k) ?? groups.set(k, []).get(k)!).push(s);
-    }
-    for (const list of groups.values()) {
-      const p = this.positions.get(list[0].localId);
-      if (!p) continue;
-      const r = 30;
-      list.forEach((s, i) => {
-        const sign = s.dir === "up" ? -1 : 1;
-        const fan = (i - (list.length - 1) / 2) * 26;
-        const ex = p.x + fan;
-        const ey = p.y + sign * (r + 22);
-        // Door-gated cross-floor link → solid violet; physical stair-over touch
-        // (no door yet) → dashed grey.
-        const color = s.viaDoor ? DOOR_STAIR : STAIR;
-        g.beginPath();
-        g.moveTo(p.x, p.y + sign * 6);
-        g.lineTo(ex, ey);
-        g.strokeStyle = color;
-        g.lineWidth = s.viaDoor ? 2.4 : 2;
-        g.setLineDash(s.viaDoor ? [] : [4, 3]);
-        g.stroke();
-        g.setLineDash([]);
-        const label = `${s.dir === "up" ? "↑" : "↓"} F${s.otherFloor}`;
-        g.font = "800 11px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-        const tw = g.measureText(label).width + 10;
-        g.fillStyle = color;
-        g.fillRect(ex - tw / 2, ey - 9, tw, 18);
-        g.fillStyle = "#f4f1ea";
-        g.textAlign = "center";
-        g.textBaseline = "middle";
-        g.fillText(label, ex, ey);
-      });
-    }
-  }
-
-  /** Bottom-left key: solid = door (connected), dashed = touching (no door). */
-  private drawLegend(h: number): void {
-    const g = this.g;
-    const x = 20;
-    let y = h - 46;
-    const sample = 26;
+    const active = this.getActiveFloor();
     g.save();
-    g.textAlign = "left";
-    g.textBaseline = "middle";
-    g.font = "600 12px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-
-    const row = (color: string, dash: number[], label: string) => {
+    g.strokeStyle = SEPARATOR;
+    g.lineWidth = 1;
+    for (let i = 1; i < this.floorCount; i++) {
+      const x = i * this.colWidth;
       g.beginPath();
-      g.moveTo(x, y);
-      g.lineTo(x + sample, y);
-      g.strokeStyle = color;
-      g.lineWidth = 2.4;
-      g.setLineDash(dash);
+      g.moveTo(x, 0);
+      g.lineTo(x, h);
       g.stroke();
-      g.setLineDash([]);
-      g.fillStyle = "#5a5a5a";
-      g.fillText(label, x + sample + 8, y);
-      y += 20;
-    };
-    row(LINE, [], "Door — connected");
-    row(TOUCH, [5, 4], "Touching — no door");
+    }
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.font = "800 12px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+    for (let i = 0; i < this.floorCount; i++) {
+      g.fillStyle = i === active ? HEADER_ACTIVE : HEADER_DIM;
+      g.fillText(`Floor ${i}`, this.columnCenterX(i), h - HEADER_H / 2 - 4);
+    }
     g.restore();
   }
 }
 
 function nodeRadius(node: GraphNode): number {
   return clamp(16 + Math.sqrt(node.cells.length) * 3.2, 18, 46);
+}
+
+/** Strip a "— Variant" or "(variant)" suffix ("Bedroom — Large" → "Bedroom",
+ *  "Stair (dogleg)" → "Stair") so the diagram shows the short type name only;
+ *  size (via {@link nodeRadius}'s sqrt-of-cell-count scaling) is what
+ *  distinguishes Small/Large instead. A label with neither pattern (e.g.
+ *  "Kitchen", "Circulation") passes through unchanged. */
+function shortLabel(label: string): string {
+  return label.replace(/\s*[—(].*$/, "").trim();
+}
+
+/** Whether edge `e` connects the same unordered pair as `pair` (hover-target
+ *  matching — an edge's `a`/`b` order isn't guaranteed to match `Violation.edge`'s). */
+function edgeMatches(e: GraphEdge, pair: [string, string]): boolean {
+  return (e.a === pair[0] && e.b === pair[1]) || (e.a === pair[1] && e.b === pair[0]);
 }
 
 function hex(color: number): string {

@@ -14,8 +14,23 @@
         <div id="view-mode-toggles">
           <button id="view-toggle" type="button">Diagram</button>
           <button id="top-view-toggle" type="button">Top View</button>
+          <button id="graph-relayout" type="button">Re-layout</button>
         </div>
         <div id="graph-floor-label"></div>
+        <div id="graph-legend">
+          <div class="gl-row"><span class="gl-swatch gl-access"></span>Door — connected</div>
+          <div class="gl-row"><span class="gl-swatch gl-touch"></span>Touching — no door</div>
+          <div class="gl-row gl-tiers">
+            <span class="gl-dot gl-hard"></span>Hard
+            <span class="gl-dot gl-soft"></span>Soft
+            <span class="gl-dot gl-note"></span>Note
+          </div>
+          <div class="gl-row"><span class="gl-entry-mark">▶</span>ENTRY — entrance</div>
+          <div class="gl-toggles">
+            <label class="gl-toggle"><input type="checkbox" id="graph-toggle-touch" />Show touching</label>
+            <label class="gl-toggle"><input type="checkbox" id="graph-toggle-depth" />Show depth</label>
+          </div>
+        </div>
         <button id="check-layout" type="button">Check Layout</button>
         <div id="validation-panel"></div>
         <button id="reset-view" type="button">Reset View</button>
@@ -40,6 +55,23 @@
         <div id="history-controls">
           <button id="undo-btn" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
           <button id="redo-btn" type="button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">↷</button>
+        </div>
+        <!-- Camera-aware north arrow overlay (true on-screen north in axo + plan;
+             updated each frame by main.ts). Hidden in diagram mode. -->
+        <div id="north-badge" title="North" aria-hidden="true">
+          <svg viewBox="0 0 40 40" width="46" height="46">
+            <circle cx="20" cy="20" r="18.5" class="nb-ring" />
+            <g class="nb-rot">
+              <polygon points="20,4 15.5,22 24.5,22" class="nb-arrow" />
+              <line x1="20" y1="20" x2="20" y2="34" class="nb-tail" />
+              <text x="20" y="15" class="nb-n">N</text>
+            </g>
+          </svg>
+        </div>
+        <!-- View controls: cutaway toggle + the north-setting compass dial
+             (dial element appended by main.ts). Hidden in diagram mode. -->
+        <div id="view-controls">
+          <button id="cutaway-toggle" type="button" class="active" title="Toggle dollhouse cutaway">Cutaway</button>
         </div>
         <div id="selection-readout"></div>
         <div id="hint">

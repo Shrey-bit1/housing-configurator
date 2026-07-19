@@ -101,11 +101,11 @@
 <div class="cover">
   <div class="marks"><i class="m1"></i><i class="m2"></i><i class="m3"></i></div>
   <h1>Layout Validation Rules</h1>
-  <p class="sub">How the 35 checks in the configurator's layout validator came together — the order they arrived in, what each one answers, and what earlier versions got wrong.</p>
+  <p class="sub">How the 36 checks in the configurator's layout validator came together — the order they arrived in, what each one answers, and what earlier versions got wrong.</p>
   <div class="facts">
-    <div><span class="k">Rules</span><span>35, told as ten passages, plus a reference appendix</span></div>
+    <div><span class="k">Rules</span><span>36, told as ten passages, plus a reference appendix</span></div>
     <div><span class="k">Tiers</span><span><span class="tier hard">Hard</span>&nbsp; <span class="tier soft">Soft</span>&nbsp; <span class="tier note">Note</span></span></div>
-    <div><span class="k">Written from</span><span><code>src/core/rules.ts</code>, <code>src/core/windows.ts</code></span></div>
+    <div><span class="k">Written from</span><span><code>src/core/rules.ts</code>, <code>src/core/windows.ts</code>, <code>src/core/orientation.ts</code></span></div>
     <div><span class="k">Date</span><span>July 2026</span></div>
   </div>
 </div>
@@ -124,7 +124,7 @@
     <li><span class="n">8</span>Adjacency by touch</li>
     <li><span class="n">9</span>Program</li>
     <li><span class="n">10</span>Daylight and glazing</li>
-    <li><span class="n">A</span>All 35 rules, for lookup</li>
+    <li><span class="n">A</span>All 36 rules, for lookup</li>
     <li><span class="n">B</span>Metrics the report prints</li>
     <li><span class="n">C</span>Assumptions and limits</li>
     <li><span class="n">D</span>References</li>
@@ -135,7 +135,7 @@
 <h2 class="sec">1 · The tool and the graph</h2>
 <div class="sec-rule"></div>
 
-<p>You place rooms, circulation, outdoor space and stairs on a 0.6 m grid across as many floors as you want, then put entrances on exterior edges and doors on interior ones. Pressing Check Layout runs all 35 rules and shows what they found in a written panel, a bubble diagram, and coloured tints on the shells in the 3D view. The checks are advisory: they run when you ask for them, and they never stop you placing anything.</p>
+<p>You place rooms, circulation, outdoor space and stairs on a 0.6 m grid across as many floors as you want, then put entrances on exterior edges and doors on interior ones. Pressing Check Layout runs all 36 rules and shows what they found in a written panel, a bubble diagram, and coloured tints on the shells in the 3D view. The checks are advisory: they run when you ask for them, and they never stop you placing anything.</p>
 
 <p>Every rule reads one graph built from the whole dwelling. Its nodes are rooms, merged circulation and outdoor clusters, and stairs. Two spaces can be joined by a touch edge, meaning they share a wall, or an access edge, meaning a door connects them — a distinction the next section is really about, because most of what follows depends on it. Entrances sit on ground-floor exterior edges and are re-derived on every run, so building a room against an old entrance invalidates it.</p>
 
@@ -257,11 +257,15 @@
 
 <p><span class="rid soft">W1</span> fires when the exterior wall a room actually has can't supply the edges it needs — in practice, when the facade is broken into runs shorter than two cells — and it only evaluates rooms that have some exterior wall to glaze. A room with none belongs to <span class="rid hard">D1</span> or <span class="rid soft">D2</span> instead.</p>
 
+<p>A band that runs out of room on its own straight edge doesn't just stop and open a second, disconnected one elsewhere — first it tries to turn a convex corner onto the adjoining edge, continuing as an L in plan, or, if it can turn at both ends of the same run, a U. The corner has to be convex, two edges of the same cell facing outward, because that's the only shape a plan can turn that way; a notch is two different cells meeting from opposite directions, which the wrap never bridges — there's no separate check for that, the same-cell test simply can't see it. An entrance on the corner edge stops the wrap exactly as it stops a straight band, since the wrap only ever looks at edges the generator already treats as exterior. The glazing still meets without a corner post: the north/south pane already reaches the true corner — it owns that corner square, the same as a plain wall does — so it's the east/west pane that extends past its usual reveal to the same point, overlapping it by a hair at the seam rather than falling short. That asymmetry has a second effect: either pane, alone, still reads as a complete edge if the other is cut away by the camera, since neither one's extent depends on whether the other is drawn.</p>
+
+<p>Which face the band lands on is now a question of orientation. The project carries a north direction — a free angle you set with a compass dial — defined once, precisely, as world −Z rotated clockwise (viewed from above) by that angle; everything that needs a bearing reads that one definition. The generator scores each candidate exterior run by how close it faces due south and takes the southernmost first, so glazing migrates to the sunny faces on its own: rotate north and the bands slide around to whatever wall now points south. <span class="rid soft">OR1</span> is the rule that watches the result — a habitable room or a kitchen whose every window ends up facing within 45° of due north is lit only from the north, no direct sun, and gets a soft flag. It reads the same derived glazing the generator produced, and its flag is set only when the room actually HAS glazing and all of it is northern, so a room with no windows at all stays <span class="rid hard">D1</span>'s or <span class="rid soft">W1</span>'s business and never doubles up here. The tier is soft on purpose: a north-only room is a real comfort compromise at this latitude, not a code failure, and some rooms are fine that way. The report also prints each room's glazing orientation as plain information — "Living Room: glazing S + E" — so the gradient is legible whether or not the rule fires; a corner-wrapped band naturally shows both of its sectors.</p>
+
 <p class="small" style="margin-top:16px">What follows is reference material: the full rule list for lookup, the numbers the report prints alongside the rules, where the model stops short of a fuller analysis, and the sources behind the rules above.</p>
 
 <!-- ============================ APPENDIX A ============================ -->
 <div class="appendix">
-<h2 class="sec">A · All 35 rules, for lookup</h2>
+<h2 class="sec">A · All 36 rules, for lookup</h2>
 <div class="sec-rule"></div>
 <table>
   <thead><tr><th style="width:56px">Id</th><th>What it checks</th><th style="width:64px">Tier</th></tr></thead>
@@ -286,8 +290,9 @@
     <tr><td class="rid-cell">H4</td><td>A door joins a bathroom and a kitchen directly.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
     <tr><td class="rid-cell">H6</td><td>A room or stair is reachable only by crossing outdoor space.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
     <tr><td class="rid-cell">MB1</td><td>A floor has bedrooms and no bathroom (checked once a bathroom exists somewhere).</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">N1</td><td>Whole-dwelling circulation area exceeds 25% of the interior.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">N1</td><td>Circulation area exceeds 25% of the interior — whole-dwelling, and independently on any single floor of a multi-floor plan.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
     <tr><td class="rid-cell">O1</td><td>An outdoor cluster has no door onto it.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">OR1</td><td>A habitable room or kitchen is glazed only toward the north (all windows within 45° of due north).</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
     <tr><td class="rid-cell">P1</td><td>No bathroom exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
     <tr><td class="rid-cell">P2</td><td>No kitchen exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
     <tr><td class="rid-cell">P3</td><td>More than one kitchen exists in the dwelling.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
@@ -310,7 +315,7 @@
 <div class="sec-rule"></div>
 <p>Four figures the report shows on every run, whether or not the rules reading them fire.</p>
 <p><strong>Entrance depth.</strong> For each reachable room, the number of doored steps from the nearest entrance. The report gives the maximum, the mean, and a per-room list; the diagram puts the number on the node. Stairs are weighted as in §6, so a floor change costs one hop overall. <span class="rid soft">DP1</span> reads this map, and <span class="rid soft">PG1</span> reads its group means.</p>
-<p><strong>Circulation percentage.</strong> Circulation-cluster cells plus stair cells, over all occupied interior cells, with outdoor excluded from both. Printed as "Circulation: N% of interior area". <span class="rid soft">N1</span> flags above 25%.</p>
+<p><strong>Circulation percentage.</strong> Circulation-cluster cells plus stair cells, over all occupied interior cells, with outdoor excluded from both. Printed as "Circulation: N% of interior area", and, once the dwelling has more than one floor, a second line breaking the same figure out per floor ("Floor 0: N% · Floor 1: N%") — omitted on a single floor, where it would just repeat the line above. <span class="rid soft">N1</span> flags above 25% whole-dwelling, and separately flags any floor that crosses 25% on its own even when the average across floors doesn't; the two flags measure different things and either or both can fire on the same dwelling.</p>
 <p><strong>Glazing against target.</strong> Per room, the glazing area the generator managed to place, set against the target for that room's type. <span class="rid soft">W1</span> flags the shortfall.</p>
 <p><strong>Public and bedroom mean depth.</strong> The two means <span class="rid soft">PG1</span> compares, printed as "Public mean depth X · Bedroom mean depth Y".</p>
 
@@ -320,10 +325,9 @@
 <ul class="plain">
   <li><span class="rid soft">F1</span> counts door-hops on the access graph. Fire code measures metres of travel distance and asks for a second independent escape route; neither is modelled.</li>
   <li>The House-GAN connection counts behind <span class="rid soft">S1</span>, <span class="rid soft">S2</span> and <span class="rid note">DR2</span> came from proximity adjacency; this model counts doors, so the thresholds are approximate against that data.</li>
-  <li>There is no compass. Nothing in the model depends on orientation, so there are no solar or facing rules, and daylight is a question of exterior wall and glazed area only.</li>
+  <li>There is now a compass — a free north angle you set — and glazing is biased toward south with <span class="rid soft">OR1</span> flagging north-only rooms. But that's the whole of the orientation model: one north/not-north cut at 45°, no seasonal sun angles, no per-sector solar-gain scoring, no shading from neighbours. Daylight beyond that stays a question of exterior wall and glazed area.</li>
   <li>Rooms come from fixed presets, so minimum areas and dimensions are built into the presets and never checked. <span class="rid soft">A1</span> is the one dimensional test in the ruleset, because circulation is the one thing the user shapes freely.</li>
   <li>One dwelling, no site: no neighbours, no party walls, no structural stacking. An upper-floor cell cantilevered past the floor below passes without comment.</li>
-  <li><span class="rid soft">N1</span>'s fraction covers the whole dwelling, so a single circulation-heavy storey can hide behind efficient ones.</li>
   <li>The named constants — <code>DEEP_ROOM_THRESHOLD_HOPS = 5</code>, <code>ESCAPE_DEPTH_MAX = 4</code>, <code>CIRCULATION_FRACTION_MAX = 0.25</code>, <span class="rid note">DR2</span>'s three doors, the glazing ratios — are starting points I chose. None of them are derived optima.</li>
 </ul>
 

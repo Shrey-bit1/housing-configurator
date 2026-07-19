@@ -1,19 +1,27 @@
 import "./style.css";
+import * as THREE from "three";
 import { type Grid } from "./core/grid";
 import { rotatedCells } from "./core/modules";
 import { FloorManager } from "./core/floorManager";
+import { worldNorthDir } from "./core/orientation";
 import { createScene } from "./scene/sceneSetup";
 import { GhostPreview } from "./scene/ghostPreview";
 import { GroupGhostPreview } from "./scene/groupGhostPreview";
 import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
 import { SelectionController, type MarkerSelectionAdapter } from "./interaction/selection";
-import { updateCutaway } from "./scene/cutaway";
+import { updateCutaway, setCutawayEnabled } from "./scene/cutaway";
+import { createCompassDial } from "./ui/compassDial";
 import { computeDwellingGraph } from "./core/adjacencyGraph";
-import { validate, computeEntranceDepths } from "./core/rules";
+import { validate, computeEntranceDepths, type Violation } from "./core/rules";
 import { GraphView } from "./ui/graphView";
 import { renderValidationPanel } from "./ui/validationPanel";
-import { applyRoomHighlights, clearRoomHighlights } from "./scene/highlight";
+import {
+  applyRoomHighlights,
+  clearRoomHighlights,
+  setHoverEmphasis,
+  clearHoverEmphasis,
+} from "./scene/highlight";
 import { EntranceController } from "./interaction/entranceController";
 import { DoorController } from "./interaction/doorController";
 import { buildPalette } from "./ui/palette";
@@ -37,6 +45,10 @@ const graphCanvas = document.getElementById("graph-canvas") as HTMLCanvasElement
 const viewToggle = document.getElementById("view-toggle") as HTMLButtonElement;
 const topViewBtn = document.getElementById("top-view-toggle") as HTMLButtonElement;
 const graphFloorLabel = document.getElementById("graph-floor-label") as HTMLElement;
+const graphLegend = document.getElementById("graph-legend") as HTMLElement;
+const graphToggleTouch = document.getElementById("graph-toggle-touch") as HTMLInputElement;
+const graphToggleDepth = document.getElementById("graph-toggle-depth") as HTMLInputElement;
+const graphRelayoutBtn = document.getElementById("graph-relayout") as HTMLButtonElement;
 const checkBtn = document.getElementById("check-layout") as HTMLButtonElement;
 const validationPanel = document.getElementById("validation-panel") as HTMLElement;
 const undoBtn = document.getElementById("undo-btn") as HTMLButtonElement;
@@ -45,6 +57,10 @@ const selectionReadout = document.getElementById("selection-readout") as HTMLEle
 const shortcutsBtn = document.getElementById("shortcuts-btn") as HTMLButtonElement;
 const shortcutsPanel = document.getElementById("shortcuts-panel") as HTMLElement;
 const shortcutsClose = document.getElementById("shortcuts-close") as HTMLButtonElement;
+const viewControls = document.getElementById("view-controls") as HTMLElement;
+const cutawayToggle = document.getElementById("cutaway-toggle") as HTMLButtonElement;
+const northBadge = document.getElementById("north-badge") as HTMLElement;
+const northBadgeRot = northBadge.querySelector(".nb-rot") as SVGElement;
 
 // ---- Scene ----
 const ctx = createScene(canvas);
@@ -390,7 +406,11 @@ const graphView = new GraphView(
   graphCanvas,
   () => computeDwellingGraph(floors.floors),
   () => floors.activeIndexValue,
-  graphFloorLabel
+  graphFloorLabel,
+  graphLegend,
+  graphToggleTouch,
+  graphToggleDepth,
+  graphRelayoutBtn
 );
 
 function setDiagramVisible(show: boolean): void {
@@ -399,10 +419,65 @@ function setDiagramVisible(show: boolean): void {
   graphView.toggle();
   viewToggle.textContent = graphView.visible ? "3D View" : "Diagram";
   // Hide the 3D-only chrome while in diagram mode (Check Layout stays available).
-  resetBtn.style.display = graphView.visible ? "none" : "";
-  document.getElementById("hint")!.style.display = graphView.visible ? "none" : "";
+  const hide = graphView.visible ? "none" : "";
+  resetBtn.style.display = hide;
+  document.getElementById("hint")!.style.display = hide;
+  viewControls.style.display = hide; // cutaway toggle + compass dial
+  northBadge.style.display = hide; // camera-aware north arrow
 }
 viewToggle.addEventListener("click", () => setDiagramVisible(!graphView.visible));
+
+// ---- North compass + orientation-aware windows ----
+// The compass DIAL is the control (drag to set north); the camera-aware north
+// BADGE (updated each frame in animate) shows true on-screen north in both axo
+// and plan. `displayNorthAngle` is the LIVE angle the badge reads — it tracks a
+// drag continuously, but the WINDOWS only re-derive (and one undo snapshot is
+// taken) on RELEASE, per the commit-on-release convention. Changing north also
+// drops any stale validation report (it moves windows/orientation).
+let displayNorthAngle = floors.northAngle;
+const compassDial = createCompassDial({
+  onInput: (deg) => {
+    displayNorthAngle = deg; // badge follows the drag; windows wait for release
+  },
+  onCommit: (deg) => {
+    displayNorthAngle = deg;
+    floors.setNorthAngle(deg); // re-derives windows against the new north
+    clearValidation();
+    commitHistory(); // one snapshot per dial gesture (no-op if angle unchanged)
+  },
+});
+viewControls.appendChild(compassDial.el);
+
+/** Re-sync the dial + live badge angle to the model's north (after load/undo,
+ *  which set `floors.northAngle` through the rebuild path). */
+function syncNorthUI(): void {
+  displayNorthAngle = floors.northAngle;
+  compassDial.setAngle(floors.northAngle);
+}
+
+/** Rotate the north badge to point at TRUE north on screen: project the world
+ *  north direction through the camera and take its clockwise-from-up angle.
+ *  Works for both axo and plan (the projection carries the view). */
+const northWorld = new THREE.Vector3();
+const originNDC = new THREE.Vector3();
+function updateNorthBadge(): void {
+  const d = worldNorthDir(displayNorthAngle);
+  originNDC.set(0, 0, 0).project(camera);
+  northWorld.set(d.x, 0, d.z).project(camera);
+  const dx = northWorld.x - originNDC.x;
+  const dyUp = northWorld.y - originNDC.y; // NDC y is up
+  const angle = (Math.atan2(dx, dyUp) * 180) / Math.PI; // clockwise from up
+  northBadgeRot.setAttribute("transform", `rotate(${angle} 20 20)`);
+}
+
+// Cutaway toggle (default ON = current dollhouse behaviour). Session view-state
+// only — never serialized, untouched by undo/load.
+let cutawayOn = true;
+cutawayToggle.addEventListener("click", () => {
+  cutawayOn = !cutawayOn;
+  setCutawayEnabled(cutawayOn);
+  cutawayToggle.classList.toggle("active", cutawayOn);
+});
 
 // Initial view: frame whatever's on the (likely empty) starting floor instead
 // of a hardcoded camera position, so this stays correct however the default
@@ -420,15 +495,28 @@ function clearValidation(): void {
   validationPanel.style.display = "none";
   validationPanel.replaceChildren();
   graphView.clearHighlights();
+  clearHoverEmphasis();
   if (validated) clearRoomHighlights(floors.floors);
   validated = false;
+}
+
+/** Hovering a report card emphasizes its target(s) in both the diagram and
+ *  the 3D view, layered on top of the normal post-check tier highlighting
+ *  (never replacing it — see `GraphView.setHover` / `setHoverEmphasis`'s doc
+ *  comments). Unhover (`v === null`) reverts to that normal highlighting. */
+function onHoverViolation(v: Violation | null): void {
+  graphView.setHover(v);
+  if (v) setHoverEmphasis(floors.floors, v.nodeIds, v.entranceIds ?? []);
+  else clearHoverEmphasis();
 }
 
 function runCheck(): void {
   const graph = computeDwellingGraph(floors.floors);
   const violations = validate(graph);
   const depths = computeEntranceDepths(graph);
-  renderValidationPanel(validationPanel, graph, violations, depths, "Dwelling", clearValidation);
+  graphView.setHover(null); // a stale hover from the previous report shouldn't survive a re-check
+  clearHoverEmphasis();
+  renderValidationPanel(validationPanel, graph, violations, depths, "Dwelling", clearValidation, onHoverViolation);
   graphView.setHighlights(violations);
   graphView.setDepths(depths);
   applyRoomHighlights(floors.floors, violations);
@@ -446,7 +534,7 @@ floors.onLayoutChange = () => clearValidation();
 // path, so a loaded design is identical to a hand-built one.
 
 function exportProject(): void {
-  const data = serializeProject(floors.floors);
+  const data = serializeProject(floors.floors, floors.northAngle);
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -487,6 +575,7 @@ function importProjectText(text: string): void {
     selection.deselect();
     floors.loadProject(parsed.data);
     renderSidebar();
+    syncNorthUI(); // a loaded file carries its own north — reflect it on the dial
     commitHistory(); // importing a project is an undoable action
   } catch (err) {
     console.error(err);
@@ -599,6 +688,7 @@ function restoreState(snapshot: string): void {
 
   floors.setActive(Math.min(prevActive, newCount - 1));
   renderSidebar();
+  syncNorthUI(); // north is in the snapshot — reflect the restored angle on the dial
 }
 
 function updateHistoryButtons(): void {
@@ -607,7 +697,7 @@ function updateHistoryButtons(): void {
 }
 
 history = new History(
-  () => JSON.stringify(serializeProject(floors.floors)),
+  () => JSON.stringify(serializeProject(floors.floors, floors.northAngle)),
   restoreState,
   updateHistoryButtons,
   20
@@ -680,6 +770,8 @@ function animate(): void {
   }
   controls.update();
   updateCutaway(scene, camera.position, controls.target);
+  updateNorthBadge();
   renderer.render(scene, camera);
 }
+
 animate();

@@ -1,6 +1,6 @@
 # Layout validation rules — list
 
-All 35 rules in `src/core/rules.ts`. For each: why it's there, and how it's computed in code.
+All 36 rules in `src/core/rules.ts`. For each: why it's there, and how it's computed in code.
 
 ---
 
@@ -96,6 +96,10 @@ All 35 rules in `src/core/rules.ts`. For each: why it's there, and how it's comp
 **Why:** A room's actual glazing falls short of its type's daylight target.
 **Code:** Reads `node.glazing.belowTarget`, computed by `computeWindows()` in `windows.ts` (per-type ratio: `1/6` living/recreation, `1/10` bedroom/kitchen, kitchen fixed at 2 edges, 2-edge minimum everywhere). Gated on `hasExteriorEdge` so it doesn't double-fire with D1/D2 on a room with no facade at all.
 
+### OR1 — soft
+**Why:** A habitable room (or kitchen) lit only from the north gets no meaningful direct sun (solar-access practice at this latitude). A heuristic, not a code failure.
+**Code:** `(ctx.is.habitable(n) || ctx.is.kitchen(n)) && n.glazing.northLit`. `northLit` is computed in `computeWindows()` (which now takes `northAngle`): each windowed edge's side → compass bearing (`orientation.ts`, north = world −Z rotated CW by `northAngle`) → true only if glazing EXISTS and every edge is within `NORTH_SECTOR_HALF_WIDTH` (45°) of due north. A no-glazing room has `northLit === false`, so OR1 never double-fires with D1/W1. Glazing itself is south-biased by the generator, so OR1 fires only when a room's ONLY exterior faces are northern.
+
 ### G1 — soft
 **Why:** A guest should be able to reach a bathroom without crossing a bedroom.
 **Code:** One dwelling-level check: bedroom-blocked BFS from entrances; fires if no bathroom node survives in that reduced reachable set.
@@ -133,8 +137,8 @@ All 35 rules in `src/core/rules.ts`. For each: why it's there, and how it's comp
 **Code:** `computeEntranceDepths()` = `accessDepths(graph, graph.entryIds)` — 0-1 BFS over ACCESS edges with stair weighting (entering a stair costs 1 hop, leaving costs 0, so a floor change costs 1 hop total). Flags rooms with depth `>= DEEP_ROOM_THRESHOLD_HOPS` (= 5).
 
 ### N1 — soft
-**Why:** Too much of the interior given over to circulation is inefficient.
-**Code:** `computeCirculationFraction()` = (circulation-cluster cells + stair cells) ÷ (all occupied cells), outdoor excluded from both. Flags above `CIRCULATION_FRACTION_MAX` (= 0.25). The percentage is also always printed in the report regardless of the flag.
+**Why:** Too much of the interior given over to circulation is inefficient. Checked whole-dwelling AND per floor, since one bloated storey can otherwise hide behind efficient others in the average.
+**Code:** `computeCirculationFraction()` = (circulation-cluster cells + stair cells) ÷ (all occupied cells), outdoor excluded from both. Flags above `CIRCULATION_FRACTION_MAX` (= 0.25). `computeCirculationFractionByFloor()` shares the same per-node tally, broken out by `GraphNode.floor`; on a multi-floor dwelling the rule additionally flags any floor whose own fraction crosses 0.25, naming it and pointing at that floor's circulation/stair nodes. Suppressed on a single floor (`graph.floorCount > 1` gate) — the per-floor figure would just repeat the whole-dwelling one. The percentage(s) are also always printed in the report regardless of the flag.
 
 ### PG1 — soft
 **Why:** Hillier & Hanson's genotype expects public rooms shallower than bedrooms; this flags the inversion.
@@ -146,4 +150,4 @@ All 35 rules in `src/core/rules.ts`. For each: why it's there, and how it's comp
 
 ---
 
-**Tier counts:** 10 hard, 18 soft, 7 note. All ids/tiers/constants verified against `src/core/rules.ts` and `src/core/windows.ts`.
+**Tier counts:** 10 hard, 19 soft, 7 note. All ids/tiers/constants verified against `src/core/rules.ts` and `src/core/windows.ts`.

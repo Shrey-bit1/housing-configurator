@@ -63,6 +63,10 @@ export interface ProjectFile {
   format: string;
   version: number;
   floors: FloorData[];
+  /** Project north, in degrees (see core/orientation.ts). ADDITIVE (v1): absent
+   *  in pre-north files → 0, defaulted by {@link normalize}, so no version bump /
+   *  migration. */
+  northAngle?: number;
 }
 
 /** How the file's version relates to the version this app understands. */
@@ -80,11 +84,13 @@ export class ProjectParseError extends Error {}
 
 // ---- Serialize -------------------------------------------------------------
 
-/** Capture the whole project (all floors, in order) as a plain JSON object. */
-export function serializeProject(floors: Floor[]): ProjectFile {
+/** Capture the whole project (all floors + project north) as a plain JSON
+ *  object. `northAngle` is project-level (not per-floor); default 0. */
+export function serializeProject(floors: Floor[], northAngle = 0): ProjectFile {
   return {
     format: PROJECT_FORMAT,
     version: APP_PROJECT_VERSION,
+    northAngle,
     floors: floors.map((f) => ({
       cols: f.grid.cols,
       rows: f.grid.rows,
@@ -170,9 +176,13 @@ function migrate(data: ProjectFile, _fileVersion: number): ProjectFile {
 
 function normalize(obj: Record<string, unknown>): ProjectFile {
   const floorsRaw = Array.isArray(obj.floors) ? obj.floors : [];
+  // North: tolerant — absent/garbage → 0, wrapped to [0,360). Kept as design
+  // state (it moves derived windows), so it round-trips like any other field.
+  const north = ((num(obj.northAngle, 0) % 360) + 360) % 360;
   return {
     format: PROJECT_FORMAT,
     version: APP_PROJECT_VERSION,
+    northAngle: north,
     floors: floorsRaw.map(normalizeFloor),
   };
 }

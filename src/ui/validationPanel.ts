@@ -1,6 +1,7 @@
 import type { DwellingGraph } from "../core/adjacencyGraph";
 import {
   computeCirculationFraction,
+  computeCirculationFractionByFloor,
   publicVsBedroomDepth,
   type Severity,
   type Violation,
@@ -10,7 +11,8 @@ import {
  * Renders the on-demand "Check Layout" report into a viewport panel: a grouped,
  * colour-coded list of issues (hard above soft above neutral notes) plus a clear
  * all-good state. Pure DOM rendering — orchestration (highlighting the diagram
- * and 3D view) lives in main.ts.
+ * and 3D view, INCLUDING the hover emphasis below) lives in main.ts; this file
+ * only fires `onHoverViolation` on mouseenter/mouseleave.
  */
 
 const SEVERITY_LABEL: Record<Severity, string> = {
@@ -27,7 +29,8 @@ export function renderValidationPanel(
   violations: Violation[],
   depths: Map<string, number>,
   title: string,
-  onClose: () => void
+  onClose: () => void,
+  onHoverViolation: (v: Violation | null) => void
 ): void {
   // Disambiguate same-named rooms across floors when the dwelling is multi-floor.
   const multi = graph.floorCount > 1;
@@ -69,12 +72,15 @@ export function renderValidationPanel(
   panel.appendChild(summary);
 
   // ---- Issue groups ----
-  appendGroup(panel, "Hard — likely failures", hard, labelById);
-  appendGroup(panel, "Soft — atypical, not wrong", soft, labelById);
-  appendGroup(panel, "Notes", notes, labelById);
+  appendGroup(panel, "Hard — likely failures", hard, labelById, onHoverViolation);
+  appendGroup(panel, "Soft — atypical, not wrong", soft, labelById, onHoverViolation);
+  appendGroup(panel, "Notes", notes, labelById, onHoverViolation);
 
   // ---- Circulation efficiency (informational net-to-gross line, always shown) ----
   appendCirculation(panel, graph);
+
+  // ---- Glazing orientation mix (informational; per room with glazing) ----
+  appendOrientation(panel, graph, multi);
 
   // ---- Depth-from-entrance metric (informational, not a pass/fail list) ----
   appendDepthSection(panel, graph, depths, multi);
@@ -82,14 +88,50 @@ export function renderValidationPanel(
   panel.style.display = "block";
 }
 
+/** Per-room glazing orientation, e.g. "Living Room: glazing S + E" — the derived
+ *  compass sectors each room's windows face (most-southern first, from
+ *  `node.glazing.sectors`, computed under the project north). Only rooms that
+ *  actually have glazing are listed; a corner-wrapped band shows both its
+ *  sectors. OR1 (lit only from the north) reads the same underlying data. */
+function appendOrientation(panel: HTMLElement, graph: DwellingGraph, multi: boolean): void {
+  const rooms = graph.nodes.filter(
+    (n) => n.kind === "room" && n.glazing && n.glazing.sectors.length > 0
+  );
+  if (rooms.length === 0) return;
+
+  const h = el("div", "vp-group-heading");
+  h.textContent = "Glazing orientation";
+  panel.appendChild(h);
+
+  for (const n of rooms) {
+    const row = el("div", "vp-metric");
+    const label = multi ? `${n.label} (F${n.floor})` : n.label;
+    row.textContent = `${label}: glazing ${n.glazing!.sectors.join(" + ")}`;
+    panel.appendChild(row);
+  }
+}
+
 /** One informational line: what share of the interior is circulation (N1's metric,
- *  always surfaced even when under the flag threshold). */
+ *  always surfaced even when under the flag threshold), plus a per-floor
+ *  breakdown line beneath it on a multi-floor dwelling (N1's rider) —
+ *  suppressed on a single floor, where it would just repeat the line above. */
 function appendCirculation(panel: HTMLElement, graph: DwellingGraph): void {
   const frac = computeCirculationFraction(graph);
   if (frac === null) return;
   const line = el("div", "vp-metric");
   line.textContent = `Circulation: ${Math.round(frac * 100)}% of interior area.`;
   panel.appendChild(line);
+
+  if (graph.floorCount > 1) {
+    const perFloor = [...computeCirculationFractionByFloor(graph)].sort((a, b) => a[0] - b[0]);
+    if (perFloor.length) {
+      const byFloorLine = el("div", "vp-metric");
+      byFloorLine.textContent = perFloor
+        .map(([floor, f]) => `Floor ${floor}: ${Math.round(f * 100)}%`)
+        .join(" · ");
+      panel.appendChild(byFloorLine);
+    }
+  }
 }
 
 /** Space-syntax depth-from-entrance: a summary line + a compact per-room list.
@@ -146,7 +188,8 @@ function appendGroup(
   panel: HTMLElement,
   heading: string,
   items: Violation[],
-  labelById: Map<string, string>
+  labelById: Map<string, string>,
+  onHoverViolation: (v: Violation | null) => void
 ): void {
   if (items.length === 0) return;
   const h = el("div", "vp-group-heading");
@@ -155,6 +198,16 @@ function appendGroup(
 
   for (const v of items) {
     const row = el("div", `vp-item ${v.severity}`);
+
+    // Dwelling-level entries (G1, P-rules, the N1/circulation line, etc.) have
+    // no node/edge to point at — leave them non-interactive rather than
+    // wiring a hover that would emphasize nothing (no fake affordance for a
+    // card that can't actually highlight anything).
+    if (v.nodeIds.length > 0 || v.edge) {
+      row.classList.add("hoverable");
+      row.addEventListener("mouseenter", () => onHoverViolation(v));
+      row.addEventListener("mouseleave", () => onHoverViolation(null));
+    }
 
     const tag = el("span", `vp-tag ${v.severity}`);
     tag.textContent = `${v.ruleId} · ${SEVERITY_LABEL[v.severity]}`;
