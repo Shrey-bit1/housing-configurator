@@ -53,7 +53,7 @@ work-in-progress research artifact, not a production app.
 | **Undo / redo history** (snapshot-based) | `src/core/history.ts` | `History`: undo/redo stacks of serialized-project snapshots (cap 20), commit-after-action model, restore via the import rebuild path. See §2f. |
 | **Exterior-edge detection** (reusable) | `src/core/exteriorEdges.ts` | `exteriorEdges(cells, occupied) → BoundaryEdge[]`. Standalone/generic: consumed by entrance placement/validity, the daylight rules (D1/D2 via `GraphNode.hasExteriorEdge`), and reserved for a future facade/window task. |
 | **Circulation / Outdoor cluster merging** | `src/scene/clusterShells.ts` (+ `src/core/cluster.ts`) | `rebuildClusterShells(floor, grid, wallHeight, doors?)` groups connector cells by `def.cluster`, flood-fills connected components (`connectedComponents`), draws ONE merged boundary shell per cluster (outer walls only) via `buildBoundaryWalls` — cutting any door openings (ABSOLUTE edge keys) on the cluster side of a room↔cluster / cluster↔cluster boundary. |
-| **Voxel furniture prop** system | `src/scene/props/*` | `voxelProp.ts` (format + library), `place.ts` (transform/tiling/clip/wall-clip + merged `InstancedMesh`; `buildPropsMesh(..., mirror)` negates emitted voxel x + mirrors the clip footprint, §2g), `kitchen.ts` (Kitchen layout, takes `mirrored`), `index.ts` (`PROP_BUILDERS: Record<string, (mirrored: boolean) => Group>`). Data in `src/scene/props/data/*.json`. |
+| **Voxel furniture prop** system | `src/scene/props/*` | `voxelProp.ts` (format + `PROP_LIBRARY`, now auto-loaded from `data/*.json` via `import.meta.glob` — drop a JSON in, no code change), `place.ts` (transform/tiling/clip/wall-clip + merged `InstancedMesh`; `buildPropsMesh(..., mirror)` negates emitted voxel x + mirrors the clip footprint, §2g), `kitchen.ts` (Kitchen layout), `rooms.ts` (Bathroom/Bedroom/Living/Recreation layouts, §2l), `index.ts` (`PROP_BUILDERS: Record<string, (mirrored) => Group>` — kitchen + the 6 room-type builders). Data in `src/scene/props/data/*.json` (19 props). |
 | **Whole-dwelling adjacency graph** (rules + bubble-diagram data) | `src/core/adjacencyGraph.ts` | `computeDwellingGraph(floors) → DwellingGraph`. See §2c. |
 | **Layout rules engine** (advisory, on-demand) | `src/core/rules.ts` | `RULES: Rule[]`, `validate(graph)`, `computeEntranceDepths(graph)`. See §8 for the full current rule table. |
 | Rules-violation **3D highlighting** | `src/scene/highlight.ts` | `applyRoomHighlights(floors, violations)` / `clearRoomHighlights(floors)`: emissive tint on implicated room/cluster/stair shells + entrance markers, across ALL floors, resolved via `parseDwellingNodeId`. Plus `setHoverEmphasis`/`clearHoverEmphasis`: an intensity-only boost on top of an active tint, for report-card hover — see §2j. |
@@ -1078,6 +1078,55 @@ angle (`displayNorthAngle`), the cutaway on/off, and the badge rotation are pure
 VIEW state (never serialized). This is the deliberate line: north the *value* is
 design; the *widgets and camera-aware arrow* are view.
 
+### 2l. Baseline furnishing — all room types (`props/rooms.ts`, `props/data/*.json`)
+
+The Kitchen prop pipeline (§2 props row, §3 voxel format) is now extended to
+every furnished room type — same machinery, no new abstractions: each layout is
+a list of fixture `Placement`s fed to `buildPropsMesh` (merged `InstancedMesh`,
+per-voxel wall-clip, room-local frame, mirror + rotation for free). Builders in
+`rooms.ts`, registered in `index.ts` `PROP_BUILDERS`:
+
+- **Bathroom** (`bathroom_small` 3×3 / `bathroom_large` 4×4 — separate types,
+  separate layouts): small = `toilet` + `basin` + `shower`, one per wall, centre
+  clear; large adds `bathtub` on the south wall. Props: `toilet`, `basin` (mirror
+  block folded in), `shower`, `bathtub`.
+- **Bedroom** (`bedroom_small` 5×4 rect / `bedroom_large` 6×6 L): `bed_single`/
+  `bed_double` head against a wall, `nightstand`(s) beside the head, `wardrobe` on
+  another wall. Large's fixtures sit on the south/east SOLID walls, clear of the
+  NE notch.
+- **Living** (7×6 L): `sofa` on the south long wall, `sideboard` (+ thin dark TV
+  slab) on the north solid wall, `coffee_table` between, `shelving` on the east.
+- **Recreation** (6×5 L): central `games_table`, two `lounge_chair`s toward the
+  south corners, `shelving` reused on the north wall.
+
+**14 new props** authored as `data/*.json` in the SAME format as the kitchen's
+(box-composed 5 cm voxels) so any single prop is swappable with no code change;
+`voxelProp.ts` now globs `data/*.json` so a dropped-in JSON registers itself.
+Kitchen files/layout are BYTE-UNCHANGED.
+
+**Simplifications (ponytail):** shower glass panels use a solid glass-tint colour
+(`#9fb8c8`), NOT the translucent glazing material — the prop system is one opaque
+`InstancedMesh`; a translucent prop layer is a future add. Big props (`bed_double`
+~17k, `wardrobe` ~11.5k voxels) are solid boxes, heavier than a shell but still
+one draw call each (the "merged geometry per instance" requirement); fine for
+re-authorable baselines.
+
+**Known limitation (recorded, not solved — §7):** props are static baselines
+placed before doors; one may sit in front of a later-placed door. Door-aware
+placement is future-gated.
+
+**Verification (Track A):** the SCREENSHOT TOOL WAS DOWN this session (timed out
+on every attempt, incl. the empty app after a full server restart), so the
+required VISUAL confirmation — silhouettes read, colours within palette, cutaway
+interiors — was NOT done and needs a human eyeball (manual steps in the session
+report). What WAS verified objectively (no visual claim): a standalone port of
+`place.ts`'s exact `emit`+wall-clip math confirmed EVERY prop voxel lands in a
+FOOTPRINT cell for all 6 furnished types, un-mirrored AND mirrored (0 out-of-
+footprint) — so nothing pokes through an exterior wall or into an L-notch;
+rotations are covered by the rigid-rotation argument (moduleMesh rotates the
+props group and `rotatedCells` by the same angle). Props build with zero console
+errors; kitchen untouched; `tsc`/build clean.
+
 ---
 
 ## 3. Key data structures / formats (written out)
@@ -1833,7 +1882,8 @@ screenshots):**
 
 **Not built:**
 - Furniture for rooms other than Kitchen — all other rooms are empty shells
-  (only `kitchen` has a `PROP_BUILDERS` entry).
+  (Kitchen + Bathroom/Bedroom/Living/Recreation are furnished, §2l; Circulation/
+  Outdoor connectors stay empty shells — no `PROP_BUILDERS` entry.)
 - 1-edge (narrow) doors — v1 doors are fixed at a 2-edge (1200 mm) span.
 - Group re-pose (rotate/mirror a multi-selection) — still out of scope (§7).
 
@@ -1867,9 +1917,16 @@ modified `PROJECT_STATE.md`, `src/core/floor.ts`, `src/core/floorManager.ts`,
 - **Facade/window placement:** reuse `exteriorEdges()` (already the shared
   primitive for entrance placement, entrance validity, and D1/D2) to place
   windows/doors on a room's exterior edges.
-- **Furnishing the remaining rooms:** the prop system is room-agnostic
-  (`place.ts` helpers + `PROP_BUILDERS` registry). Add a layout module per
-  room type + a registry entry; no engine changes needed.
+- **Furnishing rooms: DONE for all room types** (§2l) — Kitchen + Bathroom/
+  Bedroom/Living/Recreation have `PROP_BUILDERS` layouts; only Circulation/
+  Outdoor connectors are unfurnished (empty shells, by design). Remaining prop
+  work: (a) **door-aware prop placement** — props are static baselines and a
+  fixture may sit in front of a later-placed door (or a window); placement
+  ignores authored doors/windows today. (b) A **translucent prop material layer**
+  so glass fixtures (shower panels) can reuse the real glazing material instead
+  of a solid glass-tint colour. (c) SIA 500 swing-clearance checks against props
+  (see Track B's future note). (d) Slimming the solid baseline props (hollow
+  shells) if instance count matters.
 - **Cluster-wall selection friction** (see §6) — make cluster walls map back
   to a piece if desired.
 - **Space-syntax depth metric** (`computeEntranceDepths`) is deliberately

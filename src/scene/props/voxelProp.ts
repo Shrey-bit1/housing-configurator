@@ -1,8 +1,6 @@
-import counterJson from "./data/counter_run.json";
-import overheadJson from "./data/overhead_cabinet.json";
-import stoveJson from "./data/stove.json";
-import sinkJson from "./data/sink.json";
-import fridgeJson from "./data/fridge.json";
+// Every prop JSON in ./data is loaded automatically (Vite glob) — drop a new
+// `<name>.json` in and it's in PROP_LIBRARY under its `name`, no code change.
+const propJsons = import.meta.glob("./data/*.json", { eager: true, import: "default" });
 
 /**
  * Authored voxel-prop format (5 cm voxels). Loaded from JSON, not hardcoded.
@@ -50,8 +48,8 @@ function parseProp(raw: RawProp): VoxelProp {
 
 /** All authored props, keyed by their internal `name` (the reliable id). */
 export const PROP_LIBRARY: Record<string, VoxelProp> = Object.fromEntries(
-  [counterJson, overheadJson, stoveJson, sinkJson, fridgeJson].map((j) => {
-    const p = parseProp(j as unknown as RawProp);
+  Object.values(propJsons).map((j) => {
+    const p = parseProp(j as RawProp);
     return [p.name, p];
   })
 );
