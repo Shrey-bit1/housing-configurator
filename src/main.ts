@@ -126,6 +126,10 @@ const doorAdapter: MarkerSelectionAdapter = {
     floors.refreshWalls(); // re-close the opening in both wall segments
     clearValidation(); // door removal changes reachability
   },
+  cycleSwing(id) {
+    floors.active.cycleDoorSwing(id); // rebuilds the marker + plan arc; swing is not reachability, so no wall/validation refresh
+    floors.active.setDoorSelected(id); // rebuild cleared the highlight — reapply it
+  },
 };
 
 const dragDrop = new DragDropController(canvas, picker, ghost, f0.store, controls, commitHistory);
@@ -186,8 +190,10 @@ const doorController = new DoorController(
   () => floors.doorTargets(floors.active),
   () => {
     floors.refreshWalls(); // cut the opening in both adjacent wall segments
+    floors.assignDefaultSwings(); // give the new door its default leaf swing
+    if (planMode) floors.setDoorArcsVisible(true); // show its arc if we're in plan view
     clearValidation();
-    commitHistory(); // door placement is an undoable action
+    commitHistory(); // door placement is an undoable action (swing included)
   }
 );
 
@@ -378,6 +384,7 @@ function enterPlanMode(): void {
   planMode = true;
   prePlanVisibility = floors.floors.map((_, i) => floors.isFloorVisible(i));
   applyPlanVisibility();
+  floors.setDoorArcsVisible(true); // door-swing arcs are a plan-view symbol
   controls.enableRotate = false;
   ctx.frameBox(floors.contentBox(), "top");
   topViewBtn.textContent = "Axo View";
@@ -390,6 +397,7 @@ function exitPlanMode(): void {
   if (!planMode) return;
   planMode = false;
   prePlanVisibility.forEach((v, i) => floors.setFloorVisible(i, v));
+  floors.setDoorArcsVisible(false); // arcs are plan-only
   controls.enableRotate = true;
   topViewBtn.textContent = "Top View";
   topViewBtn.classList.remove("active");

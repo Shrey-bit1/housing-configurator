@@ -6,7 +6,7 @@ import { HoleView } from "../scene/holeView";
 import { EntranceView } from "../scene/entranceView";
 import { DoorView } from "../scene/doorView";
 import type { Entrance } from "./entrance";
-import { doorId, doorOverlaps, type Door } from "./door";
+import { doorId, doorOverlaps, nextSwing, type Door, type DoorSwing } from "./door";
 import { edgeKey, type Side } from "./exteriorEdges";
 import type { GlazingStat } from "./windows";
 
@@ -120,10 +120,21 @@ export class Floor {
    *  side AND a collinear door sharing a middle edge (see {@link doorOverlaps}),
    *  so a boundary never carries two doors. (Space validity — that both edges
    *  bound the same two spaces — is the caller's responsibility.) */
-  addDoor(cell: Cell, side: Side): boolean {
-    const door: Door = { id: doorId(cell, side), cell: { cx: cell.cx, cz: cell.cz }, side };
+  addDoor(cell: Cell, side: Side, swing?: DoorSwing): boolean {
+    const door: Door = { id: doorId(cell, side), cell: { cx: cell.cx, cz: cell.cz }, side, swing };
     if (doorOverlaps(door, this.doors)) return false;
     this.doors.push(door);
+    this.doorView.rebuild(this.doors);
+    return true;
+  }
+
+  /** Cycle the swing of door `id` to the next of its 4 states and redraw its
+   *  marker/plan-arc. Returns true if the door exists. Mutating → the caller
+   *  commits ONE history snapshot (S-key, main.ts). */
+  cycleDoorSwing(id: string): boolean {
+    const d = this.doors.find((x) => x.id === id);
+    if (!d) return false;
+    d.swing = nextSwing(d.swing);
     this.doorView.rebuild(this.doors);
     return true;
   }

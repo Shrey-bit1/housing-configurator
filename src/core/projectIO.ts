@@ -1,5 +1,6 @@
 import type { Floor } from "./floor";
 import { SIDES, type Side } from "./exteriorEdges";
+import type { DoorSwing } from "./door";
 
 /**
  * Project save/load — serialize the whole design to a JSON file and back.
@@ -41,11 +42,14 @@ export interface EntranceData {
 }
 
 /** An interior door: anchor cell + the side it binds to (2-edge span implied by
- *  the side's run direction). Same wire shape as an entrance. */
+ *  the side's run direction), plus its authored leaf swing. `swing` is ADDITIVE
+ *  (v1): absent in pre-swing files → filled with a computed default on load
+ *  (FloorManager.assignDefaultSwings), so no version bump/migration. */
 export interface DoorData {
   cx: number;
   cz: number;
   side: Side;
+  swing?: DoorSwing;
 }
 
 export interface FloorData {
@@ -102,7 +106,7 @@ export function serializeProject(floors: Floor[], northAngle = 0): ProjectFile {
         mirrored: i.mirrored,
       })),
       entrances: f.entrances.map((e) => ({ cx: e.cell.cx, cz: e.cell.cz, side: e.side })),
-      doors: f.doors.map((d) => ({ cx: d.cell.cx, cz: d.cell.cz, side: d.side })),
+      doors: f.doors.map((d) => ({ cx: d.cell.cx, cz: d.cell.cz, side: d.side, swing: d.swing })),
     })),
   };
 }
@@ -202,9 +206,26 @@ function normalizeFloor(raw: unknown): FloorData {
       .map(normalizeEdgeBound)
       .filter((e): e is EntranceData => e !== null),
     doors: doorRaw
-      .map(normalizeEdgeBound)
+      .map(normalizeDoor)
       .filter((d): d is DoorData => d !== null),
   };
+}
+
+/** A door is an edge-bound record plus an optional swing. Absent/garbage swing →
+ *  left undefined (loader fills a computed default); only a well-formed
+ *  {hinge, into} survives. */
+function normalizeDoor(raw: unknown): DoorData | null {
+  const base = normalizeEdgeBound(raw);
+  if (!base) return null;
+  const o = raw as Record<string, unknown>;
+  const s = o.swing;
+  const swing =
+    s && typeof s === "object" &&
+    ((s as DoorSwing).hinge === "a" || (s as DoorSwing).hinge === "b") &&
+    ((s as DoorSwing).into === "A" || (s as DoorSwing).into === "B")
+      ? { hinge: (s as DoorSwing).hinge, into: (s as DoorSwing).into }
+      : undefined;
+  return { ...base, swing };
 }
 
 /** Both entrances and doors are (cell, side) edge-bound records with the same

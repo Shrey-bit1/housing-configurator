@@ -23,6 +23,8 @@ export interface MarkerSelectionAdapter {
   pick(clientX: number, clientY: number): string | null;
   setSelected(id: string | null): void;
   remove(id: string): void;
+  /** Doors only: cycle the leaf swing (S key). Absent on the entrance adapter. */
+  cycleSwing?(id: string): void;
 }
 
 /** @deprecated Use {@link MarkerSelectionAdapter}; kept as the historical name. */
@@ -617,6 +619,13 @@ export class SelectionController {
         this.onAfterAction?.();
       } else if (this.selectedIds.size > 1) {
         this.onNoopHint?.("Mirror works with a single selection only.");
+      }
+    } else if (e.key === "s" || e.key === "S") {
+      // Cycle the selected DOOR's leaf swing through its 4 states (hinge × into).
+      // Single-key like R/M; only fires with a door selected and nothing dragging.
+      if (this.selectedDoorId && !this.moving && !this.dragDrop.isDragging) {
+        this.doors?.cycleSwing?.(this.selectedDoorId);
+        this.onAfterAction?.(); // one undo snapshot per cycle
       }
     } else if (e.key === "d" || e.key === "D") {
       // Duplicate the WHOLE selection (one instance or many). Bound to BOTH

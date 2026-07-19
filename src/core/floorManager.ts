@@ -9,8 +9,13 @@ import {
   buildSpaceTargets,
   doorWallCuts,
   resolveDoorSpaces,
+  computeDefaultSwing,
+  DEFAULT_SWING,
+  BELOW_PREFIX,
   type Door,
 } from "./door";
+import { computeDwellingGraph, dwellingNodeId } from "./adjacencyGraph";
+import { computeEntranceDepths } from "./rules";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
 import type { GroupGhostPreview } from "../scene/groupGhostPreview";
@@ -290,6 +295,53 @@ export class FloorManager {
     return buildSpaceTargets(floor, this.floorBelow(floor));
   }
 
+  /** Fill in a DEFAULT `swing` for any door that lacks one (freshly placed, or
+   *  loaded from a pre-swing file). Builds the dwelling graph + entrance depths
+   *  ONCE (only if some door actually needs a default) so the "deeper-from-
+   *  entrance = more private" rule can run; circulation-adjacency and the
+   *  hinge-corner rule are local. Rebuilds the door markers/arcs on floors it
+   *  changed. Called after door placement and after load. */
+  assignDefaultSwings(): void {
+    if (!this.floors.some((f) => f.doors.some((d) => d.swing === undefined))) return;
+    const graph = computeDwellingGraph(this.floors);
+    const depths = computeEntranceDepths(graph);
+    const circ = new Set(
+      graph.nodes.filter((n) => n.kind === "cluster" && n.roomTypeId === "circulation").map((n) => n.id)
+    );
+    this.floors.forEach((floor, fi) => {
+      let changed = false;
+      const targets = this.doorTargets(floor);
+      const targetAt = (cx: number, cz: number) => targets.get(cellKey(cx, cz)) ?? null;
+      // space token → dwelling node id (mirrors adjacencyGraph.toNode: a below-
+      // floor stair hole's token resolves to the stair's node on floor fi-1).
+      const nodeId = (tok: string) =>
+        tok.startsWith(BELOW_PREFIX)
+          ? dwellingNodeId(fi - 1, tok.slice(BELOW_PREFIX.length))
+          : dwellingNodeId(fi, tok);
+      for (const d of floor.doors) {
+        if (d.swing !== undefined) continue;
+        const spaces = resolveDoorSpaces(d, targetAt);
+        d.swing = spaces
+          ? computeDefaultSwing(
+              d,
+              spaces,
+              (tok) => circ.has(nodeId(tok)),
+              (tok) => depths.get(nodeId(tok)) ?? Infinity,
+              targetAt
+            )
+          : DEFAULT_SWING;
+        changed = true;
+      }
+      if (changed) floor.doorView.rebuild(floor.doors);
+    });
+  }
+
+  /** Show/hide the plan-view door-swing arcs on every floor (main.ts toggles
+   *  with plan/top view — arcs are a plan symbol). */
+  setDoorArcsVisible(visible: boolean): void {
+    for (const f of this.floors) f.doorView.setArcsVisible(visible);
+  }
+
   /** Whether `door` currently binds a valid shared interior boundary on `floor`
    *  (both edges join the same two distinct spaces). */
   isDoorValid(floor: Floor, door: Door): boolean {
@@ -513,13 +565,14 @@ export class FloorManager {
       for (const ent of floorsData[k].entrances)
         floor.addEntrance({ cx: ent.cx, cz: ent.cz }, ent.side);
       for (const d of floorsData[k].doors)
-        floor.addDoor({ cx: d.cx, cz: d.cz }, d.side);
+        floor.addDoor({ cx: d.cx, cz: d.cz }, d.side, d.swing); // swing absent → default filled below
     });
 
     // Cut door openings (and prune any door that doesn't bind two live spaces —
     // tolerant of hand-edited files) now that every floor is fully populated;
     // the per-place onChange fired during the loop rebuilt walls doorless.
     this.syncStairsAndHoles();
+    this.assignDefaultSwings(); // fill swing for pre-swing files (kept for files that had it)
     this.setActive(0);
   }
 }

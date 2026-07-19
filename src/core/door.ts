@@ -38,6 +38,36 @@ export interface Door {
    *  north/south door, min cz for an east/west door). */
   cell: Cell;
   side: Side;
+  /** Authored swing (§ door-swing): which end the leaf hinges at, and which of
+   *  the two connected spaces it opens into. Additive/optional — absent on old
+   *  files and freshly-placed doors, filled with a default by
+   *  {@link computeDefaultSwing} (FloorManager). Render/plan-arc code falls back
+   *  to {@link DEFAULT_SWING} if still absent. */
+  swing?: DoorSwing;
+}
+
+/** Door leaf swing. `hinge`: which END of the 2-edge opening the leaf pivots on
+ *  ("a" = anchor end, "b" = far end). `into`: which of the two connected spaces
+ *  the leaf opens toward — "A" = the door.cell side, "B" = the neighbour side
+ *  (`resolveDoorSpaces`'s a/b). Four states; the S key cycles them. */
+export interface DoorSwing {
+  hinge: "a" | "b";
+  into: "A" | "B";
+}
+
+/** The 4 swing states in a fixed cycle order (the S key steps through them). */
+export const SWING_STATES: DoorSwing[] = [
+  { hinge: "a", into: "A" },
+  { hinge: "a", into: "B" },
+  { hinge: "b", into: "A" },
+  { hinge: "b", into: "B" },
+];
+export const DEFAULT_SWING: DoorSwing = SWING_STATES[0];
+
+/** Next swing state in the cycle (wraps); used by the S-key cycle. */
+export function nextSwing(s: DoorSwing | undefined): DoorSwing {
+  const i = SWING_STATES.findIndex((x) => x.hinge === s?.hinge && x.into === s?.into);
+  return SWING_STATES[(i + 1) % SWING_STATES.length];
 }
 
 /** Edges a door spans (fixed at 2). Immutable v1 constant, referenced by name. */
@@ -233,4 +263,62 @@ export function doorWallCuts(
       cut(e.cx + dx, e.cz + dz, opposite(e.side)); // the neighbouring space's segment
     }
   return { rooms, clusters };
+}
+
+/**
+ * Default swing at placement: the leaf opens INTO THE MORE PRIVATE space, hinged
+ * at the opening end nearer a wall corner of that space. Heuristic (documented):
+ *  - `into`: one side is circulation → open into the OTHER (the room); else the
+ *    DEEPER-from-entrance side is the more private one → open there; a tie (equal
+ *    depth, both unreachable, etc.) → space "A" (deterministic).
+ *  - `hinge`: the opening end past which the into-space's wall does NOT continue
+ *    (a wall corner turns there) → hinge at that end so the leaf folds against
+ *    the return wall; mid-wall or isolated on both ends → the anchor end "a".
+ * Pure — FloorManager injects the space/circulation/depth/occupancy lookups.
+ * (Doors are grid-absolute, so this is rotation/mirror/stair-facing agnostic.)
+ */
+export function computeDefaultSwing(
+  door: Door,
+  spaces: { a: string; b: string },
+  isCirculation: (token: string) => boolean,
+  depthOf: (token: string) => number, // Infinity when unreachable
+  targetAt: (cx: number, cz: number) => string | null
+): DoorSwing {
+  const ca = isCirculation(spaces.a);
+  const cb = isCirculation(spaces.b);
+  let into: "A" | "B";
+  if (ca !== cb) into = ca ? "B" : "A"; // open into the non-circulation room
+  else {
+    const da = depthOf(spaces.a);
+    const db = depthOf(spaces.b);
+    into = db > da ? "B" : "A"; // deeper = more private; tie → A
+  }
+  return { hinge: cornerHinge(door, into === "A", targetAt), into };
+}
+
+/** Which opening end is at a wall corner of the into-space (see
+ *  {@link computeDefaultSwing}). Checks whether the into-space continues along
+ *  the wall PAST each end of the 2-edge span. */
+function cornerHinge(
+  door: Door,
+  intoIsA: boolean,
+  targetAt: (cx: number, cz: number) => string | null
+): "a" | "b" {
+  const [dx, dz] = SIDE_DELTA[door.side];
+  const runX = door.side === "north" || door.side === "south";
+  const ox = intoIsA ? 0 : dx; // offset from door.cell to the into-space's boundary cell
+  const oz = intoIsA ? 0 : dz;
+  const intoTok = targetAt(door.cell.cx + ox, door.cell.cz + oz);
+  // the into-space cell just beyond each end of the span, along the wall:
+  const aBeyond = runX
+    ? targetAt(door.cell.cx - 1 + ox, door.cell.cz + oz)
+    : targetAt(door.cell.cx + ox, door.cell.cz - 1 + oz);
+  const bBeyond = runX
+    ? targetAt(door.cell.cx + 2 + ox, door.cell.cz + oz)
+    : targetAt(door.cell.cx + ox, door.cell.cz + 2 + oz);
+  const aContinues = aBeyond === intoTok;
+  const bContinues = bBeyond === intoTok;
+  if (aContinues && !bContinues) return "b"; // wall corner at the b end
+  if (bContinues && !aContinues) return "a"; // wall corner at the a end
+  return "a"; // mid-wall or isolated → anchor end
 }

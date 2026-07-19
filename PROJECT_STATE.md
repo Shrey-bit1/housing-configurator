@@ -48,7 +48,7 @@ work-in-progress research artifact, not a production app.
 | Ground-floor **entrance** marker rendering | `src/scene/entranceView.ts` | `EntranceView`: renders `Floor.entrances` as door markers on exterior edges; meshes tagged `userData.entranceId` for highlight lookup. |
 | **Entrance placement** interaction | `src/interaction/entranceController.ts`, `src/core/entrance.ts` | `EntranceController`: ghost preview + click-to-place (ground floor only). `isActive` getter + public `cancel()` — Escape is arbitrated centrally by main.ts (§2h), not handled internally here. `Entrance { id, cell, side }`. Entrances are also SELECTABLE/DELETABLE (via `SelectionController`, see §2f) but explicitly EXCLUDED from multi-select/group ops (§2h): click a marker to select, Delete to remove. `Floor.removeEntrance(id)`; `EntranceView.markers`/`setSelectedId`. |
 | **Interior door** model + validity + space-target resolver | `src/core/door.ts` | `Door { id, cell, side }` (2-edge span, edge-key bound); `DOOR_SPAN=2`, `DOOR_OPENING_H=2.1`, `BELOW_PREFIX`; `doorId`/`doorEdges`; **`resolveDoorSpaces(door, targetAt)`** (the one definition of door validity + connectivity — both edges must join the SAME two distinct spaces); **`buildSpaceTargets(floor, floorBelow?)`** (cell → space token: room/stair id, cluster node id, or `^stair` for a hole projected up from below — shared by placement, pruning, and the graph); `doorWallCuts` (per-door room-local + cluster-absolute opening edge sets). See §2i. |
-| Interior-door **marker rendering** | `src/scene/doorView.ts` | `DoorView` + `makeDoorMesh`: a violet floor-threshold strip across each door's opening (reads in plan view; the door's click target, `userData.doorId`). Renders `Floor.doors` on ANY floor. |
+| Interior-door **marker rendering** | `src/scene/doorView.ts` | `DoorView` + `makeDoorMesh`: a violet floor-threshold strip across each door's opening (reads in plan view; the door's click target, `userData.doorId`). Renders `Floor.doors` on ANY floor. Also `makeDoorArc` — the standard architectural swing symbol (leaf line + quarter-circle arc) per door in a separate `arcs` group, shown only in plan view (`setArcsVisible`, §2i swing). |
 | **Door placement** interaction | `src/interaction/doorController.ts` | `DoorController`: hover a shared interior boundary → a 2-edge ghost slides along the nearest wall, green/red per `FloorManager.isDoorValid`; click commits. `isActive`/public `cancel()`, Escape arbitrated centrally (§2h). Doors are SELECTABLE/DELETABLE via `SelectionController` (§2f, its second `MarkerSelectionAdapter`), on any floor. |
 | **Undo / redo history** (snapshot-based) | `src/core/history.ts` | `History`: undo/redo stacks of serialized-project snapshots (cap 20), commit-after-action model, restore via the import rebuild path. See §2f. |
 | **Exterior-edge detection** (reusable) | `src/core/exteriorEdges.ts` | `exteriorEdges(cells, occupied) → BoundaryEdge[]`. Standalone/generic: consumed by entrance placement/validity, the daylight rules (D1/D2 via `GraphNode.hasExteriorEdge`), and reserved for a future facade/window task. |
@@ -794,11 +794,42 @@ restores both the move and the door (verified: moving a room away drops its door
 in one snapshot; undo brings back move + door). Doors do NOT travel with rooms —
 they are absolute edge-bound and simply vanish when stranded.
 
-**Serialization** — additive per-floor `doors` list (`DoorData`, same wire shape
-as `EntranceData`; `normalizeEdgeBound` serves both). Tolerant loader → old files
-load doorless; no version bump (`APP_PROJECT_VERSION` stays 1). Round-trip
-verified. `loadProject` restores doors after all instances + entrances, then runs
-one `syncStairsAndHoles()` to cut the openings.
+**Swing metadata + plan-view arcs** (`Door.swing`, `door.ts`, `doorView.ts`,
+`floorManager.assignDefaultSwings`). A door carries an OPTIONAL authored
+`swing: { hinge: "a"|"b", into: "A"|"B" }` — which end the leaf pivots on
+("a" = anchor end, "b" = far end) and which of the two connected spaces it opens
+into ("A" = `door.cell` side, "B" = the neighbour side, matching
+`resolveDoorSpaces`'s a/b). Four states (`SWING_STATES`); `nextSwing` cycles them.
+- **Default at placement / load** (`computeDefaultSwing`, pure): leaf opens INTO
+  THE MORE PRIVATE space — if one side is circulation → into the other (the room);
+  else the DEEPER-from-entrance side (`computeEntranceDepths`); tie → space "A".
+  Hinge = the opening end at a wall corner of the into-space (so the leaf folds
+  against the return wall), else the anchor end "a". `FloorManager.assignDefaultSwings()`
+  fills any swing-less door — building the dwelling graph + entrance depths ONCE,
+  only if some door needs it — and is called after every door placement
+  (`main`'s `doorController.onPlaced`) and after load. Doors are grid-absolute, so
+  the default is rotation/mirror/stair-facing agnostic (verified via the pure
+  function: corridor→room ⇒ `{hinge:"a",into:"B"}` = into the room; room→room with
+  B deeper ⇒ `{hinge:"a",into:"B"}` = into the deeper room).
+- **Cycle** — the **S key** on a selected door (`selection.ts` S branch →
+  `MarkerSelectionAdapter.cycleSwing` → `Floor.cycleDoorSwing`) steps the 4 states;
+  ONE history snapshot per press (undo reverts one cycle — verified). Swing is not
+  reachability, so cycling triggers no wall/validation refresh.
+- **Render** — `makeDoorArc` draws the leaf line + a 12-segment quarter-circle arc,
+  flat just above the threshold strip, in accent violet, in a dedicated `arcs`
+  group that is hidden in 3D and shown in plan (`FloorManager.setDoorArcsVisible`,
+  toggled by `enterPlanMode`/`exitPlanMode`). Arcs never intercept picking
+  (`raycast` disabled) and fade with `setDimmed` (material `userData.baseColor`).
+
+**Serialization** — additive per-floor `doors` list (`DoorData`). Cell+side share
+`EntranceData`'s wire shape (`normalizeEdgeBound`), plus an optional `swing`
+(`normalizeDoor` wraps the shared reader: a well-formed `{hinge,into}` survives,
+absent/garbage → `undefined`, which the loader then fills via
+`assignDefaultSwings` — so pre-swing files load with sensible computed defaults).
+Tolerant loader → old files load doorless; no version bump (`APP_PROJECT_VERSION`
+stays 1). Round-trip verified. `loadProject` restores doors (passing `d.swing`)
+after all instances + entrances, then runs one `syncStairsAndHoles()` to cut the
+openings and `assignDefaultSwings()` to fill any missing swing.
 
 **`connectionEdges` retired.** The dormant per-room-type `ConnectionEdge`
 scaffolding on `ModuleDef` (with its unresolved rotation/mirror semantics) is
@@ -1910,10 +1941,13 @@ modified `PROJECT_STATE.md`, `src/core/floor.ts`, `src/core/floorManager.ts`,
 
 - **Door-based adjacency: DONE** (§2i) — authored doors drive `GraphEdge.viaDoor`
   ACCESS edges; the `ConnectionEdge` scaffolding it was reserved for is removed.
-  Remaining door extensions: variable-width (1-edge / wider) doors — v1 is fixed
-  at a 2-edge span; and door swing/handedness metadata (doors are undirected
-  openings now). Doors are absolute edge-bound, so they inherit mirror/rotation
-  for free (they don't store per-side data on the def).
+- **Door swing/handedness: DONE** (§2i swing) — `Door.swing` (hinge + into),
+  privacy-based default, S-key cycle, plan-view arcs. Remaining door extensions:
+  variable-width (1-edge / wider) doors — v1 is fixed at a 2-edge span; a 3D leaf
+  (swing is a plan symbol only today, no swept 3D door panel); and **SIA 500
+  swing-clearance checks** — validate the leaf's swept quarter-disc against fixed
+  props / the opposite wall (needs door-aware prop placement first, see below).
+  Doors are absolute edge-bound, so they inherit mirror/rotation for free.
 - **Facade/window placement:** reuse `exteriorEdges()` (already the shared
   primitive for entrance placement, entrance validity, and D1/D2) to place
   windows/doors on a room's exterior edges.
