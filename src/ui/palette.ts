@@ -32,6 +32,8 @@ export interface PaletteCallbacks {
   onExport: () => void;
   /** Open the native file picker to import a project .json. */
   onImport: () => void;
+  /** Export the dwelling as a `dwelling-unit` bridge file (docs/bridge-format.md). */
+  onExportUnit: () => void;
 }
 
 /**
@@ -115,11 +117,20 @@ function buildProjectPanel(cb: PaletteCallbacks): HTMLElement {
   importBtn.addEventListener("click", () => cb.onImport());
   actions.appendChild(importBtn);
 
+  const unitBtn = document.createElement("button");
+  unitBtn.type = "button";
+  unitBtn.className = "secondary";
+  unitBtn.textContent = "Export unit";
+  unitBtn.addEventListener("click", () => cb.onExportUnit());
+  actions.appendChild(unitBtn);
+
   section.appendChild(actions);
 
   const note = document.createElement("p");
   note.className = "hint-text";
-  note.textContent = "Save the whole project to a .json file, or import one (also drag a file onto the view).";
+  note.textContent =
+    "Save the whole project to a .json file, or import one (also drag a file onto the view). " +
+    "“Export unit” writes a dwelling-unit bridge file for the building packer.";
   section.appendChild(note);
   return section;
 }

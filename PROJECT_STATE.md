@@ -60,6 +60,7 @@ work-in-progress research artifact, not a production app.
 | Bubble-diagram **view** | `src/ui/graphView.ts` | Toggleable full-screen 2D force-directed diagram of the WHOLE dwelling at once — one column per floor, stairs straddling their floor-pair boundary, draggable/pinnable nodes. See §2j. |
 | Validation report panel | `src/ui/validationPanel.ts` | `renderValidationPanel()`: grouped hard/soft/note issue list + the entrance-depth metric summary. Cards with a resolvable target fire `onHoverViolation` on mouseenter/leave (orchestrated in main.ts — see §2j); dwelling-level cards don't. |
 | **Project save / load** | `src/core/projectIO.ts` | `serializeProject(floors) → ProjectFile`, `parseProject(text) → ParsedProject` (tolerant/versioned). Per-floor `entrances` AND `doors` are additive edge-bound lists (`normalizeEdgeBound` serves both). See §3. Camera state and floor visibility are deliberately excluded (view state, not design state). |
+| **Unit export — flat → building bridge** | `src/core/unitExport.ts` (+ `docs/bridge-format.md`) | `buildUnitExport(fm, name, color) → {ok, file \| reason}`: the `dwelling-unit` v1 exporter for the bottom-up-design building packer. READ-ONLY (no store mutation, no history commit). Envelope per storey = `buildSpaceTargets` key set; edges classified entrance/glazed/open/blank by reusing graph entrance re-validation, `computeWindows`, and Outdoor-cluster membership. See §9. |
 | Sidebar palette / grid-size / floor tabs / floor-visibility toggles | `src/ui/palette.ts` | Rebuilt on floor-state change. |
 | Scene/camera/lights, **zoom-to-extent framing** | `src/scene/sceneSetup.ts` | Orthographic camera, `frameBox(box, direction)`. See §5. |
 | Interaction | `src/interaction/picker.ts`, `dragDrop.ts`, `selection.ts` | Raycast picking (`cellAt`/`groupAt`/`groundPoint`, scoped to the ACTIVE floor's store — this is also why floor visibility needs no picker-side filtering, see §5), palette→canvas placement, select/**multi-select**/move/**group-move**/rotate/**mirror**/delete/**group-delete**/**Shift+D-duplicate** (any count) of modules, plus entrance AND door select/delete (two `MarkerSelectionAdapter`s — mutually exclusive singletons, excluded from multi-select). `R`/`M` work on the palette ghost, the move ghost, the duplicate ghost, and a SINGLE selected instance — no-op on 2+ (§2h). `dragDrop.cancelPlacement()`/`selection.cancelDuplicate()`/`entranceController.cancel()` are public, no-argument, and NOT wired to their own Escape listeners — Escape is arbitrated centrally by main.ts (§2h). `dragDrop`/`selection` take an `onAfterAction` callback (fires after a committed mutation → undo snapshot, see §2f); `selection` also takes `onSelectionChange`/`onNoopHint` callbacks and an `EntranceSelectionAdapter`. |
@@ -2119,3 +2120,63 @@ E", `appendOrientation`, from `node.glazing.sectors` under the project north —
 OR1 reads the same data, §2k); and "Public mean depth X · Bedroom mean depth Y"
 (PG1's metric, in the depth section). All surface the raw figure whether or not
 the corresponding soft rule fires.
+
+---
+
+## 9. The flat → building bridge (`dwelling-unit` v1 export)
+
+**Format source of truth: `docs/bridge-format.md`.** The consumer is the
+chair's separate `bottom-up-design` repo (building-scale packer; local copy at
+`..\modelstadtt\bottom-up-design-main`, branch `bridge-flat-import`), which
+gained its first import + entrance-constrained corridor routing + a
+burial-of-authored-intent fitness term. The JSON file is the ENTIRE interface
+— neither codebase imports the other.
+
+**The design decision (overrides the merge analysis's proposal #1 direction):**
+the bridge runs **flat → building**. The inhabitant designs the dwelling in
+Re_Configure FIRST; the building packer aggregates authored dwellings. This is
+the thesis philosophy — the building aggregates bottom-up intent, it does not
+hand down envelopes. Consequences: Re_Configure is the EXPORT side (a second
+format beside the project file — the project format is untouched); the
+building never mutates a flat's interior (a placed unit is inviolable); edge
+classifications flow upward as requirements (glazed/open want facade, the
+entrance needs corridor, blank is party-wall material); and
+advisory-not-blocking holds at both scales (the packer scores against burying
+authored intent — it never forbids it — and reports the conflict).
+
+**Export path** (`src/core/unitExport.ts` + the `#unit-export-dialog` in
+index.html + `exportUnit` in main.ts, "Export unit" button in the palette's
+Project panel):
+- Envelope per storey = the `buildSpaceTargets(floor, floorBelow)` key set —
+  the same single source of truth doors/windows use (rooms + clusters +
+  stairs + stair-hole projections), so the void over a stair is part of the
+  unit's volume.
+- Edge classes (priority entrance > glazed > open > blank): `entrance` = a
+  NON-blocked authored entrance (re-validated via the graph's
+  `EntranceStatus.blocked`, never the raw list); `glazed` = `computeWindows`
+  re-run with EXACTLY the wall-pass inputs; `open` = exterior edge of an
+  Outdoor cluster; else `blank`.
+- Normalization: ONE translation per unit (min corner over the UNION of all
+  storeys), cells and edges alike — storeys keep mutual registration (stair
+  position); verified with a 2-storey flat whose storey-1 normalized min is
+  [5,0], not [0,0].
+- Name + colour are EXPORT-TIME dialog inputs (deterministic default colour by
+  name hash), NOT project-file fields. `sourceProject` embeds a byte-identical
+  normal save; `northAngle` is carried top-level (informational).
+- HARD gates (toast + refuse): ≥1 non-blocked entrance on floor 0 (points at
+  E2); every storey edge-connected + non-empty (trailing empty floors
+  trimmed). Hard RULE violations only produce a confirm — advisory stance,
+  export proceeds on OK.
+- Export is READ-ONLY: verified no store change (serialize before/after
+  identical) and no history snapshot (one undo after export drains the stack).
+- `FloorManager.floorHeightOf(floor)` is the public accessor added so the
+  exporter can carry per-storey heights (3.0 m at defaults).
+
+**Recorded v1 orientation limitation:** glazed edges were derived under the
+flat's authored `northAngle` (south bias). The packer may rotate units through
+the 4 quarter-turns (edge metadata rotates too; NEVER mirrored — a flat is
+chiral), which changes the glazing's real-world bearing, and v1 does not score
+orientation (future `SunPosition` upgrade). Any future click-through from a
+placed unit back into this editor must COMPOSE the placement rotation into
+`northAngle` so re-derived windows match the as-built unit (spec'd in
+docs/bridge-format.md; not built).

@@ -439,6 +439,12 @@ export class FloorManager {
     this.floors.forEach((f, i) => f.setDimmed(i !== this.activeIndex));
   }
 
+  /** Public read of {@link floorHeight} — the unit exporter carries per-storey
+   *  heights in the bridge file (docs/bridge-format.md). */
+  floorHeightOf(floor: Floor): number {
+    return this.floorHeight(floor);
+  }
+
   /** Floor height in world units: tallest room (or default) + slab clearance. */
   private floorHeight(floor: Floor): number {
     const base = Math.max(DEFAULT_FLOOR_CELLS, floor.store.maxRoomHeightCells);

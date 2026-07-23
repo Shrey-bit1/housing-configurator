@@ -34,6 +34,7 @@ import {
   APP_PROJECT_VERSION,
   type ProjectFile,
 } from "./core/projectIO";
+import { buildUnitExport } from "./core/unitExport";
 
 const DEFAULT_COLS = 16;
 const DEFAULT_ROWS = 16;
@@ -291,6 +292,9 @@ function renderSidebar(): void {
       },
       onImport() {
         fileInput.click();
+      },
+      onExportUnit() {
+        openUnitExportDialog();
       },
     },
     {
@@ -554,6 +558,69 @@ function exportProject(): void {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+// ---- Unit export (flat → building bridge, docs/bridge-format.md) ----
+// READ-ONLY: no store mutation, no history commit. Name + colour are
+// export-time inputs collected by the <dialog> in index.html — NOT new
+// project-file fields. Hard gates (entrance, connectivity) toast-and-refuse;
+// hard RULE violations only confirm (advisory stance — export anyway on OK).
+
+/** Small deterministic default palette; picked by name hash so the same name
+ *  always proposes the same colour (bottom-up's catalog colour family). */
+const UNIT_COLORS = ["#4dabf7", "#38d9a9", "#ffd43b", "#ff922b", "#ff6b6b", "#9775fa", "#f783ac"];
+function defaultUnitColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return UNIT_COLORS[h % UNIT_COLORS.length];
+}
+
+const unitDialog = document.getElementById("unit-export-dialog") as HTMLDialogElement;
+const unitNameInput = document.getElementById("unit-export-name") as HTMLInputElement;
+const unitColorInput = document.getElementById("unit-export-color") as HTMLInputElement;
+let unitColorTouched = false;
+unitColorInput.addEventListener("input", () => (unitColorTouched = true));
+unitNameInput.addEventListener("input", () => {
+  if (!unitColorTouched) unitColorInput.value = defaultUnitColor(unitNameInput.value || "Unit");
+});
+
+function openUnitExportDialog(): void {
+  unitColorTouched = false;
+  unitColorInput.value = defaultUnitColor(unitNameInput.value || "Unit");
+  unitDialog.showModal();
+}
+
+unitDialog.addEventListener("close", () => {
+  if (unitDialog.returnValue !== "export") return;
+  exportUnit(unitNameInput.value.trim() || "Unit", unitColorInput.value);
+});
+
+function exportUnit(name: string, color: string): void {
+  // Hard gates first (fail fast with a clear toast)…
+  const result = buildUnitExport(floors, name, color);
+  if (!result.ok) {
+    showToast("error", `Unit export refused: ${result.reason}`);
+    return;
+  }
+  // …then the ADVISORY hard-rule confirm: violations never block, only inform.
+  const hard = validate(computeDwellingGraph(floors.floors)).filter((v) => v.severity === "hard");
+  if (hard.length > 0) {
+    const ok = window.confirm(
+      `Check Layout reports ${hard.length} HARD violation(s) in this dwelling.\n` +
+        `The unit will export anyway (rules are advisory). Continue?`
+    );
+    if (!ok) return;
+  }
+  const blob = new Blob([JSON.stringify(result.file, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `unit-${name.replace(/[^\w-]+/g, "_")}-${fileTimestamp()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("info", `Unit "${name}" exported (${result.file.storeys.length} storey(s)).`);
 }
 
 /** Validate, confirm, then load — keeping the app's state intact on any failure. */

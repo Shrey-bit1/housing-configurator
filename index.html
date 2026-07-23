@@ -82,6 +82,23 @@
         </div>
         <div id="drop-overlay"><span>Drop project file to import</span></div>
         <div id="toast"></div>
+        <!-- Unit-export dialog (flat → building bridge, docs/bridge-format.md):
+             name + colour are EXPORT-TIME inputs, not project-file fields. -->
+        <dialog id="unit-export-dialog">
+          <form method="dialog">
+            <p class="vp-title">Export unit</p>
+            <label>Name
+              <input id="unit-export-name" type="text" value="Unit" autocomplete="off" />
+            </label>
+            <label>Colour
+              <input id="unit-export-color" type="color" value="#4dabf7" />
+            </label>
+            <div class="dialog-actions">
+              <button value="cancel" class="secondary" type="submit">Cancel</button>
+              <button value="export" class="primary" type="submit">Export</button>
+            </div>
+          </form>
+        </dialog>
       </main>
     </div>
     <script type="module" src="/src/main.ts"></script>
