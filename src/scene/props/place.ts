@@ -132,14 +132,19 @@ export function tileRun(
       if (b) {
         placements.push({ prop, ox: (a.cx + b.cx) / 2, oz: (a.cz + b.cz) / 2, facing });
       } else {
-        // Remainder: place as the left cell of a notional pair and clip to its
-        // 12-voxel (one-cell) half, so the prop fills exactly the leftover cell.
+        // Remainder: place as the left cell of a notional pair and clip to the
+        // 12-voxel (one-cell) half that lands on that cell. WHICH authored half
+        // that is depends on the facing rotation: south/west map authored x
+        // directly along the run (keep the LEFT half), north/east negate it
+        // (keep the RIGHT half) — without this, a north/east remainder renders
+        // its half one cell PAST the run's end (through the wall).
+        const keepRight = facing === "north" || facing === "east";
         placements.push({
           prop,
           ox: a.cx + (axis === "x" ? 0.5 : 0),
           oz: a.cz + (axis === "z" ? 0.5 : 0),
           facing,
-          clipX: [-VOXELS_PER_CELL, -1],
+          clipX: keepRight ? [0, VOXELS_PER_CELL - 1] : [-VOXELS_PER_CELL, -1],
         });
       }
     }

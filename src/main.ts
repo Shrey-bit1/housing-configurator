@@ -647,10 +647,11 @@ function importProjectText(text: string): void {
       `This will also replace your current layout. Continue?`;
   if (!window.confirm(confirmMsg)) return;
 
+  let skippedRooms = 0;
   try {
     clearValidation();
     selection.deselect();
-    floors.loadProject(parsed.data);
+    skippedRooms = floors.loadProject(parsed.data).skipped;
     renderSidebar();
     syncNorthUI(); // a loaded file carries its own north — reflect it on the dial
     commitHistory(); // importing a project is an undoable action
@@ -659,6 +660,10 @@ function importProjectText(text: string): void {
     showToast("error", "Import failed while loading — the file may be corrupt.");
     return;
   }
+  // Tolerant drop, never silent: an older file's rooms may collide under the
+  // CURRENT preset footprints (the L-presets became rectangles).
+  if (skippedRooms > 0)
+    showToast("warn", `${skippedRooms} room(s) could not be placed — preset footprints changed.`);
 
   if (parsed.status === "older")
     showToast(

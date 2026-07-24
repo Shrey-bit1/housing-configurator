@@ -14,8 +14,9 @@ A browser-based **3D flat / housing configurator** built with **TypeScript +
 Three.js**, bundled with **Vite**. It is a thesis tool: the user places
 modular rooms, furniture, and stairs on a 0.6 m grid across multiple floors,
 viewed in an axonometric (isometric) or straight-down plan projection. Rooms
-snap to the grid, can be rotated in 90° increments, mirrored (left/right flip,
-so chiral L-shapes and the dogleg stair reach both handednesses), moved, and
+snap to the grid, can be rotated in 90° increments, mirrored (left/right flip —
+since the elastic-rooms batch ① every room PRESET is a rectangle, so only the
+chiral dogleg stair gains a new shape from it; see §2g), moved, and
 deleted, singly or as a **multi-selection** (Shift-click, group move/delete —
 see §2h); the
 app renders rooms as hollow "dollhouse" shells with a camera-aware cutaway so
@@ -34,7 +35,7 @@ work-in-progress research artifact, not a production app.
 | System | Owner file(s) | Notes |
 |---|---|---|
 | Grid + occupancy + coordinate conversion | `src/core/grid.ts` | `Grid` class: dims, occupancy `Map<"cx,cz", instanceId>`, `holeCells` (stairwell voids), `gridToWorld`/`worldToGrid` (grid centred on world origin), `canPlace(cells, exclude?: string \| Set<string>)` (a Set excludes every id in it at once — the group-move self-exclusion primitive, §2h), `plateAvailable`/`occupy`/`free`/`setHoles`/`ownerAt`/`inBounds`/`resize`. `CELL_SIZE = 0.6`. |
-| Room / module / stair definitions + **THE central footprint transform** | `src/core/modules.ts` | `MODULE_DEFS` registry, `ModuleDef` (`category: "module" \| "room" \| "stair"`), `lShape()`/`rect()` footprint helpers, `ROOM_HEIGHT = 4`. Transform: `rotateCell`/`mirrorCell`/**`transformCell`**/`rotatedCells`/`occupiedCells` — **mirror THEN rotate**, see §2g. `MODULE_LIST` (furniture), `ROOM_LIST`, `STAIR_LIST`. |
+| Room / module / stair definitions + **THE central footprint transform** | `src/core/modules.ts` | `MODULE_DEFS` registry, `ModuleDef` (`category: "module" \| "room" \| "stair"`), `rect()`/`lShape()` footprint helpers, `ROOM_HEIGHT = 4`. **Every room preset is a RECTANGLE** (elastic-rooms batch ①): Living 7×5, Kitchen 4×4, Bedroom-S 5×4, Bedroom-L 6×5, Bathrooms 3×3/4×4, Recreation 5×5, Circulation/Outdoor 1×1/1×2, stair 2×6. `lShape` is currently caller-less (kept + exported as a shared utility; rectangles are the seeds for the coming derived-expansion batch). Transform: `rotateCell`/`mirrorCell`/**`transformCell`**/`rotatedCells`/`occupiedCells` — **mirror THEN rotate**, see §2g. `MODULE_LIST` (furniture), `ROOM_LIST`, `STAIR_LIST`. |
 | Placed-instance store (place/move/rotate/**mirror**/delete, **group ops**) | `src/core/store.ts` | `ModuleStore`: single source mutating occupancy + scene together. `instances: Map<id, ModuleInstance>` (each carries `mirrored: boolean`), `onChange` hook, `extraPlacementCheck?` (cross-floor stair rule, set by FloorManager), `canPlaceInstance(def, cells, excludeId?: string \| Set<string>)`, `place(type,origin,rotation,mirrored)`, `move(id,origin,rotation,mirrored?)` (rebuilds the mesh when rotation OR mirror changes), `rotate(id)`/`mirror(id)` (both pivot on the origin cell, both collision-checked), `reconcileAfterResize`, `maxRoomHeightCells`. **Group ops** (§2h): `moveMany(moves)` (atomic rigid move, all-or-nothing, self-exclusion via a Set, never rebuilds meshes since rotation/mirror are untouched), `removeMany(ids)` (single `onChange`), `placeMany(items)` (atomic batch place — new ids, no exclusion needed — used by group duplicate). |
 | Mesh building: solid cubes, **room shells**, connector tiles, **concave-corner wall logic**, **window panel-kit + glazing** | `src/scene/moduleMesh.ts` | `buildModuleMesh()` routes: `category==="stair"` → `buildStairGroup` (stairMesh.ts); connector → tile; room → `buildRoomShell` (hollow open-top shell, walls built directly at the floor's true height — see §2b); else solid cubes. `buildBoundaryWalls()` is the shared clean-corner wall generator (exported; reused by clusters), and — given a per-edge `windows` map — replaces a windowed edge's solid segment with sill/lintel panels + a glazing pane (see §2d), and — given a `doors` edge-key set — cuts a fixed 0→`DOOR_OPENING_H` opening with a solid header above (see §2i). `rebuildRoomWalls()` rebuilds just a room's wall+glazing meshes in place when height, windows, or doors change. `makeGlassMaterial()`, `setSelected()`, `setHovered(group, hovered, selected)` (subtler emissive intensity 0.15 vs selection's 0.35; no-ops when `selected` or when a rules-violation tint owns the material — §2h). `WALL_T = 0.1`, `FLOOR_H = 0.15`. |
 | **Rule-driven window generator** (derived, per room) | `src/core/windows.ts` | `computeWindows(cells, roomTypeId, floorHeight, occupied, entranceEdgeKeys, northAngle=0) → WindowPlan`. Pure computation (no Three.js). `WINDOW_CONFIG` per-type table (target ratio + variant). Seed runs sorted by SOUTHERNNESS under `northAngle` (§2d, §2k). The plan's `GlazingStat` carries `sectors`/`northLit` (derived orientation). See §2d. |
@@ -411,9 +412,14 @@ Deleting the last entrance empties `entryIds`, returning validation to the E1
 ### 2g. Mirroring (all placeables — rooms, furniture, connectors, stairs)
 
 Every `ModuleInstance` carries `mirrored: boolean` (default false) beside its
-`rotation`. Chiral footprints (the L-rooms, the dogleg stair) can therefore reach
-all **8 orientations** (4 rotations × 2 mirror states) — verified distinct for
-`living`/`kitchen`/`bedroom_large`/`recreation`.
+`rotation`. A CHIRAL footprint can reach all **8 orientations** (4 rotations ×
+2 mirror states). Since the elastic-rooms batch ① the only chiral PLACEABLES
+are the dogleg stair and the L-triomino furniture piece — every room preset is
+now a rectangle, whose mirror is the SAME shape as a rotation (possibly
+translated, since the pivot is the origin cell). The mirror MACHINERY is
+footprint-agnostic and unchanged — nothing downstream ever assumed 8 distinct
+shapes; `mirrored` still round-trips and props still reflect (verified across
+4 rotations × 2 mirror states per rect preset in batch ①).
 
 **THE transform order — mirror FIRST, then rotate** (`transformCell` in
 modules.ts, the single source of truth):
@@ -677,7 +683,7 @@ to the stylesheet's `display: none` and stay hidden; this exact bug was caught
 during verification). Single module → `"{def.name} · Floor {i} · {w}×{h}"`
 where the footprint size is the CURRENT rotated+mirrored bounding box
 (`rotatedCells(def, rotation, mirrored)`), not the def's nominal rotation-0
-size — verified a 7×6 room reads "6×7" once rotated 90°. Multiple → `"{n}
+size — verified a 7×5 room reads "5×7" once rotated 90°. Multiple → `"{n}
 selected"`. A selected entrance → `"Entrance · Floor 0"` (an extension beyond
 the spec's literal examples, added for consistency — every selection state
 shows something). Floor label uses the same `Floor {i}` (0-indexed) convention
@@ -1122,14 +1128,22 @@ per-voxel wall-clip, room-local frame, mirror + rotation for free). Builders in
   separate layouts): small = `toilet` + `basin` + `shower`, one per wall, centre
   clear; large adds `bathtub` on the south wall. Props: `toilet`, `basin` (mirror
   block folded in), `shower`, `bathtub`.
-- **Bedroom** (`bedroom_small` 5×4 rect / `bedroom_large` 6×6 L): `bed_single`/
-  `bed_double` head against a wall, `nightstand`(s) beside the head, `wardrobe` on
-  another wall. Large's fixtures sit on the south/east SOLID walls, clear of the
-  NE notch.
-- **Living** (7×6 L): `sofa` on the south long wall, `sideboard` (+ thin dark TV
-  slab) on the north solid wall, `coffee_table` between, `shelving` on the east.
-- **Recreation** (6×5 L): central `games_table`, two `lounge_chair`s toward the
-  south corners, `shelving` reused on the north wall.
+- **Bedroom** (`bedroom_small` 5×4 / `bedroom_large` 6×5, both rect): `bed_single`/
+  `bed_double` head against a wall, `nightstand`(s) beside the head, `wardrobe`
+  mid-height on the east wall.
+- **Living** (7×5 rect): `sofa` on the south long wall, `sideboard` (+ thin dark
+  TV slab) on the north wall, `coffee_table` between, `shelving` on the east.
+- **Recreation** (5×5 rect): central `games_table`, two `lounge_chair`s toward
+  the south corners, `shelving` reused on the north wall.
+- **Kitchen** (4×4 rect, re-authored in batch ①): `counter_run` +
+  `overhead_cabinet` tile the NORTH wall (4 cells = two clean 2-cell units) with
+  the `stove` mid-counter, `sink` on the east wall, `fridge` on the west. The
+  north wall is chosen DELIBERATELY: the fixed one-band kitchen window is
+  south-biased, so counters/overheads never cover the glazing. Batch ① also
+  fixed a latent `tileRun` bug this exposed: the odd-cell REMAINDER clip kept
+  the authored left half unconditionally, which is correct only for south/west
+  facings — a north/east remainder rendered one cell past the run's end
+  (through the wall). The kept half is now facing-dependent (place.ts).
 
 **14 new props** authored as `data/*.json` in the SAME format as the kitchen's
 (box-composed 5 cm voxels) so any single prop is swappable with no code change;
@@ -1349,6 +1363,15 @@ fields: absent → `false` / `0` via `normalize`, so pre-feature files load
 unchanged — no version bump, no migration step. (`northAngle` IS design state,
 unlike the view-state exclusions above — it moves the derived windows, so it
 serializes and is undoable.)
+
+**Preset-footprint drift (batch ①):** files reference room types by NAME, so a
+save made under the old L-presets loads with the CURRENT rectangular footprints
+— which can collide where the old L-notches let rooms interlock, or run out of
+bounds. `FloorManager.loadProject` returns `{ skipped }` (instances the normal
+`store.place` path refused); the import UI surfaces it as a warn toast ("N
+room(s) could not be placed — preset footprints changed") — tolerant drop,
+never silent, never auto-repositioned. Undo/redo snapshots are same-session and
+can never skip.
 
 ### Voxel prop JSON format (`voxelProp.ts`, `data/*.json`)
 ```jsonc
@@ -1937,6 +1960,23 @@ modified `PROJECT_STATE.md`, `src/core/floor.ts`, `src/core/floorManager.ts`,
 `30bf5dd`.) Run `git status` to confirm before assuming this list is current.
 
 ---
+
+**Elastic-rooms batch ① — all room presets rectangularized (branch
+`elastic-rooms`).** Living 7×6L(36) → 7×5(35), Kitchen 5×4L(16) → 4×4(16),
+Bedroom-L 6×6L(30) → 6×5(30), Recreation 6×5L(26) → 5×5(25); everything else
+was already rectangular. Rectangles are the SEEDS for the coming derived
+"elastic room" expansion batch — no expansion behaviour exists yet. Absorbed
+ripples: prop layouts re-authored per rect (kitchen counter deliberately on the
+north wall, opposite the south-biased window; the `tileRun` remainder-facing
+bug this exposed is fixed in place.ts); windows re-derive per area and were
+verified sane per type; mirroring is shape-preserving on rects (machinery
+untouched); old saves load tolerantly with a skipped-room toast (see §3). Rules
+untouched (they reference type categories via `ctx.is.*`, never shapes).
+Verified: 15/15 harness checks (footprints × 4 rot × mirror through the real
+place path, occupancy + readout bbox, windows per type, interlocked-old-save
+drop, bridge export on rect presets) + real-UI screenshots of all four
+furnished types, a rotated+mirrored placement, the selection readout ("5×7" at
+90°), and the toast path.
 
 ## 7. Future extension points (scaffolding already in place)
 

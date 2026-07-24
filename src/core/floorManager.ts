@@ -533,8 +533,16 @@ export class FloorManager {
    * Unknown types (e.g. a room type added in a newer app version) are skipped
    * gracefully rather than crashing. Assumes `data` is already validated /
    * normalized by {@link import("./projectIO").parseProject}.
+   *
+   * Returns how many saved instances could NOT be placed (collision /
+   * out-of-bounds under the CURRENT preset footprints — e.g. an old file whose
+   * L-shaped rooms interlocked where today's rectangles collide). Tolerant by
+   * design: what fits is placed through the normal paths, the rest is dropped;
+   * the import UI surfaces the count as a toast (no silent loss). Same-session
+   * snapshots (undo/redo) can never skip — their footprints match by
+   * construction.
    */
-  loadProject(data: ProjectFile): void {
+  loadProject(data: ProjectFile): { skipped: number } {
     // North is project-level design state — restore it BEFORE any rebuild so the
     // window generator (which reads this.northAngle) re-derives against the
     // loaded angle. Tolerant: a pre-north file has no field → default 0.
@@ -553,6 +561,7 @@ export class FloorManager {
     // Create ALL floors first, THEN place instances — so a stair on floor N sees
     // the (saved) floor N+1 already present and doesn't spuriously auto-create a
     // duplicate. Holes + stair rises rebuild reactively via store.onChange.
+    let skipped = 0;
     const created = floorsData.map((fd) => this.createFloor(fd.cols, fd.rows));
     created.forEach((floor, k) => {
       for (const inst of floorsData[k].instances) {
@@ -560,9 +569,10 @@ export class FloorManager {
           console.warn(`Skipping unknown module type "${inst.type}" while loading.`);
           continue;
         }
-        floor.store.place(
+        const placed = floor.store.place(
           inst.type, { cx: inst.cx, cz: inst.cz }, inst.rotation, inst.mirrored ?? false
         );
+        if (!placed) skipped++;
       }
       // Entrances + doors are authored data (not in the store); restore them.
       // Doors go on after all this floor's instances (and, by the create-all-
@@ -580,5 +590,6 @@ export class FloorManager {
     this.syncStairsAndHoles();
     this.assignDefaultSwings(); // fill swing for pre-swing files (kept for files that had it)
     this.setActive(0);
+    return { skipped };
   }
 }

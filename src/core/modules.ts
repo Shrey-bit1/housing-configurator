@@ -64,9 +64,13 @@ function rect(w: number, d: number): Cell[] {
 
 /**
  * A w x d rectangle with a `nw` x `nd` rectangular notch removed from the
- * north-east (max-x, min-z) corner — gives a consistent L shape for all rooms.
+ * north-east (max-x, min-z) corner — gives a consistent L shape.
+ *
+ * Currently CALLER-LESS: every room preset became a rectangle (batch ① of the
+ * elastic-rooms work — rectangles are the seeds the derived expansion batch
+ * builds on). Kept, and exported, as a shared footprint utility.
  */
-function lShape(w: number, d: number, nw: number, nd: number): Cell[] {
+export function lShape(w: number, d: number, nw: number, nd: number): Cell[] {
   return rect(w, d).filter(
     (c) => !(c.cx >= w - nw && c.cz < nd)
   );
@@ -134,20 +138,20 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
   living: {
     type: "living",
     name: "Living Room",
-    description: "L-shape · 7×6 (3×2 notch)",
+    description: "Rectangle · 7×5",
     category: "room",
     group: "Living Room",
     color: 0xd32f2f,
-    cells: lShape(7, 6, 3, 2),
+    cells: rect(7, 5),
     height: ROOM_HEIGHT,  },
   kitchen: {
     type: "kitchen",
     name: "Kitchen",
-    description: "L-shape · 5×4 (2×2 notch)",
+    description: "Rectangle · 4×4",
     category: "room",
     group: "Kitchen",
     color: 0xf5c400,
-    cells: lShape(5, 4, 2, 2),
+    cells: rect(4, 4),
     height: ROOM_HEIGHT,  },
   bedroom_small: {
     type: "bedroom_small",
@@ -161,11 +165,11 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
   bedroom_large: {
     type: "bedroom_large",
     name: "Bedroom — Large",
-    description: "L-shape · 6×6 (2×3 notch)",
+    description: "Rectangle · 6×5",
     category: "room",
     group: "Bedroom",
     color: 0x0d2c54,
-    cells: lShape(6, 6, 2, 3),
+    cells: rect(6, 5),
     height: ROOM_HEIGHT,  },
   bathroom_small: {
     type: "bathroom_small",
@@ -188,11 +192,11 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
   recreation: {
     type: "recreation",
     name: "Recreation Room",
-    description: "L-shape · 6×5 (2×2 notch)",
+    description: "Rectangle · 5×5",
     category: "room",
     group: "Recreation Room",
     color: 0xc68a1e,
-    cells: lShape(6, 5, 2, 2),
+    cells: rect(5, 5),
     height: ROOM_HEIGHT,  },
   circulation_single: {
     type: "circulation_single",
