@@ -2,7 +2,8 @@ import * as THREE from "three";
 import { type Grid, type Cell } from "../core/grid";
 import { occupiedCells } from "../core/modules";
 import { connectedComponents, clusterNodeId } from "../core/cluster";
-import { buildBoundaryWalls } from "./moduleMesh";
+import { edgeKey, SIDES, SIDE_DELTA } from "../core/exteriorEdges";
+import { buildBoundaryWalls, RAILING_H, type BoundaryWallOpts } from "./moduleMesh";
 import type { Floor } from "../core/floor";
 
 const EDGE_COLOR = 0x1a1a1a;
@@ -81,13 +82,43 @@ export function rebuildClusterShells(
         edgeMaterial,
         undefined, // clusters never get windows
         undefined,
-        doors
+        doors,
+        key === "outdoor" ? outdoorWallOpts(floor, component) : undefined
       )) {
         wall.userData.clusterNodeId = nodeId;
         group.add(wall);
       }
     }
   }
+}
+
+/**
+ * Per-edge treatment for an OUTDOOR cluster component (visual batch, §2n):
+ *  - an edge facing open space (nothing occupies the neighbour cell) becomes a
+ *    900 mm RAILING instead of a full wall — a balcony reads as a balcony;
+ *  - an edge facing a ROOM is DISSOLVED (no cluster-side segment), matching the
+ *    room side's own dissolve so the room opens onto its terrace.
+ * Anything else (circulation, another cluster, a stair, furniture) keeps a
+ * full-height wall. Uses EFFECTIVE occupancy, so a grown elastic room dissolves
+ * exactly like a seed-sized one.
+ */
+function outdoorWallOpts(floor: Floor, component: Cell[]): BoundaryWallOpts {
+  const skip = new Set<string>();
+  const rails = new Set<string>();
+  for (const c of component) {
+    for (const side of SIDES) {
+      const [dx, dz] = SIDE_DELTA[side];
+      const ownerId = floor.effectiveOwnerAt(c.cx + dx, c.cz + dz);
+      if (!ownerId) {
+        rails.add(edgeKey(c.cx, c.cz, side)); // open air → railing
+        continue;
+      }
+      const inst = floor.store.instances.get(ownerId);
+      if (inst && inst.def.category === "room" && !inst.def.cluster)
+        skip.add(edgeKey(c.cx, c.cz, side)); // room boundary → dissolved
+    }
+  }
+  return { skip, rails, railHeight: RAILING_H };
 }
 
 function disposeChildren(group: THREE.Object3D): void {

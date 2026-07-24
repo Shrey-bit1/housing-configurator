@@ -3,7 +3,7 @@ import { CELL_SIZE, cellKey, type Grid, type Cell } from "./grid";
 import { Floor } from "./floor";
 import { MODULE_DEFS, occupiedCells, type ModuleDef } from "./modules";
 import type { ProjectFile } from "./projectIO";
-import { edgeKey, parseEdgeKey } from "./exteriorEdges";
+import { edgeKey, parseEdgeKey, SIDES, SIDE_DELTA } from "./exteriorEdges";
 import { computeWindows, type WindowVariant } from "./windows";
 import {
   buildSpaceTargets,
@@ -248,6 +248,14 @@ export class FloorManager {
 
       floor.windowStats.clear();
       const seedRects: { min: Cell; max: Cell }[] = [];
+      // A room's edges facing a touching Outdoor cluster are DISSOLVED (§2n):
+      // no wall on either side, so the room opens onto its balcony/terrace.
+      // The cluster side is dissolved symmetrically in clusterShells.
+      const outdoorCells = new Set<string>();
+      for (const inst of floor.store.instances.values())
+        if (inst.def.cluster === "outdoor")
+          for (const c of occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored))
+            outdoorCells.add(cellKey(c.cx, c.cz));
       for (const inst of floor.store.instances.values()) {
         if (inst.def.category !== "room" || inst.def.cluster) continue; // shells only
         // EFFECTIVE footprint (expansion.ts): elastic rooms grow into claimed
@@ -276,12 +284,22 @@ export class FloorManager {
         // (absolute − origin); the "Show seeds" outline records the authored
         // minimum. Fixed rooms keep the untouched original path.
         const elastic = isElastic(inst.def);
+        // Outdoor-facing edges → LOCAL keys (abs − origin), same convention as
+        // the windows/doors sets above.
+        const dissolve = new Set<string>();
+        for (const c of cells)
+          for (const side of SIDES) {
+            const [dx, dz] = SIDE_DELTA[side];
+            if (outdoorCells.has(cellKey(c.cx + dx, c.cz + dz)))
+              dissolve.add(edgeKey(c.cx - inst.origin.cx, c.cz - inst.origin.cz, side));
+          }
         rebuildRoomWalls(
           inst.group, inst.def, inst.rotation, height, localWindows, inst.mirrored,
           roomDoors.get(inst.id), // LOCAL door-edge keys for this room (or undefined)
           elastic
             ? cells.map((c) => ({ cx: c.cx - inst.origin.cx, cz: c.cz - inst.origin.cz }))
-            : undefined
+            : undefined,
+          dissolve.size ? { skip: dissolve } : undefined
         );
         if (elastic) {
           const xs = seedCells.map((c) => c.cx);

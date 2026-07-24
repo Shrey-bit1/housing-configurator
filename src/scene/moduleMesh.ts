@@ -142,6 +142,11 @@ export function buildModuleMesh(
 export const WALL_T = 0.1;
 export const FLOOR_H = 0.15;
 
+/** Balcony-railing height for an Outdoor cluster's exterior edges — deliberately
+ *  the same 900 mm as the window sill band ({@link SILL_H}), so a terrace's
+ *  guard lines up with the sills of the rooms around it. */
+export const RAILING_H = SILL_H;
+
 /** Glazing pane thickness (thinner than the wall, set into the reveal). */
 const GLASS_T = 0.04;
 /** Tiny y inset so glazing doesn't share an exact plane with the sill top /
@@ -233,7 +238,24 @@ export function makeGlassMaterial(): THREE.MeshStandardMaterial {
  * never coincide (windows are exterior-only, doors interior-only). A door onto a
  * stair cuts only the room/cluster side — the caller simply never adds the
  * stair side to `doors` (a stair has no shell wall).
+ *
+ * `opts` (visual batch — see PROJECT_STATE §2n):
+ *  - `skip`: edges to DISSOLVE — no segment at all (a room↔Outdoor boundary, so
+ *    the room opens onto its balcony). Corner ownership follows the segment
+ *    actually BUILT, not merely the boundary: a dissolved N/S edge means this
+ *    cell's E/W wall keeps its full length and owns that corner square itself
+ *    (no trim ⇒ no notch; nothing to overlap ⇒ no z-fighting).
+ *  - `rails` + `railHeight`: edges built at HALF height (an Outdoor cluster's
+ *    exterior edge = a balcony railing). Rail geometry is merged into its own
+ *    meshes which deliberately carry NO `wallNormal`, so the cutaway pass never
+ *    hides them — a balcony must read as a balcony from every angle.
  */
+export interface BoundaryWallOpts {
+  skip?: Set<string>;
+  rails?: Set<string>;
+  railHeight?: number;
+}
+
 export function buildBoundaryWalls(
   cells: Cell[],
   centerX: (cx: number) => number,
@@ -243,14 +265,20 @@ export function buildBoundaryWalls(
   edgeMaterial: THREE.Material,
   windows?: Map<string, WindowVariant>,
   glassMaterial?: THREE.Material,
-  doors?: Set<string>
+  doors?: Set<string>,
+  opts?: BoundaryWallOpts
 ): THREE.Mesh[] {
   const key = (x: number, z: number) => `${x},${z}`;
   const occupied = new Set(cells.map((c) => key(c.cx, c.cz)));
   const H = CELL_SIZE / 2;
+  const isRail = (cx: number, cz: number, side: string) =>
+    !!opts?.rails?.has(edgeKey(cx, cz, side as never));
+  const railH = opts?.railHeight ?? fullH;
 
   const walls = { nx: [], px: [], nz: [], pz: [] } as Record<string, THREE.BufferGeometry[]>;
   const glass = { nx: [], px: [], nz: [], pz: [] } as Record<string, THREE.BufferGeometry[]>;
+  /** Half-height railings — merged separately so they can stay cutaway-proof. */
+  const rails = { nx: [], px: [], nz: [], pz: [] } as Record<string, THREE.BufferGeometry[]>;
 
   /** A box spanning an explicit y band (yMin..yMax). */
   const box = (
@@ -280,15 +308,20 @@ export function buildBoundaryWalls(
     glassZMin = zMin,
     glassZMax = zMax
   ) => {
+    // A railing edge (Outdoor cluster exterior) tops out at railHeight instead
+    // of the floor-to-floor height. Windows/doors can never coincide with one
+    // (clusters get no windows; an exterior edge takes no interior door), so
+    // the plain-segment path below covers it.
+    const topH = isRail(cx, cz, side) ? railH : fullH;
     // Door wins the edge: a fixed 0→DOOR_OPENING_H opening, solid header above.
     if (doors?.has(edgeKey(cx, cz, side as any))) {
-      const top = Math.min(DOOR_OPENING_H, fullH);
-      if (fullH - top > 0.001) solid.push(box(xMin, xMax, zMin, zMax, top, fullH));
+      const top = Math.min(DOOR_OPENING_H, topH);
+      if (topH - top > 0.001) solid.push(box(xMin, xMax, zMin, zMax, top, topH));
       return;
     }
     const variant = windows?.get(edgeKey(cx, cz, side as any));
     if (!variant) {
-      solid.push(box(xMin, xMax, zMin, zMax, 0, fullH));
+      solid.push(box(xMin, xMax, zMin, zMax, 0, topH));
       return;
     }
     // Sill (always) + lintel (framed only) — solid wall. Uses the SAME
@@ -296,8 +329,8 @@ export function buildBoundaryWalls(
     // corner cleanly via the ordinary trim (see the corner-wrapped-windows
     // doc comment above) — no wrap-specific handling needed here.
     solid.push(box(xMin, xMax, zMin, zMax, 0, SILL_H));
-    const glassTop = variant === "framed" ? fullH - LINTEL_H : fullH;
-    if (variant === "framed") solid.push(box(xMin, xMax, zMin, zMax, fullH - LINTEL_H, fullH));
+    const glassTop = variant === "framed" ? topH - LINTEL_H : topH;
+    if (variant === "framed") solid.push(box(xMin, xMax, zMin, zMax, topH - LINTEL_H, topH));
     // Glazing pane in the gap — skip if the gap collapsed (never at real heights).
     if (glassMaterial && glassTop - SILL_H > 0.05) {
       let gxMin = xMin, gxMax = xMax, gzMin = zMin, gzMax = zMax;
@@ -325,27 +358,63 @@ export function buildBoundaryWalls(
     const emptyW = !occupied.has(key(c.cx - 1, c.cz)); // -x edge (west)
     const emptyE = !occupied.has(key(c.cx + 1, c.cz)); // +x edge (east)
 
+    // A DISSOLVED edge (room↔Outdoor) is a boundary that builds no segment.
+    // Everything below keys off "is a wall actually built here" rather than
+    // "is this a boundary", so partial dissolution keeps corners exact.
+    const wallN = emptyN && !opts?.skip?.has(edgeKey(c.cx, c.cz, "north"));
+    const wallS = emptyS && !opts?.skip?.has(edgeKey(c.cx, c.cz, "south"));
+    const wallW = emptyW && !opts?.skip?.has(edgeKey(c.cx, c.cz, "west"));
+    const wallE = emptyE && !opts?.skip?.has(edgeKey(c.cx, c.cz, "east"));
+
     // Convex-corner glazing wrap (see the doc comment above): this cell's OWN
     // north/south edge being ALSO windowed means the E/W pane below meets a
     // perpendicular pane at that end — extend the glazing (only) to the true
     // corner there instead of the ordinary trim boundary.
-    const wrapN = emptyN && !!windows?.get(edgeKey(c.cx, c.cz, "north"));
-    const wrapS = emptyS && !!windows?.get(edgeKey(c.cx, c.cz, "south"));
+    const wrapN = wallN && !!windows?.get(edgeKey(c.cx, c.cz, "north"));
+    const wrapS = wallS && !!windows?.get(edgeKey(c.cx, c.cz, "south"));
 
-    // E/W walls run in z, inset in x, trimmed in z at convex ends so the
-    // perpendicular N/S wall of this cell owns the corner.
-    const zMin = z - H + (emptyN ? WALL_T : 0);
-    const zMax = z + H - (emptyS ? WALL_T : 0);
-    const glassZMin = wrapN ? z - H : zMin;
-    const glassZMax = wrapS ? z + H : zMax;
-    if (emptyW)
-      emit("west", c.cx, c.cz, walls.nx, glass.nx, x - H, x - H + WALL_T, zMin, zMax, "x", glassZMin, glassZMax);
-    if (emptyE)
-      emit("east", c.cx, c.cz, walls.px, glass.px, x + H - WALL_T, x + H, zMin, zMax, "x", glassZMin, glassZMax);
+    // Height of each of this cell's four segments (0 = not built / dissolved).
+    const hOf = (built: boolean, side: string) =>
+      built ? (isRail(c.cx, c.cz, side) ? railH : fullH) : 0;
+    const hN = hOf(wallN, "north");
+    const hS = hOf(wallS, "south");
+    const hW = hOf(wallW, "west");
+    const hE = hOf(wallE, "east");
 
-    // N/S walls run in x at full cell length (own the corners), inset in z.
-    if (emptyN) emit("north", c.cx, c.cz, walls.nz, glass.nz, x - H, x + H, z - H, z - H + WALL_T, "z");
-    if (emptyS) emit("south", c.cx, c.cz, walls.pz, glass.pz, x - H, x + H, z + H - WALL_T, z + H, "z");
+    // CORNER OWNERSHIP — generalised to unequal heights: the TALLER of two
+    // perpendicular segments owns the corner square, the shorter is trimmed
+    // back by one wall thickness. With equal heights this is exactly the
+    // original convention (N/S owns, E/W trimmed), so ordinary walls are
+    // untouched. It matters when a half-height railing meets a full wall: the
+    // rail must give the corner up (trimming the tall wall instead would leave
+    // an open notch above the rail), and when an edge is DISSOLVED (height 0)
+    // it owns nothing, so its partner runs full length across the corner.
+    const zMinFor = (hSelf: number) => z - H + (hN > 0 && hN >= hSelf ? WALL_T : 0);
+    const zMaxFor = (hSelf: number) => z + H - (hS > 0 && hS >= hSelf ? WALL_T : 0);
+    const xMinFor = (hSelf: number) => x - H + (hW > hSelf ? WALL_T : 0);
+    const xMaxFor = (hSelf: number) => x + H - (hE > hSelf ? WALL_T : 0);
+
+    if (wallW) {
+      const zMin = zMinFor(hW);
+      const zMax = zMaxFor(hW);
+      emit("west", c.cx, c.cz, isRail(c.cx, c.cz, "west") ? rails.nx : walls.nx, glass.nx,
+        x - H, x - H + WALL_T, zMin, zMax, "x", wrapN ? z - H : zMin, wrapS ? z + H : zMax);
+    }
+    if (wallE) {
+      const zMin = zMinFor(hE);
+      const zMax = zMaxFor(hE);
+      emit("east", c.cx, c.cz, isRail(c.cx, c.cz, "east") ? rails.px : walls.px, glass.px,
+        x + H - WALL_T, x + H, zMin, zMax, "x", wrapN ? z - H : zMin, wrapS ? z + H : zMax);
+    }
+
+    // N/S walls run in x, inset in z — full cell length unless a TALLER
+    // perpendicular wall takes the corner (see above).
+    if (wallN)
+      emit("north", c.cx, c.cz, isRail(c.cx, c.cz, "north") ? rails.nz : walls.nz, glass.nz,
+        xMinFor(hN), xMaxFor(hN), z - H, z - H + WALL_T, "z");
+    if (wallS)
+      emit("south", c.cx, c.cz, isRail(c.cx, c.cz, "south") ? rails.pz : walls.pz, glass.pz,
+        xMinFor(hS), xMaxFor(hS), z + H - WALL_T, z + H, "z");
   }
 
   const dirs: Array<{ key: string; normal: THREE.Vector3 }> = [
@@ -370,6 +439,26 @@ export function buildBoundaryWalls(
       edges.raycast = () => {};
       wallMesh.add(edges);
       meshes.push(wallMesh);
+    }
+
+    // Railings (Outdoor exteriors): same material/edges as a wall, but tagged
+    // WITHOUT `wallNormal` — the cutaway pass only ever flips wallNormal-tagged
+    // meshes, so a railing stays visible from every angle (it is too low to
+    // block the interior, and a balcony must read as a balcony).
+    const railGeos = rails[dk];
+    if (railGeos.length) {
+      const railMesh = new THREE.Mesh(mergeGeometries(railGeos, false), material);
+      railMesh.castShadow = true;
+      railMesh.receiveShadow = true;
+      railMesh.userData.isWall = true;
+      railMesh.userData.railing = true;
+      const railEdges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(railMesh.geometry),
+        edgeMaterial
+      );
+      railEdges.raycast = () => {};
+      railMesh.add(railEdges);
+      meshes.push(railMesh);
     }
 
     const glassGeos = glass[dk];
@@ -457,7 +546,8 @@ export function rebuildRoomWalls(
   windows?: Map<string, WindowVariant>,
   mirrored = false,
   doors?: Set<string>,
-  cellsOverride?: Cell[]
+  cellsOverride?: Cell[],
+  opts?: BoundaryWallOpts
 ): void {
   const material = group.userData.material as THREE.Material;
   let glassMaterial = group.userData.glassMaterial as THREE.Material | undefined;
@@ -499,7 +589,8 @@ export function rebuildRoomWalls(
     edgeMaterial,
     windows,
     glassMaterial,
-    doors
+    doors,
+    opts
   ))
     group.add(wall);
 }
