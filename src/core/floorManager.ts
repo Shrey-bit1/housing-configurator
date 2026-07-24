@@ -78,6 +78,8 @@ export class FloorManager {
   private syncing = false;
   /** "Show seeds" view flag (see {@link setSeedOutlinesVisible}). */
   private seedOutlinesVisible = false;
+  /** "Structure" x-ray view flag (see {@link setStructureView}). */
+  private structureView = false;
 
   constructor(
     private scene: THREE.Scene,
@@ -292,6 +294,35 @@ export class FloorManager {
       }
       floor.rebuildSeedOutlines(seedRects);
     });
+    // Walls are brand-new meshes after this pass — re-apply the x-ray view.
+    this.applyStructureView();
+  }
+
+  /**
+   * "Structure" x-ray view (view state, never serialized): hide the wall AND
+   * glazing meshes of ELASTIC rooms, leaving their floor slabs, props, and
+   * picking untouched, so the serviced/structural core (bathrooms, kitchen,
+   * circulation, stairs, entrances, doors) reads on its own with the soft
+   * rooms as open floor. Composes with the cutaway by outranking it (see
+   * cutaway.ts) and needs no special case for dimming, plan view, or Seeds.
+   */
+  setStructureView(on: boolean): void {
+    this.structureView = on;
+    this.applyStructureView();
+  }
+
+  private applyStructureView(): void {
+    const on = this.structureView;
+    for (const floor of this.floors)
+      for (const inst of floor.store.instances.values()) {
+        if (!isElastic(inst.def)) continue;
+        for (const child of inst.group.children) {
+          if (!child.userData.isWall) continue;
+          child.userData.structureHidden = on;
+          child.visible = !on;
+        }
+      }
+    markCutawayDirty(); // let the cutaway pass re-take control of what's shown
   }
 
   /**

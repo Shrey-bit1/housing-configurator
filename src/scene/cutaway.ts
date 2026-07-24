@@ -60,7 +60,7 @@ export function updateCutaway(
     dirty = false;
     lastApplied.set(NaN, NaN, NaN); // force a full recompute when cutaway returns
     scene.traverse((o) => {
-      if (o.userData.wallNormal) o.visible = true;
+      if (o.userData.wallNormal && !o.userData.structureHidden) o.visible = true;
     });
     return;
   }
@@ -72,6 +72,9 @@ export function updateCutaway(
 
   scene.traverse((o) => {
     const normal = o.userData.wallNormal as THREE.Vector3 | undefined;
-    if (normal) o.visible = normal.dot(viewDir) <= THRESHOLD;
+    // `structureHidden` (the Structure x-ray view, FloorManager) outranks the
+    // cutaway: hidden is hidden — this pass simply has less to hide. Railings
+    // carry no `wallNormal` at all, so they are never touched here.
+    if (normal && !o.userData.structureHidden) o.visible = normal.dot(viewDir) <= THRESHOLD;
   });
 }

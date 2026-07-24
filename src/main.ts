@@ -512,6 +512,17 @@ seedsToggle.addEventListener("click", () => {
   seedsToggle.classList.toggle("active", seedsOn);
 });
 
+// "Structure" x-ray toggle (default OFF): hides ELASTIC rooms' walls + glazing
+// so the serviced core reads on its own. Pure view state — never serialized,
+// untouched by undo/load; survives rebuilds (FloorManager re-applies it).
+const structureToggle = document.getElementById("structure-toggle") as HTMLButtonElement;
+let structureOn = false;
+structureToggle.addEventListener("click", () => {
+  structureOn = !structureOn;
+  floors.setStructureView(structureOn);
+  structureToggle.classList.toggle("active", structureOn);
+});
+
 // Initial view: frame whatever's on the (likely empty) starting floor instead
 // of a hardcoded camera position, so this stays correct however the default
 // grid size changes.
