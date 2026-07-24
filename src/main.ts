@@ -325,12 +325,22 @@ function updateSelectionReadout(): void {
   let text = "";
   if (insts.length === 1) {
     const inst = insts[0];
-    const cells = rotatedCells(inst.def, inst.rotation, inst.mirrored);
-    const xs = cells.map((c) => c.cx);
-    const zs = cells.map((c) => c.cz);
-    const w = Math.max(...xs) - Math.min(...xs) + 1;
-    const d = Math.max(...zs) - Math.min(...zs) + 1;
-    text = `${inst.def.name} · Floor ${floors.activeIndexValue} · ${w}×${d}`;
+    const bbox = (cells: { cx: number; cz: number }[]) => {
+      const xs = cells.map((c) => c.cx);
+      const zs = cells.map((c) => c.cz);
+      return {
+        w: Math.max(...xs) - Math.min(...xs) + 1,
+        d: Math.max(...zs) - Math.min(...zs) + 1,
+        n: cells.length,
+      };
+    };
+    const seed = bbox(rotatedCells(inst.def, inst.rotation, inst.mirrored));
+    // Effective footprint (elastic expansion): show the grown bounding box,
+    // with the authored seed size noted when the room actually grew.
+    const eff = floors.active.effectiveCells.get(inst.id);
+    const shown = eff && eff.length ? bbox(eff) : seed;
+    const grewNote = shown.n > seed.n ? ` (seed ${seed.w}×${seed.d})` : "";
+    text = `${inst.def.name} · Floor ${floors.activeIndexValue} · ${shown.w}×${shown.d}${grewNote}`;
   } else if (insts.length > 1) {
     text = `${insts.length} selected`;
   } else if (entId) {
@@ -489,6 +499,17 @@ cutawayToggle.addEventListener("click", () => {
   cutawayOn = !cutawayOn;
   setCutawayEnabled(cutawayOn);
   cutawayToggle.classList.toggle("active", cutawayOn);
+});
+
+// "Show seeds" toggle (default OFF): thin outlines of each elastic room's
+// authored seed rectangle inside its grown shell (plan + 3D). Pure view
+// state — never serialized, untouched by undo/load.
+const seedsToggle = document.getElementById("seeds-toggle") as HTMLButtonElement;
+let seedsOn = false;
+seedsToggle.addEventListener("click", () => {
+  seedsOn = !seedsOn;
+  floors.setSeedOutlinesVisible(seedsOn);
+  seedsToggle.classList.toggle("active", seedsOn);
 });
 
 // Initial view: frame whatever's on the (likely empty) starting floor instead
@@ -660,10 +681,10 @@ function importProjectText(text: string): void {
     showToast("error", "Import failed while loading — the file may be corrupt.");
     return;
   }
-  // Tolerant drop, never silent: an older file's rooms may collide under the
-  // CURRENT preset footprints (the L-presets became rectangles).
+  // Tolerant drop, never silent — cause-neutral (collision under current
+  // preset footprints, out-of-bounds, whatever made the normal path refuse).
   if (skippedRooms > 0)
-    showToast("warn", `${skippedRooms} room(s) could not be placed — preset footprints changed.`);
+    showToast("warn", `${skippedRooms} room(s) could not be placed.`);
 
   if (parsed.status === "older")
     showToast(

@@ -16,6 +16,8 @@ import {
 } from "./door";
 import { computeDwellingGraph, dwellingNodeId } from "./adjacencyGraph";
 import { computeEntranceDepths } from "./rules";
+import { computeExpansion } from "./expansion";
+import { isElastic } from "./modules";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
 import type { GroupGhostPreview } from "../scene/groupGhostPreview";
@@ -74,6 +76,8 @@ export class FloorManager {
   onStructureChange?: () => void;
   /** Re-entrancy guard for {@link syncStairsAndHoles}. */
   private syncing = false;
+  /** "Show seeds" view flag (see {@link setSeedOutlinesVisible}). */
+  private seedOutlinesVisible = false;
 
   constructor(
     private scene: THREE.Scene,
@@ -122,6 +126,7 @@ export class FloorManager {
       markCutawayDirty(); // walls may have been added/removed/rebuilt
       this.onLayoutChange?.(floor);
     };
+    floor.seedOutlines.visible = this.seedOutlinesVisible;
     this.scene.add(floor.group);
     this.floors.push(floor);
     return floor;
@@ -175,6 +180,10 @@ export class FloorManager {
       this.floors[j].setHoles(below ? this.stairCells(below) : []);
     }
 
+    // Derive the elastic-room EFFECTIVE footprints (expansion.ts) — after
+    // holes (rooms never grow over the stairwell void), BEFORE door pruning
+    // and the shell rebuild, both of which read effective space.
+    this.recomputeExpansion();
     this.pruneStaleDoors();
     this.recomputeStack();
     this.updateStairScales();
@@ -236,9 +245,14 @@ export class FloorManager {
       );
 
       floor.windowStats.clear();
+      const seedRects: { min: Cell; max: Cell }[] = [];
       for (const inst of floor.store.instances.values()) {
         if (inst.def.category !== "room" || inst.def.cluster) continue; // shells only
-        const cells = occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored); // absolute
+        // EFFECTIVE footprint (expansion.ts): elastic rooms grow into claimed
+        // gap cells; fixed rooms pass through as their seed. Walls, slab, and
+        // windows all build on this shape.
+        const seedCells = occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored);
+        const cells = floor.effectiveCells.get(inst.id) ?? seedCells; // absolute
         const plan = computeWindows(cells, inst.def.type, height, occupied, entranceEdges, this.northAngle);
         floor.windowStats.set(inst.id, {
           targetRatio: plan.targetRatio,
@@ -256,11 +270,27 @@ export class FloorManager {
           const e = parseEdgeKey(absKey);
           localWindows.set(edgeKey(e.cx - inst.origin.cx, e.cz - inst.origin.cz, e.side), variant);
         }
+        // Elastic rooms: walls + slab rebuild on the effective LOCAL cells
+        // (absolute − origin); the "Show seeds" outline records the authored
+        // minimum. Fixed rooms keep the untouched original path.
+        const elastic = isElastic(inst.def);
         rebuildRoomWalls(
           inst.group, inst.def, inst.rotation, height, localWindows, inst.mirrored,
-          roomDoors.get(inst.id) // LOCAL door-edge keys for this room (or undefined)
+          roomDoors.get(inst.id), // LOCAL door-edge keys for this room (or undefined)
+          elastic
+            ? cells.map((c) => ({ cx: c.cx - inst.origin.cx, cz: c.cz - inst.origin.cz }))
+            : undefined
         );
+        if (elastic) {
+          const xs = seedCells.map((c) => c.cx);
+          const zs = seedCells.map((c) => c.cz);
+          seedRects.push({
+            min: { cx: Math.min(...xs), cz: Math.min(...zs) },
+            max: { cx: Math.max(...xs), cz: Math.max(...zs) },
+          });
+        }
       }
+      floor.rebuildSeedOutlines(seedRects);
     });
   }
 
@@ -274,7 +304,9 @@ export class FloorManager {
   private doorWallSets(floor: Floor): { rooms: Map<string, Set<string>>; clusters: Set<string> } {
     return doorWallCuts(
       floor.doors,
-      (cx, cz) => floor.grid.ownerAt(cx, cz),
+      // EFFECTIVE occupancy: a door on an expanded boundary must cut the
+      // elastic room's wall — its edge cells are claimed, not seed cells.
+      (cx, cz) => floor.effectiveOwnerAt(cx, cz),
       (id) => {
         const inst = floor.store.instances.get(id);
         if (!inst) return null;
@@ -371,8 +403,22 @@ export class FloorManager {
    *  opening in both adjacent shells). Does NOT prune (those callers never
    *  strand a door). */
   refreshWalls(): void {
+    this.recomputeExpansion(); // cheap + idempotent; occupancy rarely changed here
     this.rebuildAllShells();
     markCutawayDirty();
+  }
+
+  /** Re-derive every floor's effective footprints (see core/expansion.ts).
+   *  Strictly per-floor; pure function of seeds + holes. */
+  private recomputeExpansion(): void {
+    for (const floor of this.floors) floor.setEffective(computeExpansion(floor));
+  }
+
+  /** Show/hide the elastic seed-rectangle outlines on every floor ("Show
+   *  seeds" — view state, never serialized; new floors follow the flag). */
+  setSeedOutlinesVisible(visible: boolean): void {
+    this.seedOutlinesVisible = visible;
+    for (const f of this.floors) f.seedOutlines.visible = visible;
   }
 
   /** Set the project north (degrees) and re-derive windows against it (they ride

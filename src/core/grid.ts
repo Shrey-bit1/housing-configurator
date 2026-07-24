@@ -117,6 +117,12 @@ export class Grid {
     this.holeCells = new Set(cells.map((c) => cellKey(c.cx, c.cz)));
   }
 
+  /** Is (cx,cz) a stairwell-void cell? (Blocked for placement AND for elastic
+   *  expansion — a room must never grow over the open stairwell.) */
+  isHole(cx: number, cz: number): boolean {
+    return this.holeCells.has(cellKey(cx, cz));
+  }
+
   /** The instance id occupying cell (cx,cz), or undefined if free. */
   ownerAt(cx: number, cz: number): string | undefined {
     return this.occupancy.get(cellKey(cx, cz));

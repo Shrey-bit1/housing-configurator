@@ -52,6 +52,21 @@ export interface ModuleDef {
 /** Room ceiling height in cells: 4 x 0.6 m = 2.4 m (spec: ~2.4–3.0 m). */
 export const ROOM_HEIGHT = 4;
 
+/**
+ * The ELASTIC room types — their placed rectangle is a SEED (a minimum claim)
+ * whose effective footprint grows to absorb enclosed empty space between
+ * placed rooms (core/expansion.ts). Everything else — bathrooms, kitchen,
+ * circulation, outdoor, stair — is FIXED: what is placed is what exists (the
+ * serviced/structural spaces). Class is a FUNCTION OF TYPE, derived here in
+ * the same spirit as rules.ts's `ctx.is.*` — never stored per instance.
+ */
+const ELASTIC_TYPES = new Set(["living", "bedroom_small", "bedroom_large", "recreation"]);
+
+/** Whether this def's effective footprint is derived by expansion (see above). */
+export function isElastic(def: ModuleDef): boolean {
+  return def.category === "room" && !def.cluster && ELASTIC_TYPES.has(def.type);
+}
+
 // ---- Footprint helpers -------------------------------------------------------
 
 /** A solid w x d rectangle of cells, origin at (0,0). */

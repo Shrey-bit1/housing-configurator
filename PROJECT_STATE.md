@@ -61,6 +61,7 @@ work-in-progress research artifact, not a production app.
 | Bubble-diagram **view** | `src/ui/graphView.ts` | Toggleable full-screen 2D force-directed diagram of the WHOLE dwelling at once — one column per floor, stairs straddling their floor-pair boundary, draggable/pinnable nodes. See §2j. |
 | Validation report panel | `src/ui/validationPanel.ts` | `renderValidationPanel()`: grouped hard/soft/note issue list + the entrance-depth metric summary. Cards with a resolvable target fire `onHoverViolation` on mouseenter/leave (orchestrated in main.ts — see §2j); dwelling-level cards don't. |
 | **Project save / load** | `src/core/projectIO.ts` | `serializeProject(floors) → ProjectFile`, `parseProject(text) → ParsedProject` (tolerant/versioned). Per-floor `entrances` AND `doors` are additive edge-bound lists (`normalizeEdgeBound` serves both). See §3. Camera state and floor visibility are deliberately excluded (view state, not design state). |
+| **Elastic-room expansion** (derived effective footprints) | `src/core/expansion.ts` | `computeExpansion(floor) → Map<instanceId, Cell[]>` — pure, per-floor, recomputed on every layout change. See §2m for the class split, algorithm, and the two-tier occupancy contract. `isElastic(def)` lives in modules.ts. |
 | **Unit export — flat → building bridge** | `src/core/unitExport.ts` (+ `docs/bridge-format.md`) | `buildUnitExport(fm, name, color) → {ok, file \| reason}`: the `dwelling-unit` v1 exporter for the bottom-up-design building packer. READ-ONLY (no store mutation, no history commit). Envelope per storey = `buildSpaceTargets` key set; edges classified entrance/glazed/open/blank by reusing graph entrance re-validation, `computeWindows`, and Outdoor-cluster membership. See §9. |
 | Sidebar palette / grid-size / floor tabs / floor-visibility toggles | `src/ui/palette.ts` | Rebuilt on floor-state change. |
 | Scene/camera/lights, **zoom-to-extent framing** | `src/scene/sceneSetup.ts` | Orthographic camera, `frameBox(box, direction)`. See §5. |
@@ -1175,6 +1176,74 @@ errors; kitchen untouched; `tsc`/build clean.
 
 ---
 
+### 2m. Elastic rooms — derived expansion (`core/expansion.ts`)
+
+**The class split (decided):** rooms are FIXED (bathroom S/L, kitchen,
+circulation, outdoor, stair — what is placed is what exists; the serviced/
+structural spaces) or ELASTIC (living, bedroom S/L, recreation — the placed
+rectangle is a SEED, a minimum claim; the effective footprint DERIVES from it,
+growing to absorb enclosed empty space between placed rooms). Class is a
+function of TYPE — `isElastic(def)` in modules.ts, the `ctx.is.*` idiom —
+never stored per instance.
+
+**The algorithm** (`computeExpansion(floor) → Map<instanceId, Cell[]>`, pure,
+strictly per-floor):
+1. Hard cells = ALL grid occupancy (seeds, fixed rooms, stairs, furniture) +
+   stairwell-hole cells. Furniture blocks growth but is no space.
+2. Outside mask = orthogonal flood fill from the grid border through empty
+   cells (the voxelFaces outside-mask idiom). A GAP cell = empty ∧ not
+   outside. Empty space touching the outside world stays empty — the flat's
+   outer silhouette is wherever the user's rooms ended.
+3. Per elastic room, a multi-source BFS INTO the gap (sources: gap cells
+   orthogonally adjacent to the room, distance 1; growth only through gap
+   cells). Each gap cell is claimed by the NEAREST room; ties break by
+   ascending numeric instance id ("m3" < "m12"); gap cells enumerate
+   row-major and claimed cells append after seed cells in that order — same
+   layout ⇒ BYTE-IDENTICAL result, incl. across save→load (verified).
+   A gap with no adjacent elastic room stays empty.
+Result: every non-furniture instance id → effective ABSOLUTE cells (fixed =
+seed pass-through). Stored transiently on `Floor.effectiveCells` (+ a
+cell→owner index behind `Floor.effectiveOwnerAt`) by
+`FloorManager.recomputeExpansion()` — in `syncStairsAndHoles` AFTER holes,
+BEFORE `pruneStaleDoors` and the shell rebuild, and in `refreshWalls`. Never
+serialized; save/load/undo see seeds only (snapshot purity verified).
+
+**The cutover — everything downstream reads EFFECTIVE footprints:**
+`buildSpaceTargets` (⇒ doors, door ghost validity, graph access edges,
+windows' occupied set, `hasExteriorEdge`, bridge-export envelope),
+`buildFloorNodes` room nodes (⇒ rules, depth, diagram, entrance hosting/E2
+re-validation), `rebuildAllShells` (walls + SLAB rebuild on effective local
+cells via `rebuildRoomWalls`'s `cellsOverride`; windows computed on effective
+cells so a grown room's glazing target grows with its area — W1 reads the
+effective area), `doorWallSets` (door cuts resolve via `effectiveOwnerAt`),
+`EntranceController` (claimed cells are inside; grown boundaries host
+entrances), the unit exporter's per-room window re-run, and the selection
+readout (effective bbox, "(seed w×d)" noted when grown). Selection/hover/
+picking follow automatically — the room MESH is the effective shape. Props
+build inside the SEED rectangle only (v1 — furniture does not spread).
+A door authored on an expanded boundary auto-removes (existing stale-door
+prune, same mutation/snapshot) when a re-flow moves the boundary — accepted
+v1 behaviour, verified.
+
+**Two-tier occupancy (the interaction contract):** placement collision reads
+the RAW GRID ONLY — hard cells (fixed rooms, elastic SEEDS, furniture, stair
+holes) block exactly as before; CLAIMED cells are soft: they are simply not
+in the grid map, so placing/moving/duplicating/importing OVER them is valid
+through every path by construction (ghost tints valid, drop succeeds), and
+the expansion recedes on the next derive pass. "What space is here" lookups
+use `effectiveOwnerAt`; "can I put a seed here" stays `Grid.canPlace`.
+
+**Visual legibility:** claimed cells render as part of their room (same
+colour, same shell — walls AND floor slab rebuild on the effective shape).
+The "Seeds" toggle (view-controls, beside Cutaway; pure view state, never
+serialized) outlines each elastic room's transformed seed rectangle with a
+thin dark line (`Floor.seedOutlines`, rebuilt with the wall pass).
+
+**Parked decisions (v1 — recorded, deliberately NOT implemented pending a
+design review of real results):** shape constraints and growth limits (free
+shape, no cap); "leftover gap becomes circulation" (an unclaimable gap stays
+empty); furniture spreading into claimed cells; door-aware prop placement.
+
 ## 3. Key data structures / formats (written out)
 
 ### Cell (`grid.ts`)
@@ -1368,10 +1437,9 @@ serializes and is undoable.)
 save made under the old L-presets loads with the CURRENT rectangular footprints
 — which can collide where the old L-notches let rooms interlock, or run out of
 bounds. `FloorManager.loadProject` returns `{ skipped }` (instances the normal
-`store.place` path refused); the import UI surfaces it as a warn toast ("N
-room(s) could not be placed — preset footprints changed") — tolerant drop,
-never silent, never auto-repositioned. Undo/redo snapshots are same-session and
-can never skip.
+`store.place` path refused); the import UI surfaces it as a cause-neutral warn
+toast ("N room(s) could not be placed.") — tolerant drop, never silent, never
+auto-repositioned. Undo/redo snapshots are same-session and can never skip.
 
 ### Voxel prop JSON format (`voxelProp.ts`, `data/*.json`)
 ```jsonc

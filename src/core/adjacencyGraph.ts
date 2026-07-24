@@ -156,7 +156,13 @@ function buildFloorNodes(
       continue;
     }
     if (def.category !== "room") continue; // furniture modules excluded
-    const cells = occupiedCells(def, inst.origin, inst.rotation, inst.mirrored);
+    // EFFECTIVE footprint (core/expansion.ts): an elastic room's node carries
+    // its grown cells, so adjacency, reachability, depth, entrance hosting,
+    // D1/D2 exterior-ness, and the diagram all see the derived shape. Fixed
+    // instances pass through; absent id → seed fallback.
+    const cells =
+      floor.effectiveCells.get(inst.id) ??
+      occupiedCells(def, inst.origin, inst.rotation, inst.mirrored);
     if (def.cluster) {
       let entry = connectors.get(def.cluster);
       if (!entry) {

@@ -191,7 +191,13 @@ export function buildSpaceTargets(floor: Floor, floorBelow?: Floor | null): Map<
   for (const inst of floor.store.instances.values()) {
     const def = inst.def;
     if (def.category === "module") continue; // furniture is not a space
-    const cells = occupiedCells(def, inst.origin, inst.rotation, inst.mirrored);
+    // EFFECTIVE footprint (expansion.ts): an elastic room's space includes its
+    // claimed cells, so doors/windows/graph/entrances all see the grown shape.
+    // Fixed instances pass through as their seed; absent id → seed fallback
+    // (mid-construction, before the first derive pass).
+    const cells =
+      floor.effectiveCells.get(inst.id) ??
+      occupiedCells(def, inst.origin, inst.rotation, inst.mirrored);
     if (def.cluster) {
       const arr = clusterCells.get(def.cluster) ?? [];
       arr.push(...cells);

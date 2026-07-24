@@ -171,7 +171,11 @@ function buildStorey(
   const glazedKeys = new Set<string>();
   for (const inst of floor.store.instances.values()) {
     if (inst.def.category !== "room" || inst.def.cluster) continue;
-    const roomCells = occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored);
+    // EFFECTIVE footprint (expansion.ts) — the same cells the wall pass
+    // windows, so the exported glazed edges match the grown room exactly.
+    const roomCells =
+      floor.effectiveCells.get(inst.id) ??
+      occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored);
     const plan = computeWindows(roomCells, inst.def.type, height, occupied, windowSkip, fm.northAngle);
     for (const key of plan.edges.keys()) glazedKeys.add(key);
   }

@@ -412,6 +412,7 @@ function buildRoomShell(
   const floorMesh = new THREE.Mesh(mergeGeometries(floorGeos, false), material);
   floorMesh.castShadow = true;
   floorMesh.receiveShadow = true;
+  floorMesh.userData.isSlab = true; // so the elastic rebuild can replace it
   group.add(floorMesh);
 
   for (const wall of buildBoundaryWalls(
@@ -441,6 +442,12 @@ function buildRoomShell(
  * matching the mirrored+rotated local cells the walls are built from) → variant.
  * Omit for a plain (windowless) rebuild. `doors` is the LOCAL edge-key set of
  * interior openings to cut in this room's walls (same local-key convention).
+ *
+ * `cellsOverride` (elastic rooms, core/expansion.ts): build walls on these
+ * LOCAL cells (absolute effective − origin) instead of the def's transformed
+ * seed footprint, and rebuild the FLOOR SLAB to match (the slab normally never
+ * changes after placement; a grown/receded effective footprint moves it).
+ * Props are untouched either way — furniture stays inside the seed (v1).
  */
 export function rebuildRoomWalls(
   group: THREE.Group,
@@ -449,7 +456,8 @@ export function rebuildRoomWalls(
   wallHeight: number,
   windows?: Map<string, WindowVariant>,
   mirrored = false,
-  doors?: Set<string>
+  doors?: Set<string>,
+  cellsOverride?: Cell[]
 ): void {
   const material = group.userData.material as THREE.Material;
   let glassMaterial = group.userData.glassMaterial as THREE.Material | undefined;
@@ -464,7 +472,24 @@ export function rebuildRoomWalls(
     disposeWallMesh(child as THREE.Mesh);
   }
   const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x1a1a1a });
-  const cells = rotatedCells(def, rotation, mirrored);
+  const cells = cellsOverride ?? rotatedCells(def, rotation, mirrored);
+  if (cellsOverride) {
+    for (const child of [...group.children]) {
+      if (!child.userData.isSlab) continue;
+      group.remove(child);
+      (child as THREE.Mesh).geometry.dispose();
+    }
+    const floorGeos = cells.map((c) => {
+      const g = new THREE.BoxGeometry(CELL_SIZE, FLOOR_H, CELL_SIZE);
+      g.translate(c.cx * CELL_SIZE, FLOOR_H / 2, c.cz * CELL_SIZE);
+      return g;
+    });
+    const floorMesh = new THREE.Mesh(mergeGeometries(floorGeos, false), material);
+    floorMesh.castShadow = true;
+    floorMesh.receiveShadow = true;
+    floorMesh.userData.isSlab = true;
+    group.add(floorMesh);
+  }
   for (const wall of buildBoundaryWalls(
     cells,
     (cx) => cx * CELL_SIZE,

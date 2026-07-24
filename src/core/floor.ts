@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Grid, type Cell } from "./grid";
+import { Grid, cellKey, CELL_SIZE, type Cell } from "./grid";
 import { ModuleStore } from "./store";
 import { GridView } from "../scene/gridView";
 import { HoleView } from "../scene/holeView";
@@ -52,6 +52,20 @@ export class Floor {
    *  serialized (windows are derived). */
   readonly windowStats = new Map<string, GlazingStat>();
 
+  /** DERIVED effective footprints (core/expansion.ts): every non-furniture
+   *  instance id → its effective ABSOLUTE cells (elastic = seed + claimed;
+   *  fixed = seed). Recomputed by the FloorManager on every layout change;
+   *  never serialized. Consumers fall back to the raw seed footprint when an
+   *  id is absent (e.g. mid-construction, before the first derive pass). */
+  readonly effectiveCells = new Map<string, Cell[]>();
+  private effectiveOwner = new Map<string, string>();
+  /** Current dim state (see {@link setDimmed}) — rebuilt seed outlines read it. */
+  private dimmed = false;
+
+  /** Thin seed-rectangle outlines for elastic rooms ("Show seeds" view toggle
+   *  — pure view state, never serialized). Rebuilt with the wall pass. */
+  readonly seedOutlines = new THREE.Group();
+
   constructor(readonly id: number, cols: number, rows: number) {
     this.grid = new Grid(cols, rows);
     this.store = new ModuleStore(this.group, this.grid);
@@ -60,6 +74,68 @@ export class Floor {
     this.entranceView = new EntranceView(this.group, this.grid);
     this.doorView = new DoorView(this.group, this.grid);
     this.group.add(this.clusterGroup);
+    this.seedOutlines.visible = false;
+    this.group.add(this.seedOutlines);
+  }
+
+  /** Replace the derived effective footprints (see {@link effectiveCells}).
+   *  Also rebuilds the cell→owner index behind {@link effectiveOwnerAt}. */
+  setEffective(map: Map<string, Cell[]>): void {
+    this.effectiveCells.clear();
+    this.effectiveOwner.clear();
+    for (const [id, cells] of map) {
+      this.effectiveCells.set(id, cells);
+      for (const c of cells) this.effectiveOwner.set(cellKey(c.cx, c.cz), id);
+    }
+  }
+
+  /** The instance owning (cx,cz) under the EFFECTIVE occupancy — a claimed
+   *  cell resolves to its elastic room. Falls back to raw grid occupancy
+   *  (covers furniture, and mid-construction states before the first derive
+   *  pass). This is the "what space is here" lookup; PLACEMENT collision
+   *  deliberately keeps reading the raw grid (seeds are hard, claims are
+   *  soft — the two-tier contract). */
+  effectiveOwnerAt(cx: number, cz: number): string | undefined {
+    return this.effectiveOwner.get(cellKey(cx, cz)) ?? this.grid.ownerAt(cx, cz);
+  }
+
+  /** Rebuild the seed outlines: one thin rectangle per elastic instance's
+   *  TRANSFORMED seed footprint (always a rectangle — presets are rects).
+   *  Fresh materials re-apply the floor's current dim state (outlines rebuild
+   *  on every wall pass — without this they'd pop back to full colour on a
+   *  dimmed floor). */
+  rebuildSeedOutlines(rects: { min: Cell; max: Cell }[]): void {
+    for (const child of [...this.seedOutlines.children]) {
+      this.seedOutlines.remove(child);
+      (child as THREE.Line).geometry?.dispose();
+      ((child as THREE.Line).material as THREE.Material)?.dispose();
+    }
+    const H = CELL_SIZE / 2;
+    // Clear of the walls: WALL_T = 0.1 boxes start AT the cell boundary, so an
+    // un-grown side's outline must sit past the wall's INNER face or it is
+    // depth-buried inside the opaque wall (invisible / cutaway-popping).
+    const INSET = 0.14;
+    const y = 0.15 + 0.03; // slab top + a hair
+    for (const r of rects) {
+      const a = this.grid.gridToWorld(r.min.cx, r.min.cz);
+      const b = this.grid.gridToWorld(r.max.cx, r.max.cz);
+      const x0 = a.x - H + INSET, z0 = a.z - H + INSET;
+      const x1 = b.x + H - INSET, z1 = b.z + H - INSET;
+      const mat = new THREE.LineBasicMaterial({ color: EDGE_COLOR });
+      mat.userData.baseColor = EDGE_COLOR;
+      const line = new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x0, y, z0),
+          new THREE.Vector3(x1, y, z0),
+          new THREE.Vector3(x1, y, z1),
+          new THREE.Vector3(x0, y, z1),
+        ]),
+        mat
+      );
+      line.raycast = () => {};
+      this.seedOutlines.add(line);
+    }
+    fade(this.seedOutlines, this.dimmed, EDGE_COLOR);
   }
 
   /**
@@ -187,11 +263,13 @@ export class Floor {
    * only ever lives on the active floor) is left alone.
    */
   setDimmed(dimmed: boolean): void {
+    this.dimmed = dimmed; // remembered so rebuilt seed outlines re-apply it
     // Per-instance rooms/modules: fall back to the room colour.
     for (const inst of this.store.instances.values())
       fade(inst.group, dimmed, inst.def.color);
     // Merged connector-cluster walls: their materials carry their own baseColor.
     fade(this.clusterGroup, dimmed, EDGE_COLOR);
+    fade(this.seedOutlines, dimmed, EDGE_COLOR);
     this.gridView.setDimmed(dimmed);
     this.holeView.setDimmed(dimmed);
     this.entranceView.setDimmed(dimmed);
