@@ -83,7 +83,7 @@ export function rebuildClusterShells(
         undefined, // clusters never get windows
         undefined,
         doors,
-        key === "outdoor" ? outdoorWallOpts(floor, component) : undefined
+        clusterWallOpts(floor, component, key)
       )) {
         wall.userData.clusterNodeId = nodeId;
         group.add(wall);
@@ -93,16 +93,25 @@ export function rebuildClusterShells(
 }
 
 /**
- * Per-edge treatment for an OUTDOOR cluster component (visual batch, §2n):
- *  - an edge facing open space (nothing occupies the neighbour cell) becomes a
- *    900 mm RAILING instead of a full wall — a balcony reads as a balcony;
- *  - an edge facing a ROOM is DISSOLVED (no cluster-side segment), matching the
- *    room side's own dissolve so the room opens onto its terrace.
- * Anything else (circulation, another cluster, a stair, furniture) keeps a
- * full-height wall. Uses EFFECTIVE occupancy, so a grown elastic room dissolves
- * exactly like a seed-sized one.
+ * Per-edge treatment for a connector cluster component (visual batch, §2n).
+ *
+ * OUTDOOR (balcony / terrace):
+ *  - facing open space (nothing occupies the neighbour) → a 900 mm RAILING
+ *    instead of a full wall — a balcony reads as a balcony;
+ *  - facing a ROOM or a CIRCULATION cluster → DISSOLVED (no cluster-side
+ *    segment), matching the other side's own dissolve.
+ *
+ * CIRCULATION (corridor):
+ *  - facing a ROOM, a STAIR, or an Outdoor cluster → DISSOLVED — the corridor
+ *    flows into what it touches;
+ *  - facing open space → a FULL-height wall stays (deliberately NO railing: a
+ *    free-standing corridor edge is a solid wall exactly as before).
+ *
+ * Anything else (furniture) keeps a full wall. Uses EFFECTIVE occupancy, so a
+ * grown elastic room dissolves exactly like a seed-sized one.
  */
-function outdoorWallOpts(floor: Floor, component: Cell[]): BoundaryWallOpts {
+function clusterWallOpts(floor: Floor, component: Cell[], key: string): BoundaryWallOpts {
+  const outdoor = key === "outdoor";
   const skip = new Set<string>();
   const rails = new Set<string>();
   for (const c of component) {
@@ -110,12 +119,17 @@ function outdoorWallOpts(floor: Floor, component: Cell[]): BoundaryWallOpts {
       const [dx, dz] = SIDE_DELTA[side];
       const ownerId = floor.effectiveOwnerAt(c.cx + dx, c.cz + dz);
       if (!ownerId) {
-        rails.add(edgeKey(c.cx, c.cz, side)); // open air → railing
+        // Open air: a balcony guards it with a railing, a corridor walls it.
+        if (outdoor) rails.add(edgeKey(c.cx, c.cz, side));
         continue;
       }
-      const inst = floor.store.instances.get(ownerId);
-      if (inst && inst.def.category === "room" && !inst.def.cluster)
-        skip.add(edgeKey(c.cx, c.cz, side)); // room boundary → dissolved
+      const def = floor.store.instances.get(ownerId)?.def;
+      if (!def) continue;
+      const isRoom = def.category === "room" && !def.cluster;
+      const dissolves = outdoor
+        ? isRoom || def.cluster === "circulation"
+        : isRoom || def.category === "stair" || def.cluster === "outdoor";
+      if (dissolves) skip.add(edgeKey(c.cx, c.cz, side));
     }
   }
   return { skip, rails, railHeight: RAILING_H };
