@@ -42,7 +42,7 @@ work-in-progress research artifact, not a production app.
 | **North / orientation** (compass convention + bearings) | `src/core/orientation.ts` | THE one place the north concept lives: convention (north = world −Z rotated CW-from-above by `northAngle`), `normalBearing`/`sideBearing` (normal→compass bearing), `bearingSector` (8-wind), `southDistance` (south-bias score), `isNorthLit`/`NORTH_SECTOR_HALF_WIDTH` (OR1), `worldNorthDir` (arrow projection). Pure, no Three.js. See §2k. |
 | **Compass dial** (north-setting control) | `src/ui/compassDial.ts` | `createCompassDial({onInput,onCommit})` — draggable SVG dial (top-down frame, N-marked needle); `onInput` live during drag, `onCommit` on release (commit-on-release). `setAngle` syncs display after load/undo. See §2k. |
 | **Stair geometry** (180° dogleg, two floors) | `src/scene/stairMesh.ts` | `buildStairGroup(def, rotation, ghost, mirrored)`. See §2a; mirroring negates the lane x-centres only (winding-safe, §2g). |
-| Dynamic dollhouse **cutaway** | `src/scene/cutaway.ts` | `updateCutaway()` hides wall meshes whose `userData.wallNormal · viewDir > THRESHOLD (0.12)`; throttled (recompute on camera move or `markCutawayDirty()`). `setCutawayEnabled(on)` toggles the whole pass — OFF shows every wall (solid exterior; the "Cutaway" view control, §2k). Unaffected by the §2b wall-height mechanism (walls are rebuilt, not scaled — `wallNormal` tags are untouched either way) or the top view (a straight-down `viewDir` dots to ~0 against every wall normal, which are always in the XZ plane — every wall stays visible, reading correctly as a plan). |
+| Dynamic dollhouse **cutaway** | `src/scene/cutaway.ts` | Skips meshes tagged `userData.structureHidden` (the Structure x-ray outranks it, §2n) and never sees railings (they carry no `wallNormal`). `updateCutaway()` hides wall meshes whose `userData.wallNormal · viewDir > THRESHOLD (0.12)`; throttled (recompute on camera move or `markCutawayDirty()`). `setCutawayEnabled(on)` toggles the whole pass — OFF shows every wall (solid exterior; the "Cutaway" view control, §2k). Unaffected by the §2b wall-height mechanism (walls are rebuilt, not scaled — `wallNormal` tags are untouched either way) or the top view (a straight-down `viewDir` dots to ~0 against every wall normal, which are always in the XZ plane — every wall stays visible, reading correctly as a plan). |
 | **Multi-floor** support, stacking, **wall/stair height reconciliation**, **window generation**, **floor visibility**, **zoom-to-extent box** | `src/core/floor.ts`, `src/core/floorManager.ts` | See §2b (height), §2d (windows), §5 (visibility/framing). `Floor` = own grid + `ModuleStore` + `GridView` + `HoleView` + `EntranceView` + `entrances[]` + `windowStats` + `clusterGroup`, all under one `group`. `FloorManager`: stack, active floor, vertical stacking offsets, dim inactive floors, stairwell holes, `rebuildAllShells()` (all floors' room walls + windows + DOOR OPENINGS + merged cluster shells), `pruneStaleDoors()` (auto-remove doors a mutation stranded, inside the same undo snapshot), `doorTargets()`/`isDoorValid()` (door placement/validity), floor visibility, content bounding box. `DEFAULT_FLOOR_CELLS = 4`, `CLEARANCE_CELLS = 1`. |
 | Grid dots / floor visual | `src/scene/gridView.ts` | Intersection dots + border; `setDimmed`. |
 | Stairwell **hole** rendering | `src/scene/holeView.ts` | `HoleView`: recessed dark panel + outline per stairwell opening (merged per connected component). Purely visual; occupancy blocking is `Grid.holeCells`. |
@@ -1243,6 +1243,69 @@ thin dark line (`Floor.seedOutlines`, rebuilt with the wall pass).
 design review of real results):** shape constraints and growth limits (free
 shape, no cap); "leftover gap becomes circulation" (an unclaimable gap stays
 empty); furniture spreading into claimed cells; door-aware prop placement.
+
+### 2n. Visual batch — structure x-ray, railings, dissolved connector walls
+
+Four VISUAL-ONLY features (A1–A4). No rule, graph, door, entrance, export or
+serialization behaviour changed — proven, not assumed: the rules report,
+depths, graph nodes/edges, window stats, door validity, the bridge-export file
+and the project JSON are **byte-identical** before and after the batch on the
+same fixture (3997 B both, captured by running the same script against the
+pre-batch tree via `git stash`).
+
+**A1 — "Structure" x-ray toggle** (`#structure-toggle`, beside Cutaway/Seeds;
+view state, never serialized). Hides the wall AND glazing meshes of ELASTIC
+rooms (`isElastic`), keeping their floor slabs, props, selection and picking —
+so the serviced/structural core (bathrooms, kitchen, circulation, stairs,
+entrances, doors) reads on its own with the soft rooms as open floor. Clicking
+a hidden room's slab still selects it. Hidden meshes carry
+`userData.structureHidden`, which `cutaway.ts` honours in BOTH branches —
+hidden is hidden, the cutaway simply has less to hide — and
+`FloorManager.applyStructureView()` re-runs at the end of every
+`rebuildAllShells`, so a rebuild while toggled can't resurrect a wall.
+
+**A2 — Outdoor railings.** An Outdoor cluster's EXTERIOR edges (nothing
+occupies the neighbour cell) build at `RAILING_H` = `SILL_H` = 900 mm instead
+of full height — same thickness, same material, same boundary pass. Rail
+geometry merges into its own meshes carrying **no `wallNormal`**, and the
+cutaway only ever flips `wallNormal`-tagged meshes, so railings are never
+hidden: a balcony reads as a balcony from every angle while the full walls
+behind it cut away normally. Circulation clusters get NO railings — a
+free-standing corridor edge stays a solid full-height wall.
+
+**A3/A4 — connector walls dissolve where they touch (ONE-SIDED).** A cluster
+drops its own boundary segment where it faces something it should read as open
+to; **the room ALWAYS keeps all of its own walls**. So the former doubled
+back-to-back wall (room 0.1 + cluster 0.1) becomes the room's single wall face,
+and the connector reads as borrowing it rather than adding its own.
+- Outdoor dissolves against rooms and circulation.
+- Circulation dissolves against rooms, stairs and outdoor; against open air it
+  keeps a full wall.
+- The stair side needs nothing — a stair renders stepped geometry and never had
+  a shell wall.
+Per-edge, not per-run: a run half against a room and half free dissolves only
+the touching cells. Elastic rooms are matched on their EFFECTIVE footprint.
+
+**Corner ownership, generalised** (`buildBoundaryWalls`, serves A2+A3+A4): the
+TALLER of two perpendicular segments owns the corner square; the shorter is
+trimmed. Equal heights reproduce the original convention exactly (N/S owns, E/W
+trimmed), so ordinary walls are bit-identical. A dissolved edge has height 0 and
+owns nothing, so its partner runs full length across the corner (no notch,
+nothing to overlap ⇒ no z-fighting); a 900 mm rail meeting a full wall gives the
+corner up (trimming the tall wall instead would leave an open notch above the
+rail). Implemented via one `BoundaryWallOpts` arg (`skip`, `rails`,
+`railHeight`).
+
+Windows are unaffected by construction (connector-facing edges are interior, so
+none is ever generated there). A door authored on a dissolved boundary stays
+valid, its marker renders, and the door-cut logic tolerates the missing segment.
+
+**VISUAL AHEAD OF SEMANTICS — recorded deliberately.** A3/A4 are a look decided
+before the meaning. The graph still emits no ACCESS edge without a door, D1
+still ignores outdoor adjacency, and the bridge export still classifies these
+edges by the existing rules. The tool therefore shows an opening that the rules
+treat as sealed. The planned **semi-exterior / access design pass** will
+reconcile the two; until then, do not read a dissolved wall as reachability.
 
 ## 3. Key data structures / formats (written out)
 
