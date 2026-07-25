@@ -30,6 +30,7 @@ bottom-up-design (`bridgeImport.ts`). The JSON file is the *entire* interface
   "storeys": [                     // index 0 = entry storey (Re_Configure floor 0)
     {
       "cells": [[x, z], …],        // occupied cells, normalized (see Normalization)
+      "cellKinds": ["room"|"outdoor"|"circulation"|"stair", …],  // OPTIONAL, see below
       "edges": [                   // EVERY exterior boundary edge of this storey, classified
         { "cell": [x, z], "side": "N|S|E|W", "class": "entrance|glazed|open|blank" }
       ],
@@ -195,6 +196,27 @@ identical to a normal Save at export time). The importer carries it — and
 `northAngle` — attached to the unit as **opaque provenance**; it must not
 parse or interpret it. It exists for the future click-through back into the
 flat editor (see the click-through rule under Orientation).
+
+## `cellKinds` — what each cell IS (optional, additive)
+
+`cellKinds` is a parallel array to `cells`, **index for index**: the kind of
+each occupied cell — `"room"`, `"outdoor"` (balcony/terrace), `"circulation"`,
+or `"stair"` (including the void over a stair on the floor below). It exists so
+the building can show a balcony as a **recess** rather than solid mass.
+
+**The field is OPTIONAL and the format stays at `"version": 1`.** An importer
+that never heard of `cellKinds` reads exactly the same `cells`, `edges` and
+`height` it read before and produces byte-identical results — absent means
+"treat every cell as `room`", which *is* the pre-existing behaviour. Bumping the
+version would force the collaborator to touch a working importer to gain
+nothing, so the additive field is the kinder call.
+
+Anything that reorders `cells` MUST reorder `cellKinds` with it (the exporter's
+one normalization translation does not, since it only shifts coordinates).
+
+Semi-exterior edges — a room's boundary onto a balcony, rendered as a french
+window in Re_Configure — are INTERIOR to the unit and never appear in `edges`.
+A balcony's own outward edges still export as `open`, exactly as before.
 
 ## Versioning
 

@@ -39,8 +39,17 @@ export interface UnitEdge {
   class: UnitEdgeClass;
 }
 
+/** What a cell IS, so the building can show a balcony as a recess instead of
+ *  solid mass. Parallel to {@link UnitStorey.cells}, index for index. */
+export type UnitCellKind = "room" | "outdoor" | "circulation" | "stair";
+
 export interface UnitStorey {
   cells: [number, number][];
+  /** OPTIONAL, purely ADDITIVE (see docs/bridge-format.md): one kind per cell,
+   *  same order as `cells`. A reader that ignores it — every v1 importer
+   *  written before this field existed — behaves exactly as before, which is
+   *  why the format stays at version 1. Absent ⇒ treat every cell as "room". */
+  cellKinds?: UnitCellKind[];
   edges: UnitEdge[];
   /** This storey's floor-to-floor height, meters. */
   height: number;
@@ -124,6 +133,8 @@ export function buildUnitExport(
       if (z < minZ) minZ = z;
     }
   for (const s of storeys) {
+    // `cellKinds` is index-parallel to `cells`, so translating cells in place
+    // keeps them aligned — do NOT reorder one without the other.
     s.cells = s.cells.map(([x, z]) => [x - minX, z - minZ]);
     s.edges = s.edges.map((e) => ({ ...e, cell: [e.cell[0] - minX, e.cell[1] - minZ] }));
   }
@@ -156,6 +167,17 @@ function buildStorey(
   const cells: Cell[] = [...targets.keys()].map((k) => {
     const [cx, cz] = k.split(",").map(Number);
     return { cx, cz };
+  });
+  // Per-cell kind, index-parallel to `cells`. A stairwell-hole projection from
+  // the floor below is the void over a stair, so it reads as "stair" too.
+  const cellKinds: UnitCellKind[] = cells.map((c) => {
+    const owner = floor.effectiveOwnerAt(c.cx, c.cz);
+    const def = owner ? floor.store.instances.get(owner)?.def : undefined;
+    if (!def) return "stair"; // only a below-floor stair projection resolves to no local instance
+    if (def.cluster === "outdoor") return "outdoor";
+    if (def.cluster === "circulation") return "circulation";
+    if (def.category === "stair") return "stair";
+    return "room";
   });
   const height = fm.floorHeightOf(floor);
 
@@ -200,5 +222,5 @@ function buildStorey(
     return { cell: [e.cx, e.cz], side: SIDE_LETTER[e.side], class: cls };
   });
 
-  return { cells: cells.map((c) => [c.cx, c.cz]), edges, height };
+  return { cells: cells.map((c) => [c.cx, c.cz]), cellKinds, edges, height };
 }
