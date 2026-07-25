@@ -45,10 +45,18 @@ export interface GraphNode {
   cells: Cell[];
   /** True when a NON-BLOCKED entrance attaches here (a reachability root). */
   isEntry?: boolean;
-  /** True when at least one boundary edge of this footprint faces outside
-   *  (per the shared {@link exteriorEdges} utility) — daylight rules (D1/D2)
-   *  consume this rather than recomputing exterior edges themselves. */
+  /** True when this footprint has daylight: at least one TRUE exterior edge
+   *  (per the shared {@link exteriorEdges} utility) OR at least one GLAZED
+   *  SEMI-EXTERIOR edge — a french window onto a qualifying balcony, which is
+   *  real daylight and real access (core/semiExterior.ts). The daylight rules
+   *  (D1/D2) and W1's gate consume this rather than recomputing anything. */
   hasExteriorEdge: boolean;
+  /** The two halves of {@link hasExteriorEdge}, kept apart on purpose: most
+   *  consumers treat them alike, but the bridge export classifies TRUE
+   *  exterior edges only, and a future daylight-discount rule (balcony depth)
+   *  will want to know which is which. */
+  hasTrueExteriorEdge: boolean;
+  hasSemiExteriorEdge: boolean;
   /** Achieved-vs-target glazing for this room (rooms only), from the derived
    *  window generator (`floor.windowStats`) — the W1 rule consumes this rather
    *  than recomputing windows. Undefined for clusters/stairs and rooms whose
@@ -64,15 +72,22 @@ export interface GraphEdge {
    *  - `viaDoor: false` — a TOUCH edge: the two footprints share a wall
    *    (physical adjacency). Consumed only by the proximity rules (H4/S3/S4/S5),
    *    which are about being next to each other, not about access.
-   *  - `viaDoor: true` — an ACCESS edge: an authored door connects the two
-   *    spaces. ALL reachability-family rules (H1/H2/H3/H6/G1/ST2/C1/C2/DP1,
-   *    entrance-rooted) traverse ONLY these — physical touch without a door is
+   *  - `viaDoor: true` — an ACCESS edge: the two spaces are connected. ALL
+   *    reachability-family rules (H1/H2/H3/H6/G1/ST2/C1/C2/DP1,
+   *    entrance-rooted) traverse ONLY these — physical touch without access is
    *    not a connection. Stair links (bottom and top) are access edges too,
    *    formed only where a door faces the stair footprint / hole projection.
+   *    Since the semi-exterior pass an ACCESS edge is not necessarily an
+   *    AUTHORED DOOR: a french window is one too (see {@link viaFrench}).
    */
   viaDoor: boolean;
   /** A cross-floor link made by a stair (vs. a normal same-floor wall touch). */
   viaStair?: boolean;
+  /** An ACCESS edge conferred by a FRENCH WINDOW on a room↔balcony boundary,
+   *  with no authored door — the glass IS the door (core/semiExterior.ts).
+   *  Outdoor clusters are LEAVES for routing, so no interior path ever passes
+   *  THROUGH one (see rules.ts `reachableFrom` / `accessDepths`). */
+  viaFrench?: boolean;
 }
 
 /**
@@ -152,6 +167,8 @@ function buildFloorNodes(
         kind: "stair",
         cells: occupiedCells(def, inst.origin, inst.rotation, inst.mirrored),
         hasExteriorEdge: false, // filled in below, once the floor's occupied set exists
+        hasTrueExteriorEdge: false,
+        hasSemiExteriorEdge: false,
       });
       continue;
     }
@@ -181,6 +198,8 @@ function buildFloorNodes(
         kind: "room",
         cells,
         hasExteriorEdge: false,
+        hasTrueExteriorEdge: false,
+        hasSemiExteriorEdge: false,
         glazing: floor.windowStats.get(inst.id), // derived by the wall/window pass
       });
     }
@@ -199,6 +218,8 @@ function buildFloorNodes(
         kind: "cluster",
         cells: component,
         hasExteriorEdge: false,
+        hasTrueExteriorEdge: false,
+        hasSemiExteriorEdge: false,
       });
     }
   }
@@ -216,7 +237,15 @@ function buildFloorNodes(
   // D1 pass a windowless room and W1 count void-facing edges. (Same-floor
   // stairs were already covered — they're real occupants; the hole is the gap.)
   const occupied = new Set(buildSpaceTargets(floor, floorBelow).keys());
-  for (const node of nodes) node.hasExteriorEdge = exteriorEdges(node.cells, occupied).length > 0;
+  for (const node of nodes) {
+    node.hasTrueExteriorEdge = exteriorEdges(node.cells, occupied).length > 0;
+    // A GLAZED semi-exterior edge (french window onto a qualifying balcony) is
+    // real daylight, so it satisfies D1/D2 and opens W1's gate exactly like a
+    // true exterior edge. The solid returns at a run's ends confer nothing —
+    // `glazedByRoom` holds only the glazed cells (core/semiExterior.ts).
+    node.hasSemiExteriorEdge = (floor.semiExterior?.glazedByRoom.get(node.rawId)?.size ?? 0) > 0;
+    node.hasExteriorEdge = node.hasTrueExteriorEdge || node.hasSemiExteriorEdge;
+  }
 
   return { nodes, owner };
 }
@@ -326,6 +355,25 @@ export function computeDwellingGraph(floors: Floor[]): DwellingGraph {
       if (accessSeen.has(k)) continue;
       accessSeen.add(k);
       edges.push({ a: na.id, b: nb.id, viaDoor: true, viaStair: na.below || nb.below });
+    }
+  });
+
+  // 4) SEMI-EXTERIOR ACCESS edges (`viaDoor: true, viaFrench: true`): a room
+  // and a qualifying Outdoor cluster that share a run carrying a FRENCH WINDOW
+  // are connected — the glass is the door, so no authored door is needed. No
+  // window means no access: a 1-cell contact leaves the balcony unreachable
+  // (0.6 m of wall is not a way through), which is exactly when OD1 fires.
+  // Deliberately NOT generalised: room↔circulation and room↔room boundaries
+  // still require an authored door.
+  floors.forEach((floor, fi) => {
+    for (const { roomId, clusterToken } of floor.semiExterior?.access ?? []) {
+      const a = dwellingNodeId(fi, roomId);
+      const b = dwellingNodeId(fi, clusterToken);
+      if (a === b || !nodeIdSet.has(a) || !nodeIdSet.has(b)) continue;
+      const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+      if (accessSeen.has(k)) continue; // an authored door here already counts
+      accessSeen.add(k);
+      edges.push({ a, b, viaDoor: true, viaFrench: true });
     }
   });
 

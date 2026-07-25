@@ -73,8 +73,12 @@ All 36 rules in `src/core/rules.ts`. For each: why it's there, and how it's comp
 **Code:** `narrowWidthCells()` helper — per circulation cluster, a cell is narrow if none of the four 2×2 cell-blocks containing it is fully inside the same cluster. Reports the narrow-cell count per cluster.
 
 ### O1 — soft
-**Why:** An outdoor space with no door onto it (balcony, terrace) is unusable. Mirrors C1.
-**Code:** Outdoor cluster nodes with degree `=== 0`.
+**Why:** An outdoor space nothing opens onto (balcony, terrace) is unusable. Mirrors C1. Since the semi-exterior pass, "connected" no longer means "doored" — a french window counts. Gated to the pre-entrance case: once there is an entrance, OD1 owns the same node.
+**Code:** `!ctx.hasEntrance`, then outdoor cluster nodes with degree `=== 0`.
+
+### OD1 — hard
+**Why:** A balcony you cannot get to is floor area the dwelling cannot use. With french-window access this fires only when the balcony touches no room along a run wide enough to glaze (a 1-cell contact is 0.6 m of wall, not a way through), or when the only rooms it touches are themselves unreachable from the entrance.
+**Code:** Outdoor cluster nodes absent from `ctx.reachableFrom(ctx.entryIds)`. Outdoor clusters are routing *leaves* — reachable, never a through-route.
 
 ### ST1 — soft
 **Why:** A stair should have a door at both the floor it leaves and the floor it arrives at.

@@ -195,7 +195,15 @@ const doorController = new DoorController(
     if (planMode) floors.setDoorArcsVisible(true); // show its arc if we're in plan view
     clearValidation();
     commitHistory(); // door placement is an undoable action (swing included)
-  }
+  },
+  // A room↔balcony boundary is already a french window — the glass IS the
+  // door — so a second one there is meaningless. Existing doors are untouched
+  // (isDoorValid is deliberately unchanged); only NEW authoring is blocked.
+  (door) =>
+    floors.isSemiExteriorDoor(floors.active, door)
+      ? { ok: false, hint: "That boundary is already a french window onto the balcony." }
+      : { ok: true },
+  (msg) => showToast("info", msg)
 );
 
 // Exactly one placement mode may be armed at a time. Every entry point (palette

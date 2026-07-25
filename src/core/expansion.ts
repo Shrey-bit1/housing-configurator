@@ -1,4 +1,4 @@
-import { cellKey, type Cell } from "./grid";
+import { cellKey, type Cell, type Grid } from "./grid";
 import { occupiedCells, isElastic } from "./modules";
 import type { Floor } from "./floor";
 
@@ -63,27 +63,7 @@ export function computeExpansion(floor: Floor): Map<string, Cell[]> {
 
   // Outside mask: empty cells reachable from the grid border through empty
   // cells. Whatever they can reach is "the outside world" and never fills.
-  const outside = new Set<string>();
-  const stack: Cell[] = [];
-  const seedOutside = (cx: number, cz: number) => {
-    if (!empty(cx, cz)) return;
-    const k = cellKey(cx, cz);
-    if (outside.has(k)) return;
-    outside.add(k);
-    stack.push({ cx, cz });
-  };
-  for (let cx = 0; cx < grid.cols; cx++) {
-    seedOutside(cx, 0);
-    seedOutside(cx, grid.rows - 1);
-  }
-  for (let cz = 0; cz < grid.rows; cz++) {
-    seedOutside(0, cz);
-    seedOutside(grid.cols - 1, cz);
-  }
-  while (stack.length) {
-    const c = stack.pop()!;
-    for (const [dx, dz] of N4) seedOutside(c.cx + dx, c.cz + dz);
-  }
+  const outside = borderReachableEmpty(grid, empty);
 
   const isGap = (cx: number, cz: number) => empty(cx, cz) && !outside.has(cellKey(cx, cz));
 
@@ -128,6 +108,46 @@ const N4: [number, number][] = [
   [0, 1],
   [0, -1],
 ];
+
+/**
+ * Cells that are EMPTY (per the caller's `isEmpty` predicate) and reachable
+ * from the grid border through other empty cells — "the outside world".
+ * Anything empty but NOT in this set is an enclosed pocket: no sky, no way out.
+ *
+ * THE one border flood fill in the codebase. `computeExpansion` uses it with
+ * "empty = nothing placed and no stairwell hole" to find fillable gaps;
+ * `semiExterior.ts` uses it with the RULES' notion of occupancy (spaces only —
+ * furniture is transparent, a 0.6 m cube doesn't take a balcony's sky) to
+ * decide which Outdoor clusters actually reach the outside. Same fill, caller's
+ * predicate — never write a second one.
+ */
+export function borderReachableEmpty(
+  grid: Grid,
+  isEmpty: (cx: number, cz: number) => boolean
+): Set<string> {
+  const outside = new Set<string>();
+  const stack: Cell[] = [];
+  const seed = (cx: number, cz: number) => {
+    if (!grid.inBounds(cx, cz) || !isEmpty(cx, cz)) return;
+    const k = cellKey(cx, cz);
+    if (outside.has(k)) return;
+    outside.add(k);
+    stack.push({ cx, cz });
+  };
+  for (let cx = 0; cx < grid.cols; cx++) {
+    seed(cx, 0);
+    seed(cx, grid.rows - 1);
+  }
+  for (let cz = 0; cz < grid.rows; cz++) {
+    seed(0, cz);
+    seed(grid.cols - 1, cz);
+  }
+  while (stack.length) {
+    const c = stack.pop()!;
+    for (const [dx, dz] of N4) seed(c.cx + dx, c.cz + dz);
+  }
+  return outside;
+}
 
 /** Numeric part of a store instance id ("m12" → 12) for the stable tie-break. */
 function idNum(id: string): number {

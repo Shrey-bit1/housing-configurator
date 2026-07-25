@@ -324,6 +324,30 @@ export function buildBoundaryWalls(
       solid.push(box(xMin, xMax, zMin, zMax, 0, topH));
       return;
     }
+    // FRENCH WINDOW (semi-exterior edge, core/semiExterior.ts): glass from the
+    // floor to the DOOR HEAD, solid wall above — the glass IS the door onto the
+    // balcony. Geometrically the door opening's inverse: the opening height is
+    // the fixed constant and the panel above grows on taller floors.
+    if (variant === "french") {
+      const head = Math.min(DOOR_OPENING_H, topH);
+      if (topH - head > 0.001) solid.push(box(xMin, xMax, zMin, zMax, head, topH));
+      if (glassMaterial && head > 2 * GLASS_EPS) {
+        let gxMin = xMin, gxMax = xMax, gzMin = zMin, gzMax = zMax;
+        if (thin === "x") {
+          const cxm = (xMin + xMax) / 2;
+          gxMin = cxm - GLASS_T / 2;
+          gxMax = cxm + GLASS_T / 2;
+          gzMin = glassZMin;
+          gzMax = glassZMax;
+        } else {
+          const czm = (zMin + zMax) / 2;
+          gzMin = czm - GLASS_T / 2;
+          gzMax = czm + GLASS_T / 2;
+        }
+        glazing.push(box(gxMin, gxMax, gzMin, gzMax, GLASS_EPS, head - GLASS_EPS));
+      }
+      return;
+    }
     // Sill (always) + lintel (framed only) — solid wall. Uses the SAME
     // (xMin,xMax,zMin,zMax) a plain wall box would, so it already wraps a
     // corner cleanly via the ordinary trim (see the corner-wrapped-windows

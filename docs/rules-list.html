@@ -84,7 +84,7 @@
 <p class="concept"><b>Severity tiers.</b> Every rule carries <code>severity: "hard" | "soft" | "note"</code>. Hard renders the dwelling uninhabitable or breaks near-universal code. Soft departs from empirical practice or comfort norms. Note characterizes a recognized pattern without judging it. <code>validate(graph)</code> runs all 35 <code>RULES</code> entries and concatenates every <code>Violation</code> they return; nothing here ever blocks placement — it only runs on "Check Layout" and only reports.</p>
 
 <div class="index">
-<b class="idx-hard">Hard (10)</b> — D1, E2, H1, H2, H3, H4, H6, P1, P2, ST2<br>
+<b class="idx-hard">Hard (11)</b> — D1, E2, H1, H2, H3, H4, H6, OD1, P1, P2, ST2<br>
 <b class="idx-soft">Soft (19)</b> — A1, AC1, C1, C2, D2, DP1, F1, G1, G2, MB1, N1, O1, OR1, PG1, S1, S2, S3, ST1, W1<br>
 <b class="idx-note">Note (7)</b> — DR1, DR2, E1, P3, S5, S6, S7
 </div>
@@ -195,9 +195,15 @@
 </div>
 
 <div class="rule">
-  <h3><span class="rid soft">O1</span><span class="name">Unreachable outdoor space</span><span class="tier soft">Soft</span></h3>
-  <p><b>Why</b> A balcony or terrace with no door onto it can't be used — the outdoor mirror of C1.</p>
-  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.outdoor(n) &amp;&amp; ctx.degree(n.id) === 0)</code>.</p>
+  <h3><span class="rid soft">O1</span><span class="name">Unconnected outdoor space</span><span class="tier soft">Soft</span></h3>
+  <p><b>Why</b> A balcony or terrace nothing opens onto can't be used — the outdoor mirror of C1. Since the semi-exterior pass "connected" no longer means "doored": a french window counts. Gated to the pre-entrance case, because once the dwelling has an entrance <span class="rid hard">OD1</span> owns the same node with a stronger claim.</p>
+  <p><b>Code</b> <code>!ctx.hasEntrance</code>, then <code>graph.nodes.filter(n =&gt; ctx.is.outdoor(n) &amp;&amp; ctx.degree(n.id) === 0)</code>.</p>
+</div>
+
+<div class="rule">
+  <h3><span class="rid hard">OD1</span><span class="name">Outdoor space not reachable</span><span class="tier hard">Hard</span></h3>
+  <p><b>Why</b> A balcony you cannot get to is floor area the dwelling cannot use. With french-window access this fires only when the balcony touches no room along a run wide enough to glaze — a 1-cell contact is 0.6 m of wall, not a way through — or when the only rooms it touches are themselves unreachable from the entrance.</p>
+  <p><b>Code</b> <code>ctx.reachableFrom(ctx.entryIds)</code>, then outdoor nodes not in the set. Outdoor clusters are routing <i>leaves</i>: reachable, never a through-route between two interior rooms.</p>
 </div>
 
 <div class="rule">

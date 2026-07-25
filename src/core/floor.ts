@@ -9,6 +9,7 @@ import type { Entrance } from "./entrance";
 import { doorId, doorOverlaps, nextSwing, type Door, type DoorSwing } from "./door";
 import { edgeKey, type Side } from "./exteriorEdges";
 import type { GlazingStat } from "./windows";
+import type { SemiExteriorPlan } from "./semiExterior";
 
 /** Canvas background colour; dimmed floors fade toward it. Keep in sync with
  *  the scene background in sceneSetup.ts. */
@@ -59,6 +60,13 @@ export class Floor {
    *  id is absent (e.g. mid-construction, before the first derive pass). */
   readonly effectiveCells = new Map<string, Cell[]>();
   private effectiveOwner = new Map<string, string>();
+
+  /** DERIVED semi-exterior plan (core/semiExterior.ts): which room edges carry
+   *  a french window onto a qualifying balcony, which boundaries block new
+   *  doors, which room↔outdoor pairs get a doorless ACCESS edge, and the
+   *  open-sky test. Recomputed by the FloorManager on every layout change,
+   *  never serialized. Undefined only before the first derive pass. */
+  semiExterior?: SemiExteriorPlan;
   /** Current dim state (see {@link setDimmed}) — rebuilt seed outlines read it. */
   private dimmed = false;
 

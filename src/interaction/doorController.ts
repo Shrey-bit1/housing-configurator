@@ -25,7 +25,7 @@ const INVALID = 0xff5d5d; // red
 export class DoorController {
   private activeMode = false;
   private preview: THREE.Mesh | null = null;
-  private candidate: { door: Door; valid: boolean } | null = null;
+  private candidate: { door: Door; valid: boolean; hint?: string } | null = null;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -34,7 +34,15 @@ export class DoorController {
     private getFloor: () => Floor,
     /** Cell → space token for the active floor (FloorManager.doorTargets). */
     private getTargets: () => Map<string, string>,
-    private onPlaced: () => void
+    private onPlaced: () => void,
+    /** Extra gate for NEW doors on top of plain validity — currently the
+     *  semi-exterior boundary (already a french window). Returns a hint to
+     *  surface when the user clicks a blocked boundary. Existing doors are
+     *  unaffected: this only ever runs during placement. */
+    private authorGate?: (door: Door) => { ok: boolean; hint?: string },
+    /** Surfaces an {@link authorGate} hint when the user clicks a blocked
+     *  boundary (wired to a toast in main.ts). */
+    private onHint?: (message: string) => void
   ) {
     window.addEventListener("pointermove", (e) => this.onMove(e));
     window.addEventListener("pointerup", (e) => this.onUp(e));
@@ -57,7 +65,10 @@ export class DoorController {
    * cursor along that wall, and test validity. Returns null only when the cursor
    * is off-canvas or in open field (no adjacent space on any side).
    */
-  private candidateAt(clientX: number, clientY: number): { door: Door; valid: boolean } | null {
+  private candidateAt(
+    clientX: number,
+    clientY: number
+  ): { door: Door; valid: boolean; hint?: string } | null {
     const pt = this.picker.groundPoint(clientX, clientY);
     if (!pt) return null;
     const grid = this.getFloor().grid;
@@ -91,9 +102,11 @@ export class DoorController {
       if (!bordersSpace) continue;
       // Valid = binds two distinct spaces AND doesn't overlap an existing door
       // (no boundary carries two doors; red ghost + no-commit on an overlap).
-      const valid =
+      const binds =
         resolveDoorSpaces(door, targetAt) !== null && !doorOverlaps(door, this.getFloor().doors);
-      return { door, valid };
+      if (!binds) return { door, valid: false };
+      const gate = this.authorGate?.(door) ?? { ok: true };
+      return { door, valid: gate.ok, hint: gate.hint };
     }
     return null;
   }
@@ -121,6 +134,8 @@ export class DoorController {
     if (cand && cand.valid) {
       this.getFloor().addDoor(cand.door.cell, cand.door.side);
       this.onPlaced();
+    } else if (cand?.hint) {
+      this.onHint?.(cand.hint); // e.g. "already a french window"
     }
     this.cancel();
   }

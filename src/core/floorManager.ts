@@ -7,6 +7,7 @@ import { edgeKey, parseEdgeKey } from "./exteriorEdges";
 import { computeWindows, type WindowVariant } from "./windows";
 import {
   buildSpaceTargets,
+  doorEdges,
   doorWallCuts,
   resolveDoorSpaces,
   computeDefaultSwing,
@@ -17,6 +18,7 @@ import {
 import { computeDwellingGraph, dwellingNodeId } from "./adjacencyGraph";
 import { computeEntranceDepths } from "./rules";
 import { computeExpansion } from "./expansion";
+import { computeSemiExterior } from "./semiExterior";
 import { isElastic } from "./modules";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
@@ -255,7 +257,13 @@ export class FloorManager {
         // windows all build on this shape.
         const seedCells = occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored);
         const cells = floor.effectiveCells.get(inst.id) ?? seedCells; // absolute
-        const plan = computeWindows(cells, inst.def.type, height, occupied, entranceEdges, this.northAngle);
+        // French windows on this room's semi-exterior (balcony) boundary are
+        // placed by construction; the band generator then only makes up the
+        // shortfall (§2o).
+        const french = floor.semiExterior?.glazedByRoom.get(inst.id);
+        const plan = computeWindows(
+          cells, inst.def.type, height, occupied, entranceEdges, this.northAngle, french
+        );
         floor.windowStats.set(inst.id, {
           targetRatio: plan.targetRatio,
           achievedRatio: plan.achievedRatio,
@@ -410,10 +418,30 @@ export class FloorManager {
   }
 
   /** Whether `door` currently binds a valid shared interior boundary on `floor`
-   *  (both edges join the same two distinct spaces). */
+   *  (both edges join the same two distinct spaces). Deliberately unchanged by
+   *  the semi-exterior pass: a door AUTHORED on a room↔balcony boundary before
+   *  french windows existed stays valid, keeps rendering, and is never pruned —
+   *  old files lose nothing. Only NEW authoring is blocked, see
+   *  {@link isDoorAuthorable}. */
   isDoorValid(floor: Floor, door: Door): boolean {
     const targets = this.doorTargets(floor);
     return resolveDoorSpaces(door, (cx, cz) => targets.get(cellKey(cx, cz)) ?? null) !== null;
+  }
+
+  /** May a NEW door be authored here? Valid, and not on a SEMI-EXTERIOR
+   *  boundary — a room↔balcony boundary is already a french window, and the
+   *  glass IS the door (core/semiExterior.ts), so a second one is meaningless. */
+  isDoorAuthorable(floor: Floor, door: Door): boolean {
+    if (!this.isDoorValid(floor, door)) return false;
+    return !this.isSemiExteriorDoor(floor, door);
+  }
+
+  /** True when ANY of `door`'s edges lies on a qualifying room↔outdoor
+   *  boundary (either cell/side representation). Drives the placement hint. */
+  isSemiExteriorDoor(floor: Floor, door: Door): boolean {
+    const boundary = floor.semiExterior?.boundary;
+    if (!boundary || boundary.size === 0) return false;
+    return doorEdges(door).some((e) => boundary.has(edgeKey(e.cx, e.cz, e.side)));
   }
 
   /** Remove any door whose edges no longer bind two distinct spaces (a space
@@ -443,10 +471,17 @@ export class FloorManager {
     markCutawayDirty();
   }
 
-  /** Re-derive every floor's effective footprints (see core/expansion.ts).
-   *  Strictly per-floor; pure function of seeds + holes. */
+  /** Re-derive every floor's effective footprints (see core/expansion.ts) and,
+   *  on top of them, its semi-exterior plan (core/semiExterior.ts — french
+   *  windows onto qualifying balconies). Strictly per-floor; both are pure
+   *  functions of the placed seeds + holes, and neither is ever serialized. */
   private recomputeExpansion(): void {
     for (const floor of this.floors) floor.setEffective(computeExpansion(floor));
+    // Semi-exterior derives FROM the effective footprints (a grown elastic room
+    // gets french windows on whatever boundary it grew into contact with), so
+    // it runs in a second pass, after every floor's expansion is settled.
+    for (const floor of this.floors)
+      floor.semiExterior = computeSemiExterior(floor, this.floorBelow(floor));
   }
 
   /** Show/hide the elastic seed-rectangle outlines on every floor ("Show

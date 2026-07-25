@@ -193,8 +193,17 @@ function buildContext(graph: DwellingGraph): RuleContext {
       visited.add(s);
       queue.push(s);
     }
+    const seedSet = new Set(seeds);
     while (queue.length) {
       const id = queue.shift()!;
+      // Outdoor clusters are LEAVES for routing (v1) — reachable, but never a
+      // through-route between two interior spaces. Seeds still expand (an
+      // entrance on a terrace must not isolate the dwelling). Same rule as
+      // `accessDepths`; see its comment for the full reasoning.
+      if (!seedSet.has(id)) {
+        const cur = nodesById.get(id);
+        if (cur && is.outdoor(cur)) continue;
+      }
       for (const nb of adj.get(id) ?? []) {
         if (visited.has(nb)) continue;
         const node = nodesById.get(nb);
@@ -265,6 +274,16 @@ export function accessDepths(graph: DwellingGraph, seeds: string[]): Map<string,
   }
 
   const isStair = new Set(graph.nodes.filter((n) => n.kind === "stair").map((n) => n.id));
+  // OUTDOOR CLUSTERS ARE LEAVES FOR ROUTING (v1): a balcony can be REACHED
+  // (so it gets a depth, and OD1 can check it) but never PASSED THROUGH — an
+  // interior path may not hop room → balcony → room. Seeds still expand: an
+  // entrance sitting on a terrace must not isolate the whole dwelling.
+  // (A balcony that genuinely connects two rooms — a Laubengang — is a later
+  // decision; see PROJECT_STATE §2o "parked".)
+  const isLeaf = new Set(
+    graph.nodes.filter((n) => n.kind === "cluster" && n.roomTypeId === "outdoor").map((n) => n.id)
+  );
+  const seedSet = new Set(seeds);
   // Cost of the directed step from→to: entering a stair costs 1, leaving one
   // costs 0 (a floor transition = one hop), everything else costs 1.
   const stepCost = (from: string, to: string): number =>
@@ -280,6 +299,7 @@ export function accessDepths(graph: DwellingGraph, seeds: string[]): Map<string,
   while (deque.length) {
     const id = deque.shift()!;
     const d = depth.get(id)!;
+    if (isLeaf.has(id) && !seedSet.has(id)) continue; // reachable, not through-routable
     for (const nb of adj.get(id) ?? []) {
       const w = stepCost(id, nb);
       if (d + w < (depth.get(nb) ?? Infinity)) {
@@ -689,11 +709,37 @@ export const RULES: Rule[] = [
     // the OVER-connected outdoor smell).
     id: "O1",
     severity: "soft",
-    description: "Outdoor space is unreachable — no door connects it to the dwelling.",
+    description: "Outdoor space is unconnected — nothing opens onto it.",
     check(graph, ctx) {
+      // GATED on there being no entrance yet: once the dwelling has an entry
+      // root, OD1 (hard) owns "the balcony can't be reached", and firing both
+      // on the same node would be a redundant double-flag (the W1/D1 idiom).
+      // O1 survives as the pre-entrance signal: with no entrance at all, OD1
+      // stays silent (E1 owns that gate) and this still points at a balcony
+      // nothing opens onto. Since the semi-exterior pass "connected" no longer
+      // means "doored": a french window counts (core/semiExterior.ts).
+      if (ctx.hasEntrance) return [];
       return graph.nodes
         .filter((n) => ctx.is.outdoor(n) && ctx.degree(n.id) === 0)
         .map((n) => violation("O1", "soft", n));
+    },
+  },
+  {
+    // The outdoor counterpart of ST2/H1: a balcony or terrace you cannot get
+    // to is a hard failure — it is floor area the dwelling cannot use. With
+    // french-window access (core/semiExterior.ts) this fires only when a
+    // balcony touches NO room along a run wide enough to glaze (a 1-cell
+    // contact is 0.6 m of wall, not a way through), or when the only rooms it
+    // touches are themselves unreachable from the entrance.
+    id: "OD1",
+    severity: "hard",
+    description: "Outdoor space is not reachable from the dwelling.",
+    check(graph, ctx) {
+      if (!ctx.hasEntrance) return []; // E1 owns the no-entrance gate
+      const reach = ctx.reachableFrom(ctx.entryIds);
+      return graph.nodes
+        .filter((n) => ctx.is.outdoor(n) && !reach.has(n.id))
+        .map((n) => violation("OD1", "hard", n));
     },
   },
 

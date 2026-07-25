@@ -1,4 +1,5 @@
 import { CELL_SIZE, type Cell } from "./grid";
+import { DOOR_OPENING_H } from "./door";
 import {
   exteriorEdges,
   edgeKey,
@@ -50,7 +51,14 @@ import {
 
 /** A windowed edge is either sill+lintel+glazing ("framed") or sill+glazing
  *  with the floor slab above acting as the lintel ("full-height"). */
-export type WindowVariant = "framed" | "full-height";
+/**
+ * `framed` / `full-height` are the two DERIVED band kits (sill + optional
+ * lintel + glazing). `french` is the SEMI-EXTERIOR kit (core/semiExterior.ts):
+ * glass from the floor to the door head, solid above — the glass IS the door
+ * onto a balcony. It is never chosen by {@link WINDOW_CONFIG}; it arrives
+ * pre-placed on the room↔outdoor boundary.
+ */
+export type WindowVariant = "framed" | "full-height" | "french";
 
 // ---- Panel-kit dimensions (absolute real-world metres, in floor coords) ----
 // Panels stay these heights regardless of floor height; the glazing gap absorbs
@@ -89,8 +97,12 @@ export const WINDOW_CONFIG: Record<string, WindowTypeConfig> = {
 };
 
 /** Glazing AREA (m²) contributed by ONE windowed edge, given the variant and
- *  the floor's true floor-to-floor height. */
+ *  the floor's true floor-to-floor height. A `french` edge is glazed from the
+ *  floor to the DOOR HEAD, so its area is independent of the floor height —
+ *  the solid panel above absorbs the difference (the same inversion the door
+ *  opening uses, see {@link DOOR_OPENING_H}). */
 export function perEdgeGlazing(variant: WindowVariant, floorHeight: number): number {
+  if (variant === "french") return EDGE_WIDTH * Math.min(DOOR_OPENING_H, floorHeight);
   const gap =
     variant === "full-height"
       ? floorHeight - SILL_H // slab above is the lintel
@@ -149,6 +161,15 @@ interface Run {
  *                          seed-run selection toward south and classifies the
  *                          resulting glazing's orientation. Default 0 keeps the
  *                          pre-north behaviour (grid-south = due south).
+ * @param frenchEdges       ABSOLUTE edge keys already glazed as FRENCH WINDOWS
+ *                          on this room's semi-exterior (room↔balcony) boundary
+ *                          — see core/semiExterior.ts. They are placed BY
+ *                          CONSTRUCTION before any band: they never appear in
+ *                          the band generator's candidate set (their neighbour
+ *                          cell is an occupied Outdoor cell, so `exteriorEdges`
+ *                          already excludes them — no second band can land
+ *                          there), and their area is credited against the
+ *                          target so W1 is computed on the room's REAL glazing.
  */
 export function computeWindows(
   cells: Cell[],
@@ -156,13 +177,18 @@ export function computeWindows(
   floorHeight: number,
   occupied: Set<string>,
   entranceEdgeKeys: Set<string>,
-  northAngle = 0
+  northAngle = 0,
+  frenchEdges?: Set<string>
 ): WindowPlan {
   const config = WINDOW_CONFIG[roomTypeId];
   if (!config) {
-    // Type never gets windows (bathroom / circulation / outdoor).
+    // Type never gets windows (bathroom / circulation / outdoor). A french
+    // window is a property of the BOUNDARY, not the room type, so it is still
+    // drawn — but such a type has no daylight target to score it against.
+    const edges = new Map<string, WindowVariant>();
+    for (const k of frenchEdges ?? []) edges.set(k, "french");
     return {
-      edges: new Map(), variant: null,
+      edges, variant: null,
       targetRatio: 0, achievedRatio: 0, belowTarget: false,
       sectors: [], northLit: false,
     };
@@ -171,6 +197,7 @@ export function computeWindows(
   const { targetRatio, variant, fixedEdges } = config;
   const floorArea = cells.length * CELL_AREA;
   const perEdge = perEdgeGlazing(variant, floorHeight);
+  const frenchArea = (frenchEdges?.size ?? 0) * perEdgeGlazing("french", floorHeight);
 
   // Exterior edges, minus any coinciding with an entrance (door wins there).
   const ext = exteriorEdges(cells, occupied).filter(
@@ -180,11 +207,15 @@ export function computeWindows(
   const extKeys = new Set(ext.map((e) => edgeKey(e.cx, e.cz, e.side)));
 
   // How many edges we need to glaze to hit the target.
+  // French windows already on the boundary count against the target, so the
+  // band generator only has to make up the SHORTFALL (with no french glass
+  // this is byte-identical to the original expression).
   let edgesNeeded: number;
   if (fixedEdges !== undefined) {
     edgesNeeded = fixedEdges;
   } else {
-    edgesNeeded = perEdge > 0 ? Math.ceil((floorArea * targetRatio) / perEdge) : 0;
+    const shortfall = Math.max(0, floorArea * targetRatio - frenchArea);
+    edgesNeeded = perEdge > 0 ? Math.ceil(shortfall / perEdge) : 0;
   }
   // Enforce the 2-edge minimum (round a computed 1 up to 2).
   if (edgesNeeded > 0 && edgesNeeded < MIN_WINDOW_EDGES) edgesNeeded = MIN_WINDOW_EDGES;
@@ -204,6 +235,11 @@ export function computeWindows(
       runKey(a) - runKey(b)
   );
   const windowed = new Map<string, WindowVariant>();
+  // Semi-exterior glass goes in FIRST, so it renders, orients (OR1) and counts
+  // (W1) like any other glazing. It can never collide with a band: its
+  // neighbour cell is an occupied Outdoor cell, so `exteriorEdges` never
+  // offered that edge as a candidate in the first place.
+  for (const k of frenchEdges ?? []) windowed.set(k, "french");
   const used = new Set<string>(); // every placed edge, straight or wrapped
   let placed = 0;
   let remaining = edgesNeeded;
@@ -266,7 +302,7 @@ export function computeWindows(
     }
   }
 
-  const achievedRatio = floorArea > 0 ? (placed * perEdge) / floorArea : 0;
+  const achievedRatio = floorArea > 0 ? (placed * perEdge + frenchArea) / floorArea : 0;
   const effectiveTargetRatio =
     fixedEdges !== undefined
       ? floorArea > 0
