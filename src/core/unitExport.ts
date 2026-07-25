@@ -1,7 +1,7 @@
 import { cellKey, type Cell } from "./grid";
 import { CELL_SIZE } from "./grid";
 import { exteriorEdges, edgeKey, type Side } from "./exteriorEdges";
-import { occupiedCells } from "./modules";
+import { occupiedCells, MODULE_DEFS, type ModuleDef } from "./modules";
 import { buildSpaceTargets } from "./door";
 import { computeWindows } from "./windows";
 import { connectedComponents } from "./cluster";
@@ -43,6 +43,34 @@ export interface UnitEdge {
  *  solid mass. Parallel to {@link UnitStorey.cells}, index for index. */
 export type UnitCellKind = "room" | "outdoor" | "circulation" | "stair";
 
+/** One entry of the unit file's {@link DwellingUnitFile.roomTypes} legend: a
+ *  module type id used by this unit, with the label and colour the CONFIGURATOR
+ *  gives it. Carrying the legend in the file is what lets the building show a
+ *  flat in its author's colours without knowing the configurator's catalog. */
+export interface UnitRoomType {
+  /** Module type id (`ModuleDef.type`) — the key `cellRooms` entries use. */
+  id: string;
+  name: string;
+  /** "#rrggbb" — the bottom-up convention (see `color` above). */
+  color: string;
+}
+
+/** `ModuleDef.color` (packed 0xRRGGBB) → the "#rrggbb" the wire format uses. */
+function hexColor(color: number): string {
+  return `#${color.toString(16).padStart(6, "0")}`;
+}
+
+/** The COARSE cell kind implied by a module def — the classification `cellKinds`
+ *  carries. Kept as one function so `cellKinds` and `cellRooms` are derived from
+ *  the SAME owner lookup and cannot disagree (asserted in {@link buildStorey}). */
+function kindOf(def: ModuleDef | undefined): UnitCellKind {
+  if (!def) return "stair"; // only a below-floor stair projection resolves to no local instance
+  if (def.cluster === "outdoor") return "outdoor";
+  if (def.cluster === "circulation") return "circulation";
+  if (def.category === "stair") return "stair";
+  return "room";
+}
+
 export interface UnitStorey {
   cells: [number, number][];
   /** OPTIONAL, purely ADDITIVE (see docs/bridge-format.md): one kind per cell,
@@ -50,6 +78,18 @@ export interface UnitStorey {
    *  written before this field existed — behaves exactly as before, which is
    *  why the format stays at version 1. Absent ⇒ treat every cell as "room". */
   cellKinds?: UnitCellKind[];
+  /** OPTIONAL, purely ADDITIVE, index-parallel to `cells` exactly like
+   *  {@link cellKinds}: the MODULE TYPE ID owning each cell ("living",
+   *  "bathroom_large", "circulation_single", "outdoor_double", "stair", …).
+   *
+   *  The FINE layer to `cellKinds`' coarse one — they are derived from one
+   *  owner lookup and must agree where they overlap (a cell whose kind is
+   *  "outdoor" carries an outdoor type id). Elastic rooms label their GROWN
+   *  cells with the owner's type: the effective occupancy is what exists, and
+   *  the seed/claimed distinction is a configurator-internal matter that
+   *  deliberately does not cross the bridge. Absent ⇒ the building knows only
+   *  the coarse kinds, which is what it knew before this field existed. */
+  cellRooms?: string[];
   edges: UnitEdge[];
   /** This storey's floor-to-floor height, meters. */
   height: number;
@@ -63,6 +103,11 @@ export interface DwellingUnitFile {
   cellSize: number; // 0.6, verbatim — the grid contract
   northAngle: number; // informational; see the orientation section of the spec
   storeys: UnitStorey[]; // index 0 = entry storey (floor 0)
+  /** OPTIONAL, purely ADDITIVE: the legend for every type id used by any
+   *  storey's `cellRooms`, sorted by id so the file is byte-stable. Present iff
+   *  `cellRooms` is. The building reads colours from HERE, never from a copy of
+   *  the configurator's catalog — one app owns the palette, the other is told. */
+  roomTypes?: UnitRoomType[];
   sourceProject: ProjectFile; // byte-identical to a normal save
 }
 
@@ -133,11 +178,40 @@ export function buildUnitExport(
       if (z < minZ) minZ = z;
     }
   for (const s of storeys) {
-    // `cellKinds` is index-parallel to `cells`, so translating cells in place
-    // keeps them aligned — do NOT reorder one without the other.
+    // `cellKinds` and `cellRooms` are index-parallel to `cells`, so translating
+    // cells IN PLACE keeps all three aligned — never reorder one alone.
     s.cells = s.cells.map(([x, z]) => [x - minX, z - minZ]);
     s.edges = s.edges.map((e) => ({ ...e, cell: [e.cell[0] - minX, e.cell[1] - minZ] }));
   }
+
+  // The coarse layer (`cellKinds`) and the fine one (`cellRooms`) come from ONE
+  // owner lookup per cell, so they agree by construction. Assert it anyway: this
+  // is the invariant the building relies on to render a balcony as a balcony
+  // AND colour it from the legend, and a future edit that derives either layer
+  // some other way must fail loudly here rather than ship a contradictory file.
+  for (let i = 0; i < storeys.length; i++) {
+    const s = storeys[i];
+    for (let k = 0; k < s.cells.length; k++) {
+      const id = s.cellRooms![k];
+      const expected = kindOf(MODULE_DEFS[id]);
+      if (expected !== s.cellKinds![k])
+        return {
+          ok: false,
+          reason:
+            `Internal: storey ${i} cell ${k} has kind "${s.cellKinds![k]}" but room type ` +
+            `"${id}" (kind "${expected}") — cellKinds and cellRooms disagree. Please report this.`,
+        };
+    }
+  }
+
+  // Legend for every type id any storey uses, sorted by id so the file is
+  // byte-stable. Built from MODULE_DEFS — the ids ARE catalog keys — so nothing
+  // has to be threaded out of the per-storey pass.
+  const usedIds = [...new Set(storeys.flatMap((s) => s.cellRooms ?? []))].sort();
+  const roomTypes: UnitRoomType[] = usedIds.map((id) => {
+    const def = MODULE_DEFS[id];
+    return { id, name: def.name, color: hexColor(def.color) };
+  });
 
   return {
     ok: true,
@@ -149,6 +223,7 @@ export function buildUnitExport(
       cellSize: CELL_SIZE,
       northAngle: fm.northAngle,
       storeys,
+      roomTypes,
       sourceProject: serializeProject(floors, fm.northAngle),
     },
   };
@@ -168,17 +243,20 @@ function buildStorey(
     const [cx, cz] = k.split(",").map(Number);
     return { cx, cz };
   });
-  // Per-cell kind, index-parallel to `cells`. A stairwell-hole projection from
-  // the floor below is the void over a stair, so it reads as "stair" too.
-  const cellKinds: UnitCellKind[] = cells.map((c) => {
+  // Per-cell kind + type id, index-parallel to `cells`, from ONE owner lookup —
+  // the coarse and fine layers can't drift because neither is derived from the
+  // other or from a second pass. A stairwell-hole projection from the floor
+  // below is the void over a stair, so it reads as "stair" in both.
+  const cellKinds: UnitCellKind[] = [];
+  const cellRooms: string[] = [];
+  for (const c of cells) {
     const owner = floor.effectiveOwnerAt(c.cx, c.cz);
-    const def = owner ? floor.store.instances.get(owner)?.def : undefined;
-    if (!def) return "stair"; // only a below-floor stair projection resolves to no local instance
-    if (def.cluster === "outdoor") return "outdoor";
-    if (def.cluster === "circulation") return "circulation";
-    if (def.category === "stair") return "stair";
-    return "room";
-  });
+    // The hole projection has no local def; it is the void over a stair, so the
+    // fine layer names MODULE_DEFS.stair rather than inventing an id.
+    const def = (owner ? floor.store.instances.get(owner)?.def : undefined) ?? MODULE_DEFS.stair;
+    cellKinds.push(kindOf(def));
+    cellRooms.push(def.type);
+  }
   const height = fm.floorHeightOf(floor);
 
   // Entrance edges: NON-blocked authored entrances only (floor 0).
@@ -234,5 +312,5 @@ function buildStorey(
     return { cell: [e.cx, e.cz], side: SIDE_LETTER[e.side], class: cls };
   });
 
-  return { cells: cells.map((c) => [c.cx, c.cz]), cellKinds, edges, height };
+  return { cells: cells.map((c) => [c.cx, c.cz]), cellKinds, cellRooms, edges, height };
 }

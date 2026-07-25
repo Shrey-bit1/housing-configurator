@@ -2512,6 +2512,28 @@ Project panel):
 - `FloorManager.floorHeightOf(floor)` is the public accessor added so the
   exporter can carry per-storey heights (3.0 m at defaults).
 
+**Units as made — `cellRooms` + `roomTypes` (additive, still v1).** The export
+carries the flat's ROOM MAP, so the building can show a dwelling as its author
+configured it rather than as a monochrome token:
+- `storeys[].cellRooms` — index-parallel to `cells` exactly like `cellKinds`:
+  the **module type id** owning each cell (`"living"`, `"bathroom_large"`,
+  `"circulation_single"`, `"outdoor_double"`, `"stair"`). The FINE layer;
+  `cellKinds` stays the coarse one (four classes, enough to carve a balcony).
+  Elastic rooms label their GROWN cells with the owner's type — the effective
+  occupancy is what exists, and the seed/claimed distinction does not cross the
+  bridge.
+- `roomTypes` (top level) — `{id, name, color}` for every id used, sorted by
+  id. The building reads colours from HERE and never keeps a copy of this
+  catalog, so the two apps cannot disagree about what a colour means.
+- The two layers are derived from ONE `effectiveOwnerAt` lookup per cell
+  (`kindOf(def)` + `def.type`), so they agree by construction; the exporter
+  then ASSERTS the agreement per cell and fails the export with a reason rather
+  than shipping a contradictory file.
+- Both OPTIONAL, both purely additive, `"version": 1` untouched: a v1 importer
+  that ignores them produces byte-identical results (verified by the stash
+  method — the export with the two fields stripped is byte-identical to the
+  pre-change export on the same fixture).
+
 **Recorded v1 orientation limitation:** glazed edges were derived under the
 flat's authored `northAngle` (south bias). The packer may rotate units through
 the 4 quarter-turns (edge metadata rotates too; NEVER mirrored — a flat is

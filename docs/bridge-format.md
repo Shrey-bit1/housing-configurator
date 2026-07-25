@@ -30,12 +30,16 @@ bottom-up-design (`bridgeImport.ts`). The JSON file is the *entire* interface
   "storeys": [                     // index 0 = entry storey (Re_Configure floor 0)
     {
       "cells": [[x, z], …],        // occupied cells, normalized (see Normalization)
-      "cellKinds": ["room"|"outdoor"|"circulation"|"stair", …],  // OPTIONAL, see below
+      "cellKinds": ["room"|"outdoor"|"circulation"|"stair", …],  // OPTIONAL — coarse, see below
+      "cellRooms": ["living"|"bathroom_large"|"outdoor_single"|…, …],  // OPTIONAL — fine, see below
       "edges": [                   // EVERY exterior boundary edge of this storey, classified
         { "cell": [x, z], "side": "N|S|E|W", "class": "entrance|glazed|open|blank" }
       ],
       "height": 3.0                // this storey's floor-to-floor, meters
     }
+  ],
+  "roomTypes": [                   // OPTIONAL legend for the ids used by cellRooms
+    { "id": "living", "name": "Living Room", "color": "#d32f2f" }
   ],
   "sourceProject": { … }           // the full flat-configurator-project JSON, embedded VERBATIM
 }
@@ -217,6 +221,44 @@ one normalization translation does not, since it only shifts coordinates).
 Semi-exterior edges — a room's boundary onto a balcony, rendered as a french
 window in Re_Configure — are INTERIOR to the unit and never appear in `edges`.
 A balcony's own outward edges still export as `open`, exactly as before.
+
+## `cellRooms` + `roomTypes` — the flat as its author made it (optional, additive)
+
+`cellKinds` is the COARSE layer (four classes, enough to carve a balcony out of
+the mass). `cellRooms` is the FINE one: a parallel array to `cells`, **index for
+index**, naming the **module type id** that owns each cell — `"living"`,
+`"bedroom_small"`, `"bathroom_large"`, `"kitchen"`, `"recreation"`,
+`"circulation_single"`, `"outdoor_double"`, `"stair"`, and so on. It exists so
+the building can show a dwelling **as it was actually configured** — rooms in
+their own colours, partitions where the flat has interior walls — instead of a
+monochrome token.
+
+`roomTypes` is the accompanying top-level legend: `{ id, name, color }` for
+every id any storey uses, sorted by id, colours as `"#rrggbb"`. **Read colours
+from here.** The reader must never keep its own copy of the configurator's
+catalog: one app owns the palette and the other is told, so adding a room
+preset upstream can never leave the two apps disagreeing about what blue means.
+An id absent from the legend (a hand-edited file) is a reader's own fallback
+decision — treat it as an unknown room, don't guess a colour.
+
+**Both fields are OPTIONAL and the format stays at `"version": 1`** — the same
+reasoning as `cellKinds`. An importer that ignores them reads exactly the same
+`cells`, `cellKinds`, `edges` and `height` as before and produces byte-identical
+results. They are written together: `roomTypes` is present iff `cellRooms` is.
+
+**The two layers must AGREE where they overlap.** A cell whose kind is
+`"outdoor"` carries an outdoor type id; `"circulation"` a circulation id;
+`"stair"` the stair id; `"room"` a real room preset. The exporter derives both
+from one owner lookup per cell and then asserts the agreement, failing the
+export rather than shipping a contradictory file. A reader may rely on it.
+
+**Elastic rooms** (Re_Configure's derived expansion) label their GROWN cells
+with the owner's type — the effective occupancy is what exists. The
+seed/claimed distinction is configurator-internal and deliberately does not
+cross the bridge.
+
+Anything that reorders `cells` MUST reorder `cellKinds` **and** `cellRooms`
+with it.
 
 ## Versioning
 
