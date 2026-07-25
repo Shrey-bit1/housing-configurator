@@ -1425,6 +1425,14 @@ still flags. Everyone else keeps `degree`, where a french window IS a connection
 — that is the point of O1's gate comment: a balcony with only a french window is
 connected, not orphaned.
 
+**Export/wall-pass agreement (follow-up).** `unitExport` re-runs `computeWindows`
+to classify `glazed` edges, and must pass the room's french set for the same
+reason the wall pass does: french glass counts against the daylight target, so
+the band added on top is smaller for a room opening onto a balcony. Without it
+the export listed a band that was never built — on the control fixture, two
+`glazed` edges that are really `blank`. Fixed; the export is now a re-run of the
+identical inputs, not a parallel derivation.
+
 **`cellKinds` (A6).** The bridge export gains an OPTIONAL array parallel to
 `storeys[].cells` (`"room" | "outdoor" | "circulation" | "stair"`), so the
 building can show a balcony as a recess. Absent ⇒ all `"room"` = today's

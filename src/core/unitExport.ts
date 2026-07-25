@@ -185,8 +185,9 @@ function buildStorey(
   const entranceKeys = new Set(openEntrances.map((e) => edgeKey(e.cell.cx, e.cell.cz, e.side)));
 
   // Glazed edges: the derived windows, re-run with EXACTLY the inputs the wall
-  // pass uses (same occupied set, same all-entrance skip set, same height and
-  // north) — reuse of the same pure function, not a parallel derivation.
+  // pass uses (same occupied set, same open-sky test, same all-entrance skip
+  // set, same height, north AND french-window set) — reuse of the same pure
+  // function, not a parallel derivation.
   const windowSkip = new Set(
     fi === 0 ? floor.entrances.map((e) => edgeKey(e.cell.cx, e.cell.cz, e.side)) : []
   );
@@ -198,9 +199,14 @@ function buildStorey(
     const roomCells =
       floor.effectiveCells.get(inst.id) ??
       occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored);
+    // …INCLUDING the room's french-window set: french glass counts against the
+    // daylight target, so the band the generator adds on top is SMALLER for a
+    // room that opens onto a balcony (§2o). Omitting it here exported a band the
+    // wall pass never built — glazing the building would honour that does not
+    // exist in the model.
     const plan = computeWindows(
       roomCells, inst.def.type, height, occupied, floor.isOutside,
-      windowSkip, fm.northAngle
+      windowSkip, fm.northAngle, floor.semiExterior?.glazedByRoom.get(inst.id)
     );
     for (const key of plan.edges.keys()) glazedKeys.add(key);
   }
