@@ -1,6 +1,6 @@
 import { cellKey, type Cell } from "./grid";
 import { SIDES, SIDE_DELTA, edgeKey, opposite, type Side } from "./exteriorEdges";
-import { occupiedCells } from "./modules";
+import { occupiedCells, isBathroom } from "./modules";
 import { connectedComponents, clusterNodeId } from "./cluster";
 import { buildSpaceTargets } from "./door";
 import { borderReachableEmpty } from "./expansion";
@@ -22,7 +22,7 @@ import type { Floor } from "./floor";
  * its four sides, 0.6 m of boundary. A room edge is semi-exterior iff the cell
  * across that side belongs to a QUALIFYING Outdoor cluster, so a wall run half
  * against a balcony and half against a bedroom is half french window, half
- * solid wall.
+ * solid wall. BATHROOMS are excluded outright (privacy — see the rooms loop).
  *
  * Everything here is DERIVED — recomputed on every layout change alongside the
  * expansion pass, never stored, never serialized.
@@ -139,6 +139,16 @@ export function computeSemiExterior(floor: Floor, floorBelow: Floor | null): Sem
   for (const inst of floor.store.instances.values()) {
     const def = inst.def;
     if (def.category !== "room" || def.cluster) continue; // rooms only
+    // BATHROOMS ARE EXCLUDED AT THE SOURCE (privacy — a bathroom keeps a solid
+    // wall against outdoor space). Skipping here, before `plan.boundary` is
+    // built, is what makes every consequence fall out automatically and in the
+    // right direction: no glass, no daylight credit, no doorless access, a
+    // balcony whose ONLY contact is a bathroom is unreachable (OD1 fires) —
+    // and, because the authoring block reads `plan.boundary`, a NEW door on a
+    // bathroom↔terrace boundary is authorable again (there is no french window
+    // there to make it meaningless). Kitchens deliberately KEEP theirs: D2
+    // wants the ventilation. Type predicate, never a hardcoded id list.
+    if (isBathroom(def)) continue;
     const cells =
       floor.effectiveCells.get(inst.id) ??
       occupiedCells(def, inst.origin, inst.rotation, inst.mirrored);

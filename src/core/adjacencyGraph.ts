@@ -236,9 +236,12 @@ function buildFloorNodes(
   // void would count the void-facing edge as "exterior" (no sky there), letting
   // D1 pass a windowless room and W1 count void-facing edges. (Same-floor
   // stairs were already covered — they're real occupants; the hole is the gap.)
+  // …and, since the sealed-void fix, an edge must also face a cell that can
+  // REACH THE GRID BORDER (`floor.isOutside`): a room that walls off an empty
+  // pocket has no facade there, so D1 fires and no window is generated onto it.
   const occupied = new Set(buildSpaceTargets(floor, floorBelow).keys());
   for (const node of nodes) {
-    node.hasTrueExteriorEdge = exteriorEdges(node.cells, occupied).length > 0;
+    node.hasTrueExteriorEdge = exteriorEdges(node.cells, occupied, floor.isOutside).length > 0;
     // A GLAZED semi-exterior edge (french window onto a qualifying balcony) is
     // real daylight, so it satisfies D1/D2 and opens W1's gate exactly like a
     // true exterior edge. The solid returns at a run's ends confer nothing —
@@ -385,7 +388,11 @@ export function computeDwellingGraph(floors: Floor[]): DwellingGraph {
     const occupied0 = new Set(owners[0].keys()); // every room/cluster/stair cell
     for (const ent of f0.entrances) {
       const hostId = owners[0].get(cellKey(ent.cell.cx, ent.cell.cz)) ?? null;
-      const stillExterior = exteriorEdges([ent.cell], occupied0).some((e) => e.side === ent.side);
+      // Same exterior test as everything else, so an entrance onto a sealed
+      // void reads as blocked (E2) exactly as one built over does.
+      const stillExterior = exteriorEdges([ent.cell], occupied0, f0.isOutside).some(
+        (e) => e.side === ent.side
+      );
       const blocked = hostId === null || !stillExterior;
       entrances.push({ id: dwellingEntranceId(0, ent.id), floor: 0, hostId, blocked });
       if (!blocked && hostId) entryIds.add(hostId);

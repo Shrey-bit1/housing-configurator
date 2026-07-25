@@ -113,8 +113,8 @@ All 36 rules in `src/core/rules.ts`. For each: why it's there, and how it's comp
 **Code:** Iterates `graph.entrances`; flags if the entrance's host node is a bedroom or bathroom.
 
 ### S1 — soft
-**Why:** An outdoor space with more than two doors is over-connected — usually balconies are a leaf, not a through-route.
-**Code:** Outdoor cluster nodes with degree `> 2`.
+**Why:** An outdoor space with more than two doors is over-connected — usually balconies are a leaf, not a through-route. Glazing doesn't count: a continuous balcony band with a french window onto three rooms is a normal typology.
+**Code:** Outdoor cluster nodes with **door** degree `> 2` (`ctx.doorDegree` — authored doors only, ignoring the doorless `viaFrench` links every other rule counts).
 
 ### S2 — soft
 **Why:** A living room with one door or none isn't functioning as the social hub it's meant to be.

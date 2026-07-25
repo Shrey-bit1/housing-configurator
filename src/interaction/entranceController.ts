@@ -62,6 +62,11 @@ export class EntranceController {
     // bind an entrance to a room's stair-FACING edge (no sky), which the graph
     // then flags blocked anyway. Reject any occupied cell.
     if (floor.effectiveOwnerAt(cell.cx, cell.cz)) return null;
+    // …and it must reach the OUTSIDE. An empty cell sealed inside the flat is a
+    // void, not a street: the graph would flag any entrance bound there as
+    // blocked (E2), so don't offer it in the first place. Same test the exterior
+    // edges themselves use (Floor.isOutside).
+    if (!floor.isOutside(cell.cx, cell.cz)) return null;
 
     for (const side of ["north", "south", "east", "west"] as Side[]) {
       const [dx, dz] = SIDE_DELTA[side];

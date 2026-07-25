@@ -48,17 +48,36 @@ export function parseEdgeKey(key: string): BoundaryEdge {
 }
 
 /**
- * Exterior boundary edges of `cells`. `occupied` is the set of ALL room+cluster
- * cell keys on the floor (typically including `cells` themselves). An edge is
- * exterior when the cell across it is not in `occupied` — i.e. it faces outside,
- * not another room/cluster and not the footprint's own interior.
+ * Exterior boundary edges of `cells` — THE definition of "faces the outside",
+ * shared by every consumer (windows, D1/D2 via `hasExteriorEdge`, W1's gate,
+ * entrance validity/E2, the bridge export's envelope). An edge is exterior when
+ * the cell across it is:
+ *  - not in `occupied` — the set of ALL room+cluster+stair cell keys on the
+ *    floor (typically including `cells` themselves), so an edge shared with
+ *    another space, or interior to the footprint, never qualifies; AND
+ *  - OUTSIDE per `isOutside` — empty AND reachable from the grid border, or out
+ *    of bounds (see `Floor.isOutside` / expansion.ts's `borderReachableEmpty`).
+ *
+ * The second test is what stops a SEALED VOID from counting as exterior: a
+ * pocket of empty cells walled in on every side has no sky, so an edge facing it
+ * is plain interior wall — no D1 credit, no window onto a sightless shaft, no
+ * entrance placeable there. `isOutside` is deliberately REQUIRED, not optional:
+ * a call site that forgot it would silently fork this definition, which is the
+ * one thing this utility exists to prevent.
  */
-export function exteriorEdges(cells: Cell[], occupied: Set<string>): BoundaryEdge[] {
+export function exteriorEdges(
+  cells: Cell[],
+  occupied: Set<string>,
+  isOutside: (cx: number, cz: number) => boolean
+): BoundaryEdge[] {
   const out: BoundaryEdge[] = [];
   for (const c of cells) {
     for (const side of SIDES) {
       const [dx, dz] = SIDE_DELTA[side];
-      if (occupied.has(cellKey(c.cx + dx, c.cz + dz))) continue; // shared/interior
+      const nx = c.cx + dx;
+      const nz = c.cz + dz;
+      if (occupied.has(cellKey(nx, nz))) continue; // shared/interior
+      if (!isOutside(nx, nz)) continue; // sealed void — empty, but no sky
       out.push({ cx: c.cx, cz: c.cz, side });
     }
   }

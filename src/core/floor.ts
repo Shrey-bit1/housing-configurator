@@ -107,6 +107,22 @@ export class Floor {
     return this.effectiveOwner.get(cellKey(cx, cz)) ?? this.grid.ownerAt(cx, cz);
   }
 
+  /**
+   * Is (cx,cz) OPEN SKY — empty of any SPACE and reachable from the grid border,
+   * or out of bounds? THE floor-level "outside" test: `exteriorEdges` gates every
+   * exterior edge on it (so a sealed void is not a facade), the cluster shells
+   * railing test uses it, and semi-exterior qualification is built on it.
+   * Furniture is deliberately transparent (a 0.6 m cube takes away no sky).
+   *
+   * Computed ONCE per derive pass, inside `computeSemiExterior` (the flood fill
+   * is `expansion.ts`'s `borderReachableEmpty`, the one in the codebase), and
+   * read from the plan here — never recomputed per call. Bound as a field so it
+   * can be passed as a plain callback. Before the first derive pass a floor has
+   * nothing placed, so every cell genuinely IS outside.
+   */
+  readonly isOutside = (cx: number, cz: number): boolean =>
+    this.semiExterior?.isOutside(cx, cz) ?? true;
+
   /** Rebuild the seed outlines: one thin rectangle per elastic instance's
    *  TRANSFORMED seed footprint (always a rectangle — presets are rects).
    *  Fresh materials re-apply the floor's current dim state (outlines rebuild

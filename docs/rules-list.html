@@ -256,8 +256,8 @@
 
 <div class="rule">
   <h3><span class="rid soft">S1</span><span class="name">Over-connected outdoor space</span><span class="tier soft">Soft</span></h3>
-  <p><b>Why</b> An outdoor space with more than two doors onto it is usually being used as a through-route, not a leaf.</p>
-  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.outdoor(n) &amp;&amp; ctx.degree(n.id) &gt; 2)</code>.</p>
+  <p><b>Why</b> An outdoor space with more than two doors onto it is usually being used as a through-route, not a leaf. Glazing doesn't count as a door here: a continuous balcony band with a french window onto three rooms is a normal typology, not a route.</p>
+  <p><b>Code</b> <code>graph.nodes.filter(n =&gt; ctx.is.outdoor(n) &amp;&amp; ctx.doorDegree(n.id) &gt; 2)</code>. <code>doorDegree</code> counts AUTHORED doors only — the one rule that ignores the doorless <code>viaFrench</code> access edges; every other rule reads <code>ctx.degree</code>, where a french window is a connection.</p>
 </div>
 
 <div class="rule">

@@ -26,7 +26,8 @@ import {
  * per-edge assignment; the W1 rule consumes the achieved-vs-target stat.
  *
  * Exterior-edge detection reuses the shared {@link exteriorEdges} utility, so a
- * wall shared with another room (or facing a stair/cluster) is never windowed.
+ * wall shared with another room (or facing a stair/cluster, or facing a SEALED
+ * VOID — empty but with no way out to the border) is never windowed.
  * A band is never narrower than {@link MIN_WINDOW_EDGES} (1200 mm) as a whole.
  *
  * CORNER WRAPPING: a band that exhausts its straight run before the room's
@@ -156,6 +157,9 @@ interface Run {
  * @param roomTypeId        `def.type` (keys {@link WINDOW_CONFIG})
  * @param floorHeight       floor's true floor-to-floor height (world units)
  * @param occupied          set of ALL room/cluster/stair cell keys on the floor
+ * @param isOutside         open-sky test (`Floor.isOutside`) — with `occupied`,
+ *                          THE definition of an exterior edge. A room that walls
+ *                          off a sealed empty pocket gets no window onto it.
  * @param entranceEdgeKeys  edges hosting an entrance — skipped (a door wins there)
  * @param northAngle        project north (degrees, see orientation.ts) — biases
  *                          seed-run selection toward south and classifies the
@@ -176,6 +180,7 @@ export function computeWindows(
   roomTypeId: string,
   floorHeight: number,
   occupied: Set<string>,
+  isOutside: (cx: number, cz: number) => boolean,
   entranceEdgeKeys: Set<string>,
   northAngle = 0,
   frenchEdges?: Set<string>
@@ -200,7 +205,7 @@ export function computeWindows(
   const frenchArea = (frenchEdges?.size ?? 0) * perEdgeGlazing("french", floorHeight);
 
   // Exterior edges, minus any coinciding with an entrance (door wins there).
-  const ext = exteriorEdges(cells, occupied).filter(
+  const ext = exteriorEdges(cells, occupied, isOutside).filter(
     (e) => !entranceEdgeKeys.has(edgeKey(e.cx, e.cz, e.side))
   );
   // Lookup for corner-wrap walking (`stepArm`) — same edge set as `ext`, keyed.

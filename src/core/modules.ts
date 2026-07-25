@@ -67,6 +67,24 @@ export function isElastic(def: ModuleDef): boolean {
   return def.category === "room" && !def.cluster && ELASTIC_TYPES.has(def.type);
 }
 
+/**
+ * The BATHROOM room types — THE one list, shared by the def-level
+ * {@link isBathroom} and rules.ts's node-level `ctx.is.bathroom`, so the two can
+ * never drift when a bathroom preset is added.
+ */
+export const BATHROOM_TYPES = ["bathroom_small", "bathroom_large"];
+
+/**
+ * Whether this def is a bathroom. A bathroom keeps a SOLID wall against outdoor
+ * space — privacy — so it is excluded from french windows at the source
+ * (core/semiExterior.ts): no glass, no daylight credit, no doorless access.
+ * Class is a FUNCTION OF TYPE, derived here in the same spirit as
+ * rules.ts's `ctx.is.*` — never stored per instance (cf. {@link isElastic}).
+ */
+export function isBathroom(def: ModuleDef): boolean {
+  return def.category === "room" && !def.cluster && BATHROOM_TYPES.includes(def.type);
+}
+
 // ---- Footprint helpers -------------------------------------------------------
 
 /** A solid w x d rectangle of cells, origin at (0,0). */

@@ -262,7 +262,8 @@ export class FloorManager {
         // shortfall (§2o).
         const french = floor.semiExterior?.glazedByRoom.get(inst.id);
         const plan = computeWindows(
-          cells, inst.def.type, height, occupied, entranceEdges, this.northAngle, french
+          cells, inst.def.type, height, occupied, floor.isOutside,
+          entranceEdges, this.northAngle, french
         );
         floor.windowStats.set(inst.id, {
           targetRatio: plan.targetRatio,

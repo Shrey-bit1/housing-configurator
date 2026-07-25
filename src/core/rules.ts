@@ -1,4 +1,5 @@
 import type { DwellingGraph, GraphNode } from "./adjacencyGraph";
+import { BATHROOM_TYPES } from "./modules";
 
 /**
  * Layout-rules validation — ADVISORY ONLY.
@@ -92,6 +93,11 @@ interface RuleContext {
    *  (same-floor) ones without re-scanning the edge list. */
   viaStairAdj: Map<string, Set<string>>;
   degree: (id: string) => number;
+  /** Distinct neighbours joined by an AUTHORED DOOR — `degree` minus the
+   *  doorless french-window links (`viaFrench`, core/semiExterior.ts). Used ONLY
+   *  by S1, which asks a question about doors specifically; every other rule
+   *  wants `degree`, where a french window IS a connection. */
+  doorDegree: (id: string) => number;
   is: {
     circulation: (n: GraphNode) => boolean;
     outdoor: (n: GraphNode) => boolean;
@@ -134,9 +140,11 @@ function buildContext(graph: DwellingGraph): RuleContext {
 
   const adj = new Map<string, Set<string>>();
   const viaStairAdj = new Map<string, Set<string>>();
+  const doorAdj = new Map<string, Set<string>>();
   for (const n of graph.nodes) {
     adj.set(n.id, new Set());
     viaStairAdj.set(n.id, new Set());
+    doorAdj.set(n.id, new Set());
   }
   // ACCESS graph only: reachability and connectivity are door-based now, so a
   // TOUCH edge (viaDoor: false) contributes nothing to adjacency here. (Proximity
@@ -148,6 +156,10 @@ function buildContext(graph: DwellingGraph): RuleContext {
     if (e.viaStair) {
       viaStairAdj.get(e.a)?.add(e.b);
       viaStairAdj.get(e.b)?.add(e.a);
+    }
+    if (!e.viaFrench) {
+      doorAdj.get(e.a)?.add(e.b);
+      doorAdj.get(e.b)?.add(e.a);
     }
   }
 
@@ -162,7 +174,9 @@ function buildContext(graph: DwellingGraph): RuleContext {
   const is = {
     circulation: (n: GraphNode) => n.kind === "cluster" && n.roomTypeId === "circulation",
     outdoor: (n: GraphNode) => n.kind === "cluster" && n.roomTypeId === "outdoor",
-    bathroom: (n: GraphNode) => isRoomType(n, "bathroom_small", "bathroom_large"),
+    // Shared list with modules.ts's def-level `isBathroom` (which the french-
+    // window exclusion uses) so the two views of "bathroom" can't drift.
+    bathroom: (n: GraphNode) => isRoomType(n, ...BATHROOM_TYPES),
     bedroom,
     kitchen: (n: GraphNode) => isRoomType(n, "kitchen"),
     living,
@@ -220,6 +234,7 @@ function buildContext(graph: DwellingGraph): RuleContext {
     adj,
     viaStairAdj,
     degree: (id) => adj.get(id)?.size ?? 0,
+    doorDegree: (id) => doorAdj.get(id)?.size ?? 0,
     is,
     entryIds: graph.entryIds,
     hasEntrance: graph.entryIds.length > 0,
@@ -876,19 +891,28 @@ export const RULES: Rule[] = [
   },
 
   // ===== SOFT =====
-  // S1/S2 count ACCESS (door) connections via `ctx.degree` (which is access-only,
-  // see buildContext) — a hub is a *connected* hub, and a balcony with three DOORS
-  // is the real smell, not one that merely abuts three rooms through sealed walls.
+  // S1/S2 count ACCESS connections (not mere physical touch): a hub is a
+  // *connected* hub, and a balcony with three DOORS is the real smell, not one
+  // that merely abuts three rooms through sealed walls.
   // GROUNDING CAVEAT: the empirical anchors (House-GAN Table 1 connection counts)
   // were proximity-based, so these thresholds are approximate under door-based
   // access semantics. (ST1 is likewise access-based, per-end — correct as is.)
   {
+    // THE ONE RULE THAT COUNTS DOORS RATHER THAN CONNECTIONS. S1 reads
+    // `ctx.doorDegree` — AUTHORED doors only — where every other rule reads
+    // `ctx.degree`, which also sees the doorless french-window links. The two
+    // counts differ on purpose: a continuous balcony band GLAZED to three rooms
+    // is a normal typology (a Laubengang-ish terrace, every room opening to the
+    // same sky), and flagging it as a through-route would be wrong; three
+    // authored DOORS onto one balcony still says "route", which is what this
+    // rule is for. O1 correctly keeps reading `ctx.degree`: a balcony with only
+    // a french window IS connected, so it is not orphaned.
     id: "S1",
     severity: "soft",
     description: "Outdoor / balcony over-connected (more than two doors) — usually a leaf space.",
     check(graph, ctx) {
       return graph.nodes
-        .filter((n) => ctx.is.outdoor(n) && ctx.degree(n.id) > 2)
+        .filter((n) => ctx.is.outdoor(n) && ctx.doorDegree(n.id) > 2)
         .map((n) => violation("S1", "soft", n));
     },
   },

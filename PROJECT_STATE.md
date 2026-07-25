@@ -223,10 +223,17 @@ they're a pure function of placement (verified by round-trip). **Exterior
 edges only** — interior openings are the separate, AUTHORED door system (§2i),
 not derived here.
 
+**What "exterior" means** lives in ONE place — `exteriorEdges(cells, occupied,
+isOutside)` — and every consumer passes the same `Floor.isOutside`: an edge is
+exterior iff the cell across it is unoccupied AND border-reachable (or out of
+bounds). See §2o's sealed-void note; the predicate is required, not optional, so
+a call site cannot silently fork the definition.
+
 **Generator** (`computeWindows(cells, roomTypeId, floorHeight, occupied,
-entranceEdgeKeys, northAngle=0) → WindowPlan`, pure, no Three.js — the plan is a
-pure function of footprint + floorHeight + occupancy + entrances + **northAngle**,
-so it reproduces identically on load/undo/rotate/mirror/dial):
+isOutside, entranceEdgeKeys, northAngle=0, frenchEdges?) → WindowPlan`, pure, no
+Three.js — the plan is a pure function of footprint + floorHeight + occupancy +
+entrances + **northAngle**, so it reproduces identically on
+load/undo/rotate/mirror/dial):
 - Per-type policy in `WINDOW_CONFIG` (tunable): Living/Recreation → ratio 1/6,
   full-height; Bedroom S/L → 1/10, framed; Kitchen → fixed one 2-edge band,
   framed; Bathroom/Circulation/Outdoor (absent from the table) → none.
@@ -1341,9 +1348,21 @@ keys: rooms + clusters + stairs + hole projections). Furniture is deliberately
 transparent — a 0.6 m cube parked at a balcony edge takes away no sky.
 *Finding:* the "item-1 fix" the W1 comment refers to only adds stair-hole
 projections to that occupied set; it does NOT do border-reachability, so there
-was no existing mechanism to reuse — hence the extraction. (A room facing a
-sealed EMPTY void still counts as truly exterior; that pre-existing gap is
-untouched here.)
+was no existing mechanism to reuse — hence the extraction.
+
+**BATHROOMS ARE EXCLUDED (follow-up).** A bathroom keeps a solid wall against
+outdoor space — privacy. The exclusion is one `continue` at the TOP of
+`computeSemiExterior`'s rooms loop, via the def-level type predicate
+`isBathroom` (modules.ts, sharing `BATHROOM_TYPES` with rules.ts's
+`ctx.is.bathroom` so the two views can't drift). Placing it at the source is
+what makes every consequence fall out in the right direction, with no second
+special case anywhere: no glass, no daylight credit, no doorless access; a
+balcony whose ONLY contact is a bathroom is unreachable, so OD1 fires; and
+because the door-authoring block reads `plan.boundary` — built inside that same
+loop, after the exclusion — a NEW bathroom↔terrace door is AUTHORABLE again
+(there is no french window there to make it redundant), while an old file's door
+survives untouched via `isDoorValid`. Kitchens deliberately KEEP theirs: D2
+wants the ventilation.
 
 **Geometry (A2).** On a semi-exterior edge the room's wall builds as glass from
 0 to `DOOR_OPENING_H` (2100 mm, the constant — not a literal) and solid above,
@@ -1398,12 +1417,50 @@ that means it touches no room along a glazeable run, or only rooms that are
 themselves unreachable. O1 (soft) is now gated to the no-entrance case so the
 two never double-flag the same node.
 
+**S1 counts AUTHORED doors only (follow-up).** `RuleContext` gained
+`doorDegree` — the same adjacency as `degree` minus the `viaFrench` links — and
+**S1 is the only rule that reads it**. A continuous balcony band glazed to three
+rooms is a normal typology and stays quiet; three real doors onto one balcony
+still flags. Everyone else keeps `degree`, where a french window IS a connection
+— that is the point of O1's gate comment: a balcony with only a french window is
+connected, not orphaned.
+
 **`cellKinds` (A6).** The bridge export gains an OPTIONAL array parallel to
 `storeys[].cells` (`"room" | "outdoor" | "circulation" | "stair"`), so the
 building can show a balcony as a recess. Absent ⇒ all `"room"` = today's
 behaviour, so the format stays **version 1** (see docs/bridge-format.md).
 Semi-exterior edges are interior to the unit and do NOT appear in the envelope;
 a balcony's own outer edges still export as `open`.
+
+**SEALED VOIDS ARE NOT EXTERIOR — behaviour change, 2026-07-25 (follow-up).**
+An edge faces the exterior iff the cell across it is empty AND border-reachable,
+or out of bounds. An edge facing a pocket the plan walls in on every side is
+plain interior wall: no D1/D2 credit, no window onto a sightless shaft, no
+entrance placeable there, and the pocket's edges are absent from the bridge
+export's envelope entirely (not `"blank"` — there is nothing there).
+
+*Routing:* ONE change at the shared utility. `exteriorEdges` took a third,
+**required** `isOutside` parameter, so tsc enumerated every consumer and none can
+keep the old semantics by omission — windows, D1/D2 + W1's gate (via
+`hasTrueExteriorEdge`), entrance validity/E2, and the export envelope now agree
+by construction. All four pass `Floor.isOutside`, which reads the plan
+`computeSemiExterior` already produced, so the border flood fill still runs
+exactly ONCE per floor per derive pass (expansion's is a second, separate fill
+under a different emptiness predicate — hard occupancy incl. furniture and holes
+— and cannot be shared). `EntranceController` refuses a non-outside cell up
+front, and `clusterShells`' railing test now reads the same `Floor.isOutside`
+(dropping its `?? !ownerId` fallback).
+
+*Deliberate consequence:* an older layout with a fixed-room-sealed pocket newly
+FAILS D1/D2 where it used to pass. Decided, not an accident.
+
+*Which rooms this can actually reach:* every habitable room type is elastic, and
+expansion absorbs any empty gap adjacent to an elastic seed — so a habitable room
+can only face a surviving sealed void when the pocket is blocked from absorption,
+i.e. it holds FURNITURE (hard for expansion, transparent for the exterior test).
+The general case is a void sealed by fixed rooms/clusters, which D2 (kitchen) and
+the window/entrance/export consumers see. Both are covered in the harness. If the
+parked elastic growth LIMIT (§7) ever lands, plain D1 cases return.
 
 **Parked (deliberately, not oversights):** corner-wrap for french bands; a
 daylight discount for balcony depth; the Laubengang case (a balcony that

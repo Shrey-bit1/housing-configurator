@@ -198,7 +198,10 @@ function buildStorey(
     const roomCells =
       floor.effectiveCells.get(inst.id) ??
       occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored);
-    const plan = computeWindows(roomCells, inst.def.type, height, occupied, windowSkip, fm.northAngle);
+    const plan = computeWindows(
+      roomCells, inst.def.type, height, occupied, floor.isOutside,
+      windowSkip, fm.northAngle
+    );
     for (const key of plan.edges.keys()) glazedKeys.add(key);
   }
 
@@ -210,7 +213,10 @@ function buildStorey(
       outdoorCells.add(cellKey(c.cx, c.cz));
   }
 
-  const edges: UnitEdge[] = exteriorEdges(cells, occupied).map((e) => {
+  // The envelope is the SAME exterior test the rules and windows use, sealed-void
+  // gating included — a pocket the flat walls in is not facade, so its edges are
+  // absent from the envelope entirely (not "blank": there is nothing there).
+  const edges: UnitEdge[] = exteriorEdges(cells, occupied, floor.isOutside).map((e) => {
     const key = edgeKey(e.cx, e.cz, e.side);
     const cls: UnitEdgeClass = entranceKeys.has(key)
       ? "entrance"
