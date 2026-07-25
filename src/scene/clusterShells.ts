@@ -117,13 +117,20 @@ function clusterWallOpts(floor: Floor, component: Cell[], key: string): Boundary
   for (const c of component) {
     for (const side of SIDES) {
       const [dx, dz] = SIDE_DELTA[side];
-      const ownerId = floor.effectiveOwnerAt(c.cx + dx, c.cz + dz);
-      if (!ownerId) {
-        // Open air: a balcony guards it with a railing, a corridor walls it.
+      const nx = c.cx + dx;
+      const nz = c.cz + dz;
+      const ownerId = floor.effectiveOwnerAt(nx, nz);
+      // "Open air" is the RULES' exterior test — empty of any SPACE and
+      // reachable from the grid border (semiExterior.isOutside). Furniture is
+      // transparent, so a cube parked at a balcony edge no longer grows a
+      // full-height stub there; an enclosed void behind a balcony is NOT open
+      // air and reads as walled.
+      if (floor.semiExterior?.isOutside(nx, nz) ?? !ownerId) {
+        // A balcony guards it with a railing; a corridor walls it.
         if (outdoor) rails.add(edgeKey(c.cx, c.cz, side));
         continue;
       }
-      const def = floor.store.instances.get(ownerId)?.def;
+      const def = ownerId ? floor.store.instances.get(ownerId)?.def : undefined;
       if (!def) continue;
       const isRoom = def.category === "room" && !def.cluster;
       const dissolves = outdoor

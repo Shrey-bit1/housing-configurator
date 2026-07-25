@@ -1300,12 +1300,116 @@ Windows are unaffected by construction (connector-facing edges are interior, so
 none is ever generated there). A door authored on a dissolved boundary stays
 valid, its marker renders, and the door-cut logic tolerates the missing segment.
 
-**VISUAL AHEAD OF SEMANTICS — recorded deliberately.** A3/A4 are a look decided
-before the meaning. The graph still emits no ACCESS edge without a door, D1
-still ignores outdoor adjacency, and the bridge export still classifies these
-edges by the existing rules. The tool therefore shows an opening that the rules
-treat as sealed. The planned **semi-exterior / access design pass** will
-reconcile the two; until then, do not read a dissolved wall as reachability.
+**Outdoor↔stair keeps a full wall on purpose.** A stair renders stepped
+geometry and never had a shell wall, so there was never a doubled wall to
+remove there — and a balcony against a stair core should read as walled, not
+open. (Circulation↔stair DOES dissolve: that is a corridor meeting the stair it
+serves.)
+
+**WHAT A3/A4 ACTUALLY DID (corrected).** An earlier draft of this note claimed
+the tool "shows an opening that the rules treat as sealed". That has been untrue
+since `b55e7c4`: the dissolve is ONE-SIDED, rooms keep every wall, and all that
+disappears is the connector's redundant second leaf — de-doubling, not opening.
+Nothing looked open, so nothing was out of step with the rules.
+
+**The semantics question is now CLOSED for room↔outdoor.** The semi-exterior
+pass (§2o) makes that boundary a french window: real glazing (D1/D2/W1/OR1) and
+real access (a doorless ACCESS edge). Room↔circulation is deliberately NOT
+generalised — an interior boundary still needs an authored door.
+
+### 2o. Semi-exterior edges — the balcony boundary is a french window
+
+**The concept.** Where a room and an Outdoor cluster share a boundary, that
+boundary is not a solid wall: it is glazed from the floor to the door head and
+solid above, and **the glass IS the door** — you walk through it onto the
+balcony. Everything else follows from that one physical fact: the room has real
+daylight there (D1/D2 satisfied, area counts toward W1, orientation feeds OR1)
+and real access to the balcony (an ACCESS edge with no authored door). Owner:
+`core/semiExterior.ts`; derived every rebuild, never stored.
+
+An EDGE is what `exteriorEdges.ts` already means — one cell plus one of its four
+sides, 0.6 m. A room edge is semi-exterior iff the cell across it belongs to a
+QUALIFYING Outdoor cluster, so a run half against a balcony and half against a
+bedroom is half french window, half solid wall.
+
+**Qualification (A1).** A cluster confers nothing unless IT reaches the outside:
+some cluster edge must face a cell that is empty and border-reachable (or out of
+bounds). A courtyard sealed inside the flat has no sky. The flood fill is the
+one in `expansion.ts` (`borderReachableEmpty`, extracted and shared — never a
+second implementation), fed the RULES' notion of occupancy (`buildSpaceTargets`
+keys: rooms + clusters + stairs + hole projections). Furniture is deliberately
+transparent — a 0.6 m cube parked at a balcony edge takes away no sky.
+*Finding:* the "item-1 fix" the W1 comment refers to only adds stair-hole
+projections to that occupied set; it does NOT do border-reachability, so there
+was no existing mechanism to reuse — hence the extraction. (A room facing a
+sealed EMPTY void still counts as truly exterior; that pre-existing gap is
+untouched here.)
+
+**Geometry (A2).** On a semi-exterior edge the room's wall builds as glass from
+0 to `DOOR_OPENING_H` (2100 mm, the constant — not a literal) and solid above,
+via a third `WindowVariant`, `"french"`. It is the door opening's inverse: the
+glazed height is fixed and the panel above grows on taller floors. The Outdoor
+side still builds nothing (§2n's one-sided rule is unchanged).
+
+**Band selection.** Semi-exterior edges group into maximal contiguous straight
+runs (a run that turns a corner is two runs — corner-wrap is PARKED). For a run
+of `n` cells the glazed width is `w = max(2, min(round(0.75n), n − 2))`, and
+`w > n` (only n = 1) means no window at all:
+
+| n | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | ≥8 |
+|---|---|---|---|---|---|---|---|---|----|
+| w | — | 2 | 2 | 2 | 3 | 4 | 5 | 6 | round(0.75n) |
+
+So the one-cell returns cap the band below 75% for runs of 4–7 cells; the 75%
+target only governs from 8 cells (4.8 m) up. Rounding is ROUND-HALF-UP
+(`Math.round`) — n = 2 and n = 6 depend on it; do not "tidy" it to a floor. The
+2-cell minimum is 1.2 m — the SIA 500 accessible width this codebase already
+uses and exactly the door preset's 1200 mm — so **the smallest french window is
+precisely one door wide**; that is the justification, not a coincidence. The
+band is centred (`Math.floor((n − w) / 2)` solid cells lead, walking the run
+ascending cx then cz), so an odd remainder puts the extra solid cell at the far
+end. Verified identical in all 4 rotations × mirrored.
+
+**Exterior status (A3).** `GraphNode.hasExteriorEdge` — D1's and D2's hinge, and
+W1's gate — is now `hasTrueExteriorEdge || hasSemiExteriorEdge`, the two halves
+kept separate on the node because the bridge export classifies only true
+exterior edges and a future daylight-discount rule will want the distinction.
+ONLY GLAZED cells count: a 1-cell contact confers nothing, so a room touching a
+balcony at one cell and nothing else still fails D1 — 0.6 m holds no window.
+French edges are placed by construction BEFORE the band generator, which can
+never double-band them (their neighbour cell is occupied, so `exteriorEdges`
+never offered them) and whose target is reduced by the french area first, so W1
+scores the room's real glazing. Entrances stay blocked on these edges (E2 agrees
+by construction — the balcony cell is occupied).
+
+**Access (A4).** A room and a qualifying cluster sharing a glazed run get an
+ACCESS edge (`viaDoor: true, viaFrench: true`) with no authored door. No glass ⇒
+no access. Room↔circulation is unchanged (authored door required). **Outdoor
+clusters are LEAVES for routing**: reachable, never a through-route between two
+interior rooms — enforced in `reachableFrom` and `accessDepths` (seeds still
+expand, so an entrance on a terrace can't isolate the dwelling). Verified: a
+fixture's interior depths, escape depths, circulation fraction and G1 are
+byte-identical pre/post pass. Doors already authored on a room↔outdoor boundary
+stay valid and keep rendering; NEW ones are blocked with a hint
+(`isDoorAuthorable`, distinct from the untouched `isDoorValid`).
+
+**OD1 (A5, HARD).** An Outdoor cluster not reachable from an entrance. With A4
+that means it touches no room along a glazeable run, or only rooms that are
+themselves unreachable. O1 (soft) is now gated to the no-entrance case so the
+two never double-flag the same node.
+
+**`cellKinds` (A6).** The bridge export gains an OPTIONAL array parallel to
+`storeys[].cells` (`"room" | "outdoor" | "circulation" | "stair"`), so the
+building can show a balcony as a recess. Absent ⇒ all `"room"` = today's
+behaviour, so the format stays **version 1** (see docs/bridge-format.md).
+Semi-exterior edges are interior to the unit and do NOT appear in the envelope;
+a balcony's own outer edges still export as `open`.
+
+**Parked (deliberately, not oversights):** corner-wrap for french bands; a
+daylight discount for balcony depth; the Laubengang case (a balcony that
+genuinely connects two rooms) — outdoor stays a routing leaf until then; and
+whether a buried balcony should cost what buried glazing costs in the building
+packer's fitness (see BRIDGE.md).
 
 ## 3. Key data structures / formats (written out)
 
