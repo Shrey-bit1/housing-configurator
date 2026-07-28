@@ -18,3 +18,13 @@ dist/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Cowork bridge: machine-local context file. The rest of _cowork/ is
+# committed on purpose — see .claude/bridge/PROTOCOL.md
+_cowork/CONTEXT.md
+
+# Cowork bridge: keep the protocol and skills tracked, ignore the rest of .claude/
+!.claude/
+.claude/*
+!.claude/bridge/
+!.claude/skills/
