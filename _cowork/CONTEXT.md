@@ -26,7 +26,7 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** `elastic-rooms`
+**Branch:** `main`
 **Last updated:** 2026-07-28
 
 ## What this project is
@@ -100,11 +100,10 @@ rules engine and the export format are the mature parts, the UI is not.
 
 3. **`.claude/` is mostly gitignored, but the bridge is deliberately exempt.** A
    pre-existing rule ignores `.claude/` wholesale; four negation rules at
-   `.gitignore:27-30` carve `.claude/bridge/` and `.claude/skills/` back out, so the
+   `.gitignore:28-31` carve `.claude/bridge/` and `.claude/skills/` back out, so the
    protocol and the three skills are versioned alongside the records they produce.
    Everything else directly under `.claude/` — `settings.local.json`, `launch.json` —
-   stays ignored as machine-local. `_cowork/CONTEXT.md` (this file) is the other
-   deliberate exception, for the same reason: it holds an absolute path.
+   stays ignored as machine-local.
 
 4. **Three.js is Y-up, so the plan is the X/Z plane, not X/Y.** `CELL_SIZE` is
    0.6 m, floor height is derived rather than configured, and rooms are hollow
