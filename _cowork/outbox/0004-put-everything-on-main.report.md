@@ -134,6 +134,24 @@ satisfy it.
 `.claude/skills/next/SKILL.md` is therefore unchanged. Its closing sub-step still
 reads as it did after run 0003, quoted in full below.
 
+### The by-name step misses a deletion when the prompt was already committed
+
+Committing this run's record by naming three paths left one change unstaged, and the
+gap only appears in the circumstances this prompt created. Task 1 committed the prompt
+file while it was still sitting in `_cowork/inbox/`, so when the closing step moved it
+to `_cowork/done/` git saw an addition under `done/`, which the by-name staging
+covered, and a deletion under `inbox/`, which it did not. Runs 0002 and 0003 never hit
+this, because in both of them the prompt file had never been committed in the inbox, so
+the move produced an addition and nothing else.
+
+The leftover was found by reading `git status` after the record commit rather than
+assuming the tree was clean, and it was fixed by staging that deletion by name in a
+follow-up commit. The earlier commit was left alone, since a constraint here forbids
+rewriting existing commits. This is a small argument in favour of task 4's intent: a
+step that stages everything would not have missed it. It is also an argument for
+naming four paths rather than three, which is the cheaper of the two fixes and does not
+need a permission that this environment withholds.
+
 ### The three lines in CONTEXT.md
 
 All three were wrong in the way the prompt described, and all three were corrected.
