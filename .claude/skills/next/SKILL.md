@@ -71,7 +71,21 @@ padding.
    relevant section of `_cowork/CONTEXT.md` and its **Last updated** line. That file
    is how future planning sessions orient themselves; a stale one sends them wrong.
    Skip this for ordinary edits.
-5. Reply with **only** these three lines. No summary, no recap — the report file
+5. **Commit this run's own record, and nothing else.** Stage exactly three paths by
+   name: the report in `_cowork/outbox/`, the prompt now sitting in `_cowork/done/`,
+   and `_cowork/LOG.md`. Commit them with the message `bridge: <id> <title>`.
+
+   `git add -A` and `git add .` are forbidden in this step. A skill that commits on
+   every run is the one place a stray flag does lasting damage: it would sweep up
+   whatever else happened to be in the working tree and write it into history under a
+   message describing something else.
+
+   Nothing else goes into that commit, whatever else the run touched. If the work
+   changed code, or updated `_cowork/CONTEXT.md` in the step above, those changes stay
+   in the working tree so a person commits them deliberately after reading them.
+   Committing is where this stops; pushing is a separate decision that belongs to
+   whoever is watching the run.
+6. Reply with **only** these three lines. No summary, no recap — the report file
    already holds all of it, and the planning session reads that, not this:
 
 ```
