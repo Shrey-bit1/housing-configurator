@@ -12,3 +12,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0002 | 2026-07-28 | Verify and push the bridge commit | complete | 0002-verify-and-push-the-bridge-commit.report.md |
 | 0003 | 2026-07-28 | Make the bridge survive a clone | complete | 0003-make-the-bridge-survive-a-clone.report.md |
 | 0004 | 2026-07-28 | Put everything on main | partial | 0004-put-everything-on-main.report.md |
+| 0005 | 2026-07-28 | Fix the commit rule and delete the stale branches | partial | 0005-fix-the-commit-rule-and-delete-stale-branches.report.md |
