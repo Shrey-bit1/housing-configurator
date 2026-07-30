@@ -286,6 +286,13 @@ export class Floor {
    * Only placed rooms/modules and the grid are touched — the drag ghost (which
    * only ever lives on the active floor) is left alone.
    */
+  /** Re-run the colour pass at the dim state already in force. Needed when
+   *  something changed a material's `baseColor` without changing the dimming,
+   *  which is what the Interface view does when it neutralises room colours. */
+  refreshColors(): void {
+    this.setDimmed(this.dimmed);
+  }
+
   setDimmed(dimmed: boolean): void {
     this.dimmed = dimmed; // remembered so rebuilt seed outlines re-apply it
     // Per-instance rooms/modules: fall back to the room colour.

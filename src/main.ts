@@ -531,6 +531,18 @@ structureToggle.addEventListener("click", () => {
   structureToggle.classList.toggle("active", structureOn);
 });
 
+// "Interface view" toggle (default OFF): shows only the binding level of a unit
+// — perimeter with its glazing, wet cells, stair, balconies, entrance — and
+// reduces everything else to one open plate. Pure view state: never serialized,
+// nothing in the export changes, and turning it off restores the scene.
+const interfaceToggle = document.getElementById("interface-toggle") as HTMLButtonElement;
+let interfaceOn = false;
+interfaceToggle.addEventListener("click", () => {
+  interfaceOn = !interfaceOn;
+  floors.setInterfaceView(interfaceOn);
+  interfaceToggle.classList.toggle("active", interfaceOn);
+});
+
 // Initial view: frame whatever's on the (likely empty) starting floor instead
 // of a hardcoded camera position, so this stays correct however the default
 // grid size changes.

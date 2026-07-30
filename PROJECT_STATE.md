@@ -1776,6 +1776,31 @@ View, Top View, Diagram) are all mutually aware of each other's state.
   per-floor visibility/dimming (the pass only ever flips `wallNormal`-tagged
   `.visible`). Lives in the bottom-right `#view-controls` group with the compass
   dial; both hide in diagram mode.
+- **Interface view toggle** (`#interface-toggle`, main.ts; `setInterfaceView`,
+  floorManager.ts): shows only the BINDING level of a unit and reduces the rest
+  to one open plate. Default OFF, session VIEW state, never serialized, no
+  effect on the `dwelling-unit` export.
+  - **Kept as-is:** wet rooms (`isWet` — `bathroom_small`, `bathroom_large`,
+    `kitchen`), stairs, Outdoor clusters (balconies/terraces), entrance markers,
+    and every wall segment sitting on the flat's OUTER boundary with its glazing.
+  - **Stripped from every non-wet room:** interior partitions, furniture props,
+    interior door markers and arcs, and the room's own colour.
+  - **Two mechanisms, both filters.** Walls go through the shell rebuild:
+    `partitionEdges()` returns the LOCAL edge keys whose neighbour cell is
+    occupied, and those are handed to `rebuildRoomWalls` as the existing
+    `BoundaryWallOpts.skip` set (the same dissolve the Outdoor boundary uses),
+    so no new geometry path exists. Mesh visibility cannot do this job: a room's
+    walls are merged ONE MESH PER DIRECTION (moduleMesh.ts ~L451-498), so a
+    single mesh holds both facade and partition segments. Furniture, colour and
+    door markers are plain visibility/material state in `applyInterfaceView()`.
+  - Colour goes through `material.userData.baseColor`, which `fade()` (floor.ts)
+    already treats as authoritative, so the view composes with dimming and the
+    cutaway instead of fighting them; `Floor.refreshColors()` re-runs that pass.
+  - **`INTERFACE_TINT_BEDROOMS`** (floorManager.ts, exported const): when true,
+    bedrooms keep a tinted plate marking position. Whether bedroom positions are
+    part of the binding level is still open, so this is one line to flip.
+  - Door markers hide via `DoorView.setVisible()`, which restores the arc state
+    `setArcsVisible` last asked for, so the plan/3D arc toggle survives.
 
 ---
 

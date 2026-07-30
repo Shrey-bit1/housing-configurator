@@ -85,6 +85,32 @@ export function isBathroom(def: ModuleDef): boolean {
   return def.category === "room" && !def.cluster && BATHROOM_TYPES.includes(def.type);
 }
 
+/**
+ * The WET room types — bathrooms plus the kitchen. These are the spaces that
+ * carry plumbing, so they are the ones whose position is binding on the building
+ * around the flat rather than exchangeable inside it.
+ *
+ * There is no shaft type in this app yet. When one is added it belongs in this
+ * list, because every consumer here asks "does this cell need a pipe" rather
+ * than "is this a bathroom", and a shaft answers yes.
+ */
+export const WET_TYPES = [...BATHROOM_TYPES, "kitchen"];
+
+/** Whether this def is a wet room. Class is a FUNCTION OF TYPE, derived here in
+ *  the same spirit as {@link isBathroom} and {@link isElastic}. */
+export function isWet(def: ModuleDef): boolean {
+  return def.category === "room" && !def.cluster && WET_TYPES.includes(def.type);
+}
+
+/** The BEDROOM room types, shared by the interface view's position tint and by
+ *  rules.ts's node-level `ctx.is.bedroom`. */
+export const BEDROOM_TYPES = ["bedroom_small", "bedroom_large"];
+
+/** Whether this def is a bedroom. */
+export function isBedroom(def: ModuleDef): boolean {
+  return def.category === "room" && !def.cluster && BEDROOM_TYPES.includes(def.type);
+}
+
 // ---- Footprint helpers -------------------------------------------------------
 
 /** A solid w x d rectangle of cells, origin at (0,0). */

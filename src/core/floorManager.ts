@@ -3,7 +3,7 @@ import { CELL_SIZE, cellKey, type Grid, type Cell } from "./grid";
 import { Floor } from "./floor";
 import { MODULE_DEFS, occupiedCells, type ModuleDef } from "./modules";
 import type { ProjectFile } from "./projectIO";
-import { edgeKey, parseEdgeKey } from "./exteriorEdges";
+import { edgeKey, parseEdgeKey, SIDES, SIDE_DELTA } from "./exteriorEdges";
 import { computeWindows, type WindowVariant } from "./windows";
 import {
   buildSpaceTargets,
@@ -19,7 +19,7 @@ import { computeDwellingGraph, dwellingNodeId } from "./adjacencyGraph";
 import { computeEntranceDepths } from "./rules";
 import { computeExpansion } from "./expansion";
 import { computeSemiExterior } from "./semiExterior";
-import { isElastic } from "./modules";
+import { isElastic, isWet, isBedroom } from "./modules";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
 import type { GroupGhostPreview } from "../scene/groupGhostPreview";
@@ -36,6 +36,22 @@ const DEFAULT_FLOOR_CELLS = 4;
  *  height — this is also how far room/cluster walls now rise above the tallest
  *  room's nominal height, so they still meet the plate above with no gap. */
 const CLEARANCE_CELLS = 1;
+
+/**
+ * THE bedroom-tint flag for the Interface view. Whether bedroom POSITIONS belong
+ * in the binding level is still open: the 28 July meeting asked at 30:20 for a
+ * view showing "only the outline and the units", while the export list for the
+ * same meeting names bedroom positions among the things a unit communicates.
+ * Flip this one line to settle it either way. `true` marks each bedroom with a
+ * tinted plate; `false` leaves bedrooms indistinguishable from the open area.
+ */
+export const INTERFACE_TINT_BEDROOMS = true;
+
+/** The neutral plate colour every stripped room falls back to in the Interface
+ *  view, so the freed area reads as one continuous surface. */
+const OPEN_PLATE = 0xd8d4cb;
+/** The bedroom position tint, used only when {@link INTERFACE_TINT_BEDROOMS}. */
+const BEDROOM_TINT = 0xa9bcd0;
 
 interface FloorDeps {
   picker: Picker;
@@ -82,6 +98,9 @@ export class FloorManager {
   private seedOutlinesVisible = false;
   /** "Structure" x-ray view flag (see {@link setStructureView}). */
   private structureView = false;
+
+  /** "Interface view" flag (see {@link setInterfaceView}). */
+  private interfaceView = false;
 
   constructor(
     private scene: THREE.Scene,
@@ -294,6 +313,14 @@ export class FloorManager {
           roomDoors.get(inst.id), // LOCAL door-edge keys for this room (or undefined)
           elastic
             ? cells.map((c) => ({ cx: c.cx - inst.origin.cx, cz: c.cz - inst.origin.cz }))
+            : undefined,
+          // INTERFACE VIEW: dissolve this room's INTERIOR partitions and keep the
+          // segments that sit on the flat's outer boundary, so the perimeter and
+          // its glazing survive while the inside opens up. Reuses the `skip` set
+          // the Outdoor dissolve already introduced, which is why the view needs
+          // no new geometry path (see setInterfaceView).
+          this.interfaceView && !isWet(inst.def)
+            ? { skip: this.partitionEdges(cells, occupied, inst.origin) }
             : undefined
         );
         if (elastic) {
@@ -309,6 +336,76 @@ export class FloorManager {
     });
     // Walls are brand-new meshes after this pass — re-apply the x-ray view.
     this.applyStructureView();
+  }
+
+  /**
+   * The LOCAL edge keys of `cells` that face another occupied space rather than
+   * the outside, which is exactly the set of interior partitions. An edge whose
+   * neighbour cell is unoccupied is on the flat's outer boundary and is kept.
+   *
+   * Walls are only ever built where a room's own footprint ends, so testing the
+   * neighbour against the floor's occupied set is enough to classify every
+   * segment that exists. Local keys, because walls are built in the room's local
+   * frame (absolute − origin), matching the window and door key convention.
+   */
+  private partitionEdges(
+    cells: Cell[], occupied: Set<string>, origin: Cell
+  ): Set<string> {
+    const skip = new Set<string>();
+    for (const c of cells)
+      for (const side of SIDES) {
+        const [dx, dz] = SIDE_DELTA[side];
+        if (!occupied.has(`${c.cx + dx},${c.cz + dz}`)) continue; // faces outside
+        skip.add(edgeKey(c.cx - origin.cx, c.cz - origin.cz, side));
+      }
+    return skip;
+  }
+
+  /**
+   * INTERFACE VIEW (view state, never serialized). The thesis reads a unit at
+   * two levels: the binding one, which is where the wet cells, the stair, the
+   * balconies, the entrance and the facade sit, and the exchangeable one, which
+   * is how the rest of the interior is divided. This view shows only the first.
+   *
+   * With it on, wet rooms, stairs, balconies, terraces and the entrance marker
+   * are untouched, and every other room loses its interior partitions, its
+   * furniture, its interior door markers and its own colour, so the freed area
+   * reads as one open plate inside a perimeter that stays standing. Bedrooms
+   * keep a tinted plate marking position, behind {@link INTERFACE_TINT_BEDROOMS}.
+   *
+   * Two mechanisms, both filters rather than model changes. Walls go through the
+   * shell rebuild, because a room's wall meshes are merged one-per-direction and
+   * a single mesh therefore holds both facade and partition segments, so mesh
+   * visibility cannot separate them. Furniture, colour and door markers are
+   * plain visibility and material state, applied here.
+   */
+  setInterfaceView(on: boolean): void {
+    this.interfaceView = on;
+    this.rebuildAllShells();  // walls: partitions dissolve, perimeter stays
+    this.applyInterfaceView(); // furniture, colour, door markers
+  }
+
+  private applyInterfaceView(): void {
+    const on = this.interfaceView;
+    for (const floor of this.floors) {
+      for (const inst of floor.store.instances.values()) {
+        if (inst.def.category !== "room" || inst.def.cluster) continue;
+        const stripped = on && !isWet(inst.def);
+        for (const child of inst.group.children)
+          if (child.userData.props) child.visible = !stripped;
+        // Colour goes through `baseColor`, which the dim pass already treats as
+        // authoritative (floor.ts `fade`), so the view composes with dimming and
+        // with the cutaway instead of fighting them for the same material.
+        const mat = inst.group.userData.material as THREE.Material | undefined;
+        if (mat) {
+          const tint = INTERFACE_TINT_BEDROOMS && isBedroom(inst.def);
+          if (stripped) mat.userData.baseColor = tint ? BEDROOM_TINT : OPEN_PLATE;
+          else delete mat.userData.baseColor;
+        }
+      }
+      floor.refreshColors();      // re-run `fade` so the baseColor change lands
+      floor.doorView.setVisible(!on);
+    }
   }
 
   /**

@@ -137,6 +137,15 @@ export class DoorView {
     this.arcs.visible = visible;
   }
 
+  /** Show/hide every door marker and its arc together, for the Interface view:
+   *  an interior door describes how the flat is divided, which that view drops.
+   *  Turning it back on restores whatever {@link setArcsVisible} last asked for,
+   *  so the plan/3D arc state survives the round trip. */
+  setVisible(visible: boolean): void {
+    this.group.visible = visible;
+    this.arcs.visible = visible && this.arcsVisible;
+  }
+
   /** The marker meshes (for raycast picking / selection). */
   get markers(): THREE.Object3D[] {
     return [...this.group.children];
