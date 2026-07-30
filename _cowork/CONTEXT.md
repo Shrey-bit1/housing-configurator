@@ -50,8 +50,10 @@ rules engine and the export format are the mature parts, the UI is not.
   selection and group ops, door and entrance placement, raycast picking.
 - `src/ui/` — DOM panels: palette, validation report, bubble diagram, compass dial,
   toasts.
-- `docs/` — the flat→building JSON spec, the rules reference (HTML plus a generated
-  PDF), and the analysis behind the two-repo split.
+- `docs/` — the flat→building JSON spec, the rules reference (HTML only since run
+  0013), and the analysis behind the two-repo split. The built PDFs were removed from
+  the repo in commit 6d214ad and live on the Drive; `docs/build-pdf.py` regenerates
+  them from the HTML on demand and `.gitignore` now keeps them from coming back.
 - `dist/`, `node_modules/` — build output and dependencies, both gitignored.
 - `.claude/` — dev-server launch configs, and this bridge. **Gitignored** (see
   Non-obvious things).
@@ -63,6 +65,9 @@ rules engine and the export format are the mature parts, the UI is not.
   any layout it wants without a human. Run 0009 reported the opposite; the cause was
   `importProjectText`'s unconditional `window.confirm`, which run 0010 made conditional
   on there being something to replace.
+- `captures/` — rendered PNGs of views, written by the app itself through the dev
+  server (see How to work with it). New in run 0013 and untracked, so it never shows
+  up in a clone; the first capture creates it.
 - `_cowork/` — the bridge traffic. Tracked in git on purpose.
 
 ## Entry points
@@ -82,15 +87,28 @@ rules engine and the export format are the mature parts, the UI is not.
 - **Node is not on PATH** in shells spawned by tooling. It lives at
   `C:\Program Files\nodejs` and has to be prepended before `npm` will resolve.
   `.claude/dev.cmd` exists purely to work around this.
-- **There is a test suite as of run 0008, and it is one file.** `npm test` runs
-  `vitest run`; it takes under a second and needs no config file. The one file is
-  `src/core/exteriorEdges.test.ts`, four cases over the `isFacadeEdge` predicate.
-  Everything else is still verified the old way: `tsc` clean, `npm run build` clean, and
-  driving the app in a real browser. Since run 0010 the Check Layout panel is fully
-  scriptable: write a fixture into `testflats/`, open `?project=<name>`, and read
-  `#validation-panel` from the DOM. That works even with the Browser pane hidden, because
-  the panel is DOM rather than pixels, so rule work no longer depends on the pane. Only
-  geometry still needs screenshots.
+- **There is a test suite as of run 0008.** `npm test` runs `vitest run`; it needs no
+  config file and takes about three seconds. Two files as of run 0013:
+  `src/core/exteriorEdges.test.ts`, five cases over the `isFacadeEdge` predicate, and
+  `src/core/unitExport.test.ts`, three cases over the export glazing invariant. Read the
+  second one's header before trusting it, because it deliberately does not call
+  `buildUnitExport` and says why. Everything else is still verified the old way: `tsc`
+  clean, `npm run build` clean, and driving the app in a real browser. Since run 0010 the
+  Check Layout panel is fully scriptable: write a fixture into `testflats/`, open
+  `?project=<name>`, and read `#validation-panel` from the DOM. That works even with the
+  Browser pane hidden, because the panel is DOM rather than pixels.
+- **Geometry is scriptable too, since run 0013.** In DEV the app exposes
+  `window.__app` with the floor manager, camera, scene, controls, renderer, the
+  plan-mode entry points, and `capture(name)`, which renders one frame and POSTs the
+  canvas to `/__capture?name=…`; the `capture-sink` plugin in `vite.config.ts` writes it
+  under `captures/`. So a check can read a mesh's real dimensions rather than describe a
+  screenshot, and can leave a rendered plan behind as a file. Both are behind
+  `import.meta.env.DEV` and `apply: "serve"`, so neither ships.
+- **Restart the dev server at the start of a session.** Run 0013 found one that had
+  been running for four hours and was serving a transform of `src/scene/clusterShells.ts`
+  from before run 0011 edited it, which threw on every page load while the source in the
+  repo was fine. A long-lived server is not a trustworthy one; `rm -rf node_modules/.vite`
+  clears the cache if a restart alone does not.
 - Python is needed for exactly one thing: `docs/build-pdf.py`, which regenerates the
   rules PDF when `rules.ts` changes.
 - `CLAUDE.md` requires that `PROJECT_STATE.md` be updated before any feature is
