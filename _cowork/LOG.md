@@ -19,3 +19,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0009 | 2026-07-30 | Circulation wall bug, test flats, modes guide, rules QA | partial | 0009-circulation-wall-bug-test-flats-modes-guide-rules-qa.report.md |
 | 0010 | 2026-07-30 | Dev loader, circulation glazing, stair rule, message fixes | partial | 0010-dev-loader-circulation-glazing-stair-rule-message-fixes.report.md |
 | 0011 | 2026-07-30 | Marker, Structure view, circulation glazing, stair rule | partial | 0011-marker-structure-view-circulation-glazing-stair-rule.report.md |
+| 0012 | 2026-07-30 | Marker first, Structure view, stair rule, export test | partial | 0012-marker-first-structure-view-stair-rule-export-test.report.md |
