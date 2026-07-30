@@ -14,3 +14,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0004 | 2026-07-28 | Put everything on main | partial | 0004-put-everything-on-main.report.md |
 | 0005 | 2026-07-28 | Fix the commit rule and delete the stale branches | partial | 0005-fix-the-commit-rule-and-delete-stale-branches.report.md |
 | 0006 | 2026-07-29 | Interface view and a soft rule for split wet areas | partial | 0006-interface-view-and-a-soft-rule-for-split-wet-areas.report.md |
+| 0007 | 2026-07-30 | Balcony edge fix, entrance check, and the two wet rules | partial | 0007-balcony-edge-fix-entrance-check-and-the-two-wet-rules.report.md |
