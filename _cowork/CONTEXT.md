@@ -87,12 +87,23 @@ rules engine and the export format are the mature parts, the UI is not.
 - **Node is not on PATH** in shells spawned by tooling. It lives at
   `C:\Program Files\nodejs` and has to be prepended before `npm` will resolve.
   `.claude/dev.cmd` exists purely to work around this.
-- **There is a test suite as of run 0008.** `npm test` runs `vitest run`; it needs no
-  config file and takes about three seconds. Two files as of run 0013:
-  `src/core/exteriorEdges.test.ts`, five cases over the `isFacadeEdge` predicate, and
-  `src/core/unitExport.test.ts`, three cases over the export glazing invariant. Read the
-  second one's header before trusting it, because it deliberately does not call
-  `buildUnitExport` and says why. Everything else is still verified the old way: `tsc`
+- **There are TWO test suites as of run 0014.** `npm test` is the fast one, about
+  0.9 s over 33 cases in three files: `src/core/exteriorEdges.test.ts` (five cases over
+  `isFacadeEdge`), `src/core/unitExport.test.ts` (three pure cases over the export
+  glazing invariant, whose header explains that it deliberately does not call
+  `buildUnitExport`), and `src/core/rules.test.ts` (25 cases, one firing and one silent
+  fixture for each of eleven rules, over HAND-BUILT `DwellingGraph` objects). `npm run
+  test:slow` is the second, about 5.5 s, holding anything named `*.slow.test.ts` — today
+  one file that drives a real `FloorManager` through a stubbed `FloorDeps` and calls the
+  real `buildUnitExport`. The split exists because that import graph pulls in three.js;
+  it is written in exactly two places, `test.exclude` in `vite.config.ts` and `include`
+  in `vitest.slow.config.ts`.
+- **`npm run test:slow` currently reports `4 passed | 1 expected fail`, and the
+  expected fail is deliberate.** French-window edges are built but never exported
+  (`unitExport.ts:311` enumerates the envelope with the strict open-sky test, which
+  skips edges whose neighbour cell is occupied, and a balcony cell is occupied). It is
+  recorded as an `it.fails` case so the suite stays green and turns RED the day someone
+  fixes the export. Do not "fix" the red by deleting the test. Everything else is still verified the old way: `tsc`
   clean, `npm run build` clean, and driving the app in a real browser. Since run 0010 the
   Check Layout panel is fully scriptable: write a fixture into `testflats/`, open
   `?project=<name>`, and read `#validation-panel` from the DOM. That works even with the
