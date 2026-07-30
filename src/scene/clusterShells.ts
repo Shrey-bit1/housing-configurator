@@ -3,7 +3,13 @@ import { type Grid, type Cell } from "../core/grid";
 import { occupiedCells } from "../core/modules";
 import { connectedComponents, clusterNodeId } from "../core/cluster";
 import { edgeKey, SIDES, SIDE_DELTA } from "../core/exteriorEdges";
-import { buildBoundaryWalls, RAILING_H, type BoundaryWallOpts } from "./moduleMesh";
+import {
+  buildBoundaryWalls,
+  makeGlassMaterial,
+  RAILING_H,
+  type BoundaryWallOpts,
+} from "./moduleMesh";
+import type { WindowVariant } from "../core/windows";
 import type { Floor } from "../core/floor";
 
 const EDGE_COLOR = 0x1a1a1a;
@@ -73,6 +79,14 @@ export function rebuildClusterShells(
       // Same id the adjacency graph assigns this cluster, so rules-validation
       // 3D highlighting can locate the right shell meshes.
       const nodeId = clusterNodeId(key, component);
+      // FRENCH WINDOWS on a corridor↔balcony boundary, from the parallel map
+      // `computeSemiExterior` fills for circulation components. Absolute edge
+      // keys, which is what this builder wants because cluster walls are built
+      // on absolute cells. Outdoor clusters get none: a balcony is the outside.
+      const glazed = floor.semiExterior?.glazedByCluster.get(nodeId);
+      const windows = glazed
+        ? new Map<string, WindowVariant>([...glazed].map((k) => [k, "french" as const]))
+        : undefined;
       for (const wall of buildBoundaryWalls(
         component,
         centerX,
@@ -80,8 +94,8 @@ export function rebuildClusterShells(
         wallHeight,
         material,
         edgeMaterial,
-        undefined, // clusters never get windows
-        undefined,
+        windows,
+        windows ? makeGlassMaterial() : undefined,
         doors,
         clusterWallOpts(floor, component, key)
       )) {

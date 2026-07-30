@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { Grid, cellKey, type Cell } from "./grid";
 import { borderReachableEmpty } from "./expansion";
 import { connectedComponents } from "./cluster";
-import { isFacadeEdge, edgeKey, SIDES, SIDE_DELTA, opposite, type Side } from "./exteriorEdges";
+import { semiExteriorBands } from "./semiExterior";
+import { isFacadeEdge, edgeKey, SIDES, SIDE_DELTA, type Side } from "./exteriorEdges";
 
 /**
  * The first test in this repository, and it exists because both defects ever
@@ -61,14 +62,12 @@ function derive(
     if (!reachesSky) continue; // sealed courtyard — confers nothing
     for (const c of component) qualifying.add(cellKey(c.cx, c.cz));
   }
+  // The app's OWN boundary construction, not a copy of it. Before run 0011 this
+  // helper reproduced about fifteen lines of `computeSemiExterior`, so the test
+  // could keep passing while the app diverged; both now call one function.
   const boundary = new Set<string>();
-  for (const c of spaces)
-    for (const side of SIDES) {
-      const [dx, dz] = SIDE_DELTA[side];
-      if (!qualifying.has(cellKey(c.cx + dx, c.cz + dz))) continue;
-      boundary.add(edgeKey(c.cx, c.cz, side));
-      boundary.add(edgeKey(c.cx + dx, c.cz + dz, opposite(side)));
-    }
+  const qualifyingTokens = new Map([...qualifying].map((k) => [k, "outdoor"] as const));
+  semiExteriorBands(spaces, qualifyingTokens, boundary);
   const isSemiExterior = (cx: number, cz: number, side: Side) =>
     boundary.has(edgeKey(cx, cz, side));
 
@@ -111,6 +110,18 @@ describe("isFacadeEdge", () => {
     expect(occupied.has(cellKey(5, 5))).toBe(false); // the pocket is empty
     expect(isOutside(5, 5)).toBe(false); // but sealed off from the border
     expect(isFacadeEdge(5, 4, "south", occupied, isOutside, isSemiExterior)).toBe(false);
+  });
+
+  it("counts a CIRCULATION edge onto an open adjacent balcony as facade", () => {
+    // Run 0011: corridors enter the semi-exterior system too, so a corridor
+    // against a balcony is envelope exactly as a room against one is. The
+    // predicate does not know the difference; what changed is that
+    // `computeSemiExterior` now records the corridor's boundary at all.
+    const corridor = rect(4, 4, 4, 6); // a 1x3 run of circulation cells
+    const balcony = rect(5, 4, 5, 6); // directly east, open beyond
+    const { occupied, isOutside, isSemiExterior } = derive(10, 10, corridor, balcony);
+    expect(occupied.has(cellKey(5, 5))).toBe(true); // the balcony is occupied
+    expect(isFacadeEdge(4, 5, "east", occupied, isOutside, isSemiExterior)).toBe(true);
   });
 
   it("does NOT count an edge onto a sealed courtyard balcony as facade", () => {

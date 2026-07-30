@@ -49,6 +49,13 @@ export interface SemiExteriorPlan {
    *  cell/side representations (room side and outdoor side) — glazed cells and
    *  solid returns alike. Used to stop NEW doors being authored there. */
   boundary: Set<string>;
+  /** CIRCULATION cluster token → ABSOLUTE edge keys carrying french-window
+   *  glass, the corridor counterpart of {@link glazedByRoom}. Kept as a separate
+   *  map rather than widening that one: a room is an instance and a corridor is
+   *  a merged component, so one map would hold two kinds of key and every
+   *  consumer would have to know which it was reading. `rebuildClusterShells`
+   *  consumes this; nothing on the room path changes. */
+  glazedByCluster: Map<string, Set<string>>;
   /** Room instance id ↔ outdoor cluster token (`clusterNodeId`, the same token
    *  `buildSpaceTargets` uses), for the graph's doorless ACCESS edges. Present
    *  only where a run actually carries glass — no window, no access. */
@@ -105,6 +112,7 @@ export function computeSemiExterior(floor: Floor, floorBelow: Floor | null): Sem
 
   const plan: SemiExteriorPlan = {
     glazedByRoom: new Map(),
+    glazedByCluster: new Map(),
     boundary: new Set(),
     access: [],
     isOutside,
@@ -135,76 +143,117 @@ export function computeSemiExterior(floor: Floor, floorBelow: Floor | null): Sem
   }
   if (qualifying.size === 0) return plan;
 
-  // ---- Per room: boundary edges → runs → bands ----------------------------
+  // ---- Per space: boundary edges → runs → bands ----------------------------
+  // ROOMS first, exactly as before. Bathrooms are excluded AT THE SOURCE
+  // (privacy — a bathroom keeps a solid wall against outdoor space). Skipping
+  // here, before `plan.boundary` is built, is what makes every consequence fall
+  // out automatically and in the right direction: no glass, no daylight credit,
+  // no doorless access, a balcony whose ONLY contact is a bathroom is
+  // unreachable (OD1 fires) — and, because the authoring block reads
+  // `plan.boundary`, a NEW door on a bathroom↔terrace boundary is authorable
+  // again. Kitchens deliberately KEEP theirs: D2 wants the ventilation.
   for (const inst of floor.store.instances.values()) {
     const def = inst.def;
     if (def.category !== "room" || def.cluster) continue; // rooms only
-    // BATHROOMS ARE EXCLUDED AT THE SOURCE (privacy — a bathroom keeps a solid
-    // wall against outdoor space). Skipping here, before `plan.boundary` is
-    // built, is what makes every consequence fall out automatically and in the
-    // right direction: no glass, no daylight credit, no doorless access, a
-    // balcony whose ONLY contact is a bathroom is unreachable (OD1 fires) —
-    // and, because the authoring block reads `plan.boundary`, a NEW door on a
-    // bathroom↔terrace boundary is authorable again (there is no french window
-    // there to make it meaningless). Kitchens deliberately KEEP theirs: D2
-    // wants the ventilation. Type predicate, never a hardcoded id list.
     if (isBathroom(def)) continue;
     const cells =
       floor.effectiveCells.get(inst.id) ??
       occupiedCells(def, inst.origin, inst.rotation, inst.mirrored);
-
-    // Boundary edges facing a qualifying outdoor cell, bucketed per side and
-    // per line so contiguous runs fall out. North/south runs vary in cx along a
-    // fixed cz; east/west runs vary in cz along a fixed cx.
-    const bySideLine = new Map<string, { cell: Cell; token: string; along: number }[]>();
-    for (const c of cells) {
-      for (const side of SIDES) {
-        const [dx, dz] = SIDE_DELTA[side];
-        const token = qualifying.get(cellKey(c.cx + dx, c.cz + dz));
-        if (!token) continue;
-        // Record BOTH representations of the physical boundary so a door
-        // candidate hits it from either side.
-        plan.boundary.add(edgeKey(c.cx, c.cz, side));
-        plan.boundary.add(edgeKey(c.cx + dx, c.cz + dz, opposite(side)));
-        const runsAlongX = side === "north" || side === "south";
-        const line = `${side}|${runsAlongX ? c.cz : c.cx}`;
-        const entry = bySideLine.get(line) ?? [];
-        entry.push({ cell: c, token, along: runsAlongX ? c.cx : c.cz });
-        bySideLine.set(line, entry);
-      }
-    }
-    if (bySideLine.size === 0) continue;
-
-    const glazed = new Set<string>();
-    const accessTokens = new Set<string>();
-    for (const [line, entries] of bySideLine) {
-      const side = line.slice(0, line.indexOf("|")) as Side;
-      // Canonical order: ascending cx, then ascending cz (one of the two is
-      // fixed within a line, so `along` is the whole ordering).
-      entries.sort((a, b) => a.along - b.along);
-      // Split into maximal contiguous runs. A boundary that turns a corner is
-      // two runs in v1 (corner-wrap is PARKED — see PROJECT_STATE §2o).
-      let start = 0;
-      for (let i = 1; i <= entries.length; i++) {
-        if (i < entries.length && entries[i].along === entries[i - 1].along + 1) continue;
-        const run = entries.slice(start, i);
-        start = i;
-        const w = frenchBandWidth(run.length);
-        if (w === 0) continue; // 1-cell contact: solid wall, nothing conferred
-        // Centre the band; an odd remainder puts the extra solid cell at the
-        // FAR end (`Math.floor` of the leading margin).
-        const lead = Math.floor((run.length - w) / 2);
-        for (let k = lead; k < lead + w; k++) {
-          const e = run[k];
-          glazed.add(edgeKey(e.cell.cx, e.cell.cz, side));
-          accessTokens.add(e.token);
-        }
-      }
-    }
+    const { glazed, accessTokens } = semiExteriorBands(cells, qualifying, plan.boundary);
     if (glazed.size === 0) continue;
     plan.glazedByRoom.set(inst.id, glazed);
     for (const clusterToken of accessTokens)
       plan.access.push({ roomId: inst.id, clusterToken });
   }
+
+  // CIRCULATION clusters next, through the SAME construction. A corridor
+  // against a balcony is as much of an envelope boundary as a room against one,
+  // and until this existed the corridor got no glass while the room beside it
+  // did. The unit is a connected COMPONENT rather than an instance, because
+  // that is what `rebuildClusterShells` draws and what `clusterNodeId` names.
+  const corridorCells: Cell[] = [];
+  for (const inst of floor.store.instances.values())
+    if (inst.def.cluster === "circulation")
+      corridorCells.push(
+        ...(floor.effectiveCells.get(inst.id) ??
+          occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored))
+      );
+  for (const component of connectedComponents(corridorCells)) {
+    const { glazed, accessTokens } = semiExteriorBands(component, qualifying, plan.boundary);
+    if (glazed.size === 0) continue;
+    const token = clusterNodeId("circulation", component);
+    plan.glazedByCluster.set(token, glazed);
+    for (const clusterToken of accessTokens)
+      plan.access.push({ roomId: token, clusterToken });
+  }
+
   return plan;
+}
+
+
+/**
+ * THE semi-exterior band construction, shared by rooms and circulation clusters
+ * and by the test, so no consumer can drift from it.
+ *
+ * Given a footprint and the qualifying outdoor cells, it records every boundary
+ * edge into `boundary` (both cell/side representations, so a door candidate hits
+ * it from either side), splits the boundary into maximal contiguous runs per
+ * side and line, and glazes a centred band in each run whose width comes from
+ * {@link frenchBandWidth}. A one-cell contact confers nothing and stays solid.
+ *
+ * Returns the glazed ABSOLUTE edge keys and the outdoor cluster tokens the glass
+ * grants access to. It mutates `boundary` because the caller wants every
+ * boundary edge recorded whether or not it ends up glazed: the door-authoring
+ * block reads `boundary`, and a solid return at a run's end is still a
+ * room↔outdoor boundary.
+ */
+export function semiExteriorBands(
+  cells: Cell[],
+  qualifying: Map<string, string>,
+  boundary: Set<string>
+): { glazed: Set<string>; accessTokens: Set<string> } {
+  // Boundary edges facing a qualifying outdoor cell, bucketed per side and per
+  // line so contiguous runs fall out. North/south runs vary in cx along a fixed
+  // cz; east/west runs vary in cz along a fixed cx.
+  const bySideLine = new Map<string, { cell: Cell; token: string; along: number }[]>();
+  for (const c of cells) {
+    for (const side of SIDES) {
+      const [dx, dz] = SIDE_DELTA[side];
+      const token = qualifying.get(cellKey(c.cx + dx, c.cz + dz));
+      if (!token) continue;
+      boundary.add(edgeKey(c.cx, c.cz, side));
+      boundary.add(edgeKey(c.cx + dx, c.cz + dz, opposite(side)));
+      const runsAlongX = side === "north" || side === "south";
+      const line = `${side}|${runsAlongX ? c.cz : c.cx}`;
+      const entry = bySideLine.get(line) ?? [];
+      entry.push({ cell: c, token, along: runsAlongX ? c.cx : c.cz });
+      bySideLine.set(line, entry);
+    }
+  }
+
+  const glazed = new Set<string>();
+  const accessTokens = new Set<string>();
+  for (const [line, entries] of bySideLine) {
+    const side = line.slice(0, line.indexOf("|")) as Side;
+    entries.sort((a, b) => a.along - b.along);
+    // Maximal contiguous runs. A boundary that turns a corner is two runs in v1
+    // (corner-wrap is PARKED — see PROJECT_STATE §2o).
+    let start = 0;
+    for (let i = 1; i <= entries.length; i++) {
+      if (i < entries.length && entries[i].along === entries[i - 1].along + 1) continue;
+      const run = entries.slice(start, i);
+      start = i;
+      const w = frenchBandWidth(run.length);
+      if (w === 0) continue; // 1-cell contact: solid wall, nothing conferred
+      // Centre the band; an odd remainder puts the extra solid cell at the FAR
+      // end (`Math.floor` of the leading margin).
+      const lead = Math.floor((run.length - w) / 2);
+      for (let k = lead; k < lead + w; k++) {
+        const e = run[k];
+        glazed.add(edgeKey(e.cell.cx, e.cell.cz, side));
+        accessTokens.add(e.token);
+      }
+    }
+  }
+  return { glazed, accessTokens };
 }

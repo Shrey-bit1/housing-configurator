@@ -288,6 +288,14 @@ function buildStorey(
     );
     for (const key of plan.edges.keys()) glazedKeys.add(key);
   }
+  // CIRCULATION clusters carry french glass too since run 0011, and the export
+  // has to say so: the standing invariant is that exported glazing equals BUILT
+  // glazing on the same flat, and the wall pass now builds these. They are not
+  // re-derived through `computeWindows` because a corridor has no daylight
+  // target to make up a shortfall against; the semi-exterior band IS the whole
+  // of its glass. Absolute edge keys, the same space `glazedKeys` uses.
+  for (const glazed of floor.semiExterior?.glazedByCluster.values() ?? [])
+    for (const key of glazed) glazedKeys.add(key);
 
   // Open-air edges: exterior edges of Outdoor clusters (balconies/terraces).
   const outdoorCells = new Set<string>();
