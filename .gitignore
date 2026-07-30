@@ -19,6 +19,11 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Generated rules documents: built on demand from the HTMLs by docs/build-pdf.py
+# and kept on the Drive, so a local rebuild never re-enters the repo.
+docs/rules-list.pdf
+docs/rules-reference.pdf
+
 # Cowork bridge: the one machine-local line, split out of CONTEXT.md so the
 # orientation file itself can travel. The rest of _cowork/ is committed on
 # purpose — see .claude/bridge/PROTOCOL.md

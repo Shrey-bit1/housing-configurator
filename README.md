@@ -176,3 +176,4 @@ src/
 - Rooms, modules, and stairs on a given floor share one occupancy map (collision is checked uniformly between them); each floor is otherwise independent, except that a stair's footprint reserves a matching hole on the floor directly above.
 - The adjacency graph and layout rules span the *whole dwelling* (all floors), not just the active floor — cross-floor reachability is carried by stair edges.
 - Facade/window placement is not implemented yet; the daylight rules (D1/D2) only check that a room *has* an exterior wall, not what's on it (planned follow-up, will reuse the existing exterior-edge utility).
+- The rules documents are kept here as HTML (`docs/rules-list.html`, `docs/rules-reference.html`) and the PDFs are generated on demand with `python docs/build-pdf.py docs/rules-reference.html docs/rules-reference.pdf`. The built PDFs live on the shared Drive rather than in this repo, because they are large binaries that change on every rules edit.
