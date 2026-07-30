@@ -520,27 +520,32 @@ seedsToggle.addEventListener("click", () => {
   seedsToggle.classList.toggle("active", seedsOn);
 });
 
-// "Structure" x-ray toggle (default OFF): hides ELASTIC rooms' walls + glazing
-// so the serviced core reads on its own. Pure view state — never serialized,
-// untouched by undo/load; survives rebuilds (FloorManager re-applies it).
-const structureToggle = document.getElementById("structure-toggle") as HTMLButtonElement;
-let structureOn = false;
-structureToggle.addEventListener("click", () => {
-  structureOn = !structureOn;
-  floors.setStructureView(structureOn);
-  structureToggle.classList.toggle("active", structureOn);
-});
-
+// "Structure" toggle (default OFF): renders the FIXED layer as built — wet
+// rooms and stairs whole — and drops every other space to a bare plate. Pure
+// view state: never serialized, untouched by undo/load; survives rebuilds
+// (FloorManager re-applies it).
+//
 // "Interface view" toggle (default OFF): shows only the binding level of a unit
 // — perimeter with its glazing, wet cells, stair, balconies, entrance — and
-// reduces everything else to one open plate. Pure view state: never serialized,
-// nothing in the export changes, and turning it off restores the scene.
+// reduces everything else to one open plate. Same guarantees.
+//
+// The two are MUTUALLY EXCLUSIVE in the FloorManager (they express a stripped
+// room through the same `baseColor` slot), so turning one on turns the other
+// off in the model; syncButtons re-reads the model rather than tracking the
+// pair here, which is what keeps the two buttons from disagreeing with it.
+const structureToggle = document.getElementById("structure-toggle") as HTMLButtonElement;
 const interfaceToggle = document.getElementById("interface-toggle") as HTMLButtonElement;
-let interfaceOn = false;
+function syncViewToggles(): void {
+  structureToggle.classList.toggle("active", floors.structureViewOn);
+  interfaceToggle.classList.toggle("active", floors.interfaceViewOn);
+}
+structureToggle.addEventListener("click", () => {
+  floors.setStructureView(!floors.structureViewOn);
+  syncViewToggles();
+});
 interfaceToggle.addEventListener("click", () => {
-  interfaceOn = !interfaceOn;
-  floors.setInterfaceView(interfaceOn);
-  interfaceToggle.classList.toggle("active", interfaceOn);
+  floors.setInterfaceView(!floors.interfaceViewOn);
+  syncViewToggles();
 });
 
 // Initial view: frame whatever's on the (likely empty) starting floor instead
@@ -786,6 +791,27 @@ document.body.appendChild(fileInput);
 // parsing, the confirm, error handling and history behave identically. Only where
 // the File comes from differs. A bare name resolves against `testflats/`.
 if (import.meta.env.DEV) {
+  // Dev-only handle on the live state, so a check can MEASURE the scene rather
+  // than read a screenshot. The `?project=` loader made fixtures scriptable and
+  // this makes their result scriptable too: span widths, marker positions, view
+  // toggles and mesh visibility are all questions a picture answers badly.
+  // Same `import.meta.env.DEV` gate, so it is dropped from a production build.
+  (window as unknown as { __app: unknown }).__app = {
+    floors, camera, scene, controls, renderer,
+    enterPlanMode, exitPlanMode, isPlanMode: () => planMode,
+    /** Render one frame and write the canvas to `captures/<name>` through the
+     *  dev server's capture sink (vite.config.ts). The render has to happen in
+     *  the same turn as the read, because the context is created without
+     *  `preserveDrawingBuffer`, so anything read a frame later comes back
+     *  cleared. */
+    capture(name: string): Promise<unknown> {
+      renderer.render(scene, camera);
+      return fetch(`/__capture?name=${encodeURIComponent(name)}`, {
+        method: "POST",
+        body: canvas.toDataURL("image/png"),
+      }).then((r) => r.json());
+    },
+  };
   const wanted = new URLSearchParams(location.search).get("project");
   if (wanted) {
     const url = wanted.includes("/") ? wanted : `/testflats/${wanted}`;

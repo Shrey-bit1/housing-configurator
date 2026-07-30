@@ -46,7 +46,7 @@ work-in-progress research artifact, not a production app.
 | **Multi-floor** support, stacking, **wall/stair height reconciliation**, **window generation**, **floor visibility**, **zoom-to-extent box** | `src/core/floor.ts`, `src/core/floorManager.ts` | See §2b (height), §2d (windows), §5 (visibility/framing). `Floor` = own grid + `ModuleStore` + `GridView` + `HoleView` + `EntranceView` + `entrances[]` + `windowStats` + `clusterGroup`, all under one `group`. `FloorManager`: stack, active floor, vertical stacking offsets, dim inactive floors, stairwell holes, `rebuildAllShells()` (all floors' room walls + windows + DOOR OPENINGS + merged cluster shells), `pruneStaleDoors()` (auto-remove doors a mutation stranded, inside the same undo snapshot), `doorTargets()`/`isDoorValid()` (door placement/validity), floor visibility, content bounding box. `DEFAULT_FLOOR_CELLS = 4`, `CLEARANCE_CELLS = 1`. |
 | Grid dots / floor visual | `src/scene/gridView.ts` | Intersection dots + border; `setDimmed`. |
 | Stairwell **hole** rendering | `src/scene/holeView.ts` | `HoleView`: recessed dark panel + outline per stairwell opening (merged per connected component). Purely visual; occupancy blocking is `Grid.holeCells`. |
-| Ground-floor **entrance** marker rendering | `src/scene/entranceView.ts` | `EntranceView`: renders `Floor.entrances` as door markers on exterior edges; meshes tagged `userData.entranceId` for highlight lookup. |
+| Ground-floor **entrance** marker rendering | `src/scene/entranceView.ts` | `EntranceView` + `makeEntranceMesh` + `entranceSpan`: renders `Floor.entrances` as two-cell DOOR LEAVES at `DOOR_OPENING_H`, with a floor threshold strip (the plan read) and two `ENTRY` canvas-texture label plates in the wall plane. The second cell is DERIVED at draw time via `Floor.canWidenEntrance`, never stored (§2p). Every descendant is tagged `userData.entranceId`, because picking reads it off whichever object the ray hit. |
 | **Entrance placement** interaction | `src/interaction/entranceController.ts`, `src/core/entrance.ts` | `EntranceController`: ghost preview + click-to-place (ground floor only). `isActive` getter + public `cancel()` — Escape is arbitrated centrally by main.ts (§2h), not handled internally here. `Entrance { id, cell, side }`. Entrances are also SELECTABLE/DELETABLE (via `SelectionController`, see §2f) but explicitly EXCLUDED from multi-select/group ops (§2h): click a marker to select, Delete to remove. `Floor.removeEntrance(id)`; `EntranceView.markers`/`setSelectedId`. |
 | **Interior door** model + validity + space-target resolver | `src/core/door.ts` | `Door { id, cell, side }` (2-edge span, edge-key bound); `DOOR_SPAN=2`, `DOOR_OPENING_H=2.1`, `BELOW_PREFIX`; `doorId`/`doorEdges`; **`resolveDoorSpaces(door, targetAt)`** (the one definition of door validity + connectivity — both edges must join the SAME two distinct spaces); **`buildSpaceTargets(floor, floorBelow?)`** (cell → space token: room/stair id, cluster node id, or `^stair` for a hole projected up from below — shared by placement, pruning, and the graph); `doorWallCuts` (per-door room-local + cluster-absolute opening edge sets). See §2i. |
 | Interior-door **marker rendering** | `src/scene/doorView.ts` | `DoorView` + `makeDoorMesh`: a violet floor-threshold strip across each door's opening (reads in plan view; the door's click target, `userData.doorId`). Renders `Floor.doors` on ANY floor. Also `makeDoorArc` — the standard architectural swing symbol (leaf line + quarter-circle arc) per door in a separate `arcs` group, shown only in plan view (`setArcsVisible`, §2i swing). |
@@ -67,7 +67,7 @@ work-in-progress research artifact, not a production app.
 | Scene/camera/lights, **zoom-to-extent framing** | `src/scene/sceneSetup.ts` | Orthographic camera, `frameBox(box, direction)`. See §5. |
 | Interaction | `src/interaction/picker.ts`, `dragDrop.ts`, `selection.ts` | Raycast picking (`cellAt`/`groupAt`/`groundPoint`, scoped to the ACTIVE floor's store — this is also why floor visibility needs no picker-side filtering, see §5), palette→canvas placement, select/**multi-select**/move/**group-move**/rotate/**mirror**/delete/**group-delete**/**Shift+D-duplicate** (any count) of modules, plus entrance AND door select/delete (two `MarkerSelectionAdapter`s — mutually exclusive singletons, excluded from multi-select). `R`/`M` work on the palette ghost, the move ghost, the duplicate ghost, and a SINGLE selected instance — no-op on 2+ (§2h). `dragDrop.cancelPlacement()`/`selection.cancelDuplicate()`/`entranceController.cancel()` are public, no-argument, and NOT wired to their own Escape listeners — Escape is arbitrated centrally by main.ts (§2h). `dragDrop`/`selection` take an `onAfterAction` callback (fires after a committed mutation → undo snapshot, see §2f); `selection` also takes `onSelectionChange`/`onNoopHint` callbacks and an `EntranceSelectionAdapter`. |
 | **Group-move ghost** | `src/scene/groupGhostPreview.ts` | `GroupGhostPreview`: one translucent ghost mesh per selected member, positioned by its cell offset from the grabbed member's target origin, tinted green/red as ONE unit (mirrors `GhostPreview`'s shape/API). See §2h. |
-| Wiring / render loop / view-mode orchestration | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
+| Wiring / render loop / view-mode orchestration, **dev-only `?project=` loader + `window.__app` capture handle** | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
 
 **Concave-corner wall logic** (part of `buildBoundaryWalls`): walls are inset to
 the INTERIOR side of their boundary line (no protrusion). N/S walls (run in x)
@@ -1282,16 +1282,20 @@ and the project JSON are **byte-identical** before and after the batch on the
 same fixture (3997 B both, captured by running the same script against the
 pre-batch tree via `git stash`).
 
-**A1 — "Structure" x-ray toggle** (`#structure-toggle`, beside Cutaway/Seeds;
-view state, never serialized). Hides the wall AND glazing meshes of ELASTIC
-rooms (`isElastic`), keeping their floor slabs, props, selection and picking —
-so the serviced/structural core (bathrooms, kitchen, circulation, stairs,
-entrances, doors) reads on its own with the soft rooms as open floor. Clicking
-a hidden room's slab still selects it. Hidden meshes carry
-`userData.structureHidden`, which `cutaway.ts` honours in BOTH branches —
-hidden is hidden, the cutaway simply has less to hide — and
-`FloorManager.applyStructureView()` re-runs at the end of every
-`rebuildAllShells`, so a rebuild while toggled can't resurrect a wall.
+**A1 — "Structure" toggle** (`#structure-toggle`, beside Cutaway/Seeds; view
+state, never serialized). **Reworked in run 0013 — see §2p for what it does
+now.** The original A1 was an ELASTIC X-RAY: it hid the wall and glazing meshes
+of instances passing `isElastic`, which is Living Room, Bedroom (both sizes)
+and Recreation Room, and touched nothing else. Circulation and Outdoor walls
+kept standing, because cluster walls are built once per merged component into
+`floor.clusterGroup` and were never in that loop; every stripped room kept its
+own colour; and the Kitchen, which is neither elastic nor special-cased, was
+stripped like a bedroom. That is recorded here rather than deleted because the
+mechanism it introduced survives unchanged: hidden meshes carry
+`userData.structureHidden`, `cutaway.ts` honours it in BOTH branches (hidden is
+hidden, the cutaway simply has less to hide), `applyStructureView()` re-runs at
+the end of every `rebuildAllShells` so a rebuild while toggled cannot resurrect
+a wall, and clicking a hidden room's slab still selects it.
 
 **A2 — Outdoor railings.** An Outdoor cluster's EXTERIOR edges (nothing
 occupies the neighbour cell) build at `RAILING_H` = `SILL_H` = 900 mm instead
@@ -1497,6 +1501,90 @@ daylight discount for balcony depth; the Laubengang case (a balcony that
 genuinely connects two rooms) — outdoor stays a routing leaf until then; and
 whether a buried balcony should cost what buried glazing costs in the building
 packer's fitness (see BRIDGE.md).
+
+### 2p. Entrance leaf, the fixed-layer Structure view, and readable plans (run 0013)
+
+Three visual changes and one dev-side capability, none of which touches a model,
+a rule, the project JSON or the `dwelling-unit` export. Export byte-identity was
+measured rather than assumed: `buildUnitExport` over
+`testflats/flat-1-two-storey.json` serializes to 22933 characters both before
+and after, with the same rolling hash 585028207, captured by running the same
+snippet against the pre-change tree through `git stash`.
+
+**The entrance marker is a door leaf** (`src/scene/entranceView.ts`). It used to
+be a 0.44 x 1.30 x 0.16 slab with a single outline child. It is now a leaf
+1.10 x 2.10 x 0.16, which is two cells minus a 0.1 inset at `DOOR_OPENING_H`,
+carrying four children: the outline, a magenta threshold strip on the floor, and
+two `ENTRY` label plates facing opposite ways. The height and the threshold come
+from `doorView.ts` on purpose, so the front door reads in the same drawing
+language as every interior door and at the same 1200 mm width, distinguished
+only by its own magenta.
+
+THE SECOND CELL IS DERIVED, NOT STORED. `Entrance` is still one cell plus one
+side, which is what E2 checks and what the project file holds, so no saved
+project became invalid. `entranceSpan(cell, side, canWiden)` picks the second
+cell at draw time: it prefers the neighbour further along the wall's run, which
+is east on a north- or south-facing wall and south on an east- or west-facing
+one, matching the run direction `core/door.ts` already uses for a door's second
+edge; failing that it tries the other side; failing both it stays one cell wide,
+which is the old drawing and is always legal. `Floor.canWidenEntrance` is the
+test, and it requires two things: the neighbour is the same space, or another
+module of the same connector cluster, since a corridor is several instances
+merged; and the neighbour's own edge on that side faces open sky by
+`Floor.isOutside`. Without the first a leaf could straddle two rooms while the
+graph roots reachability in one node, and without the second its far half would
+sit in a party wall. Because the span is derived, `Floor.refreshEntranceMarkers`
+runs inside `rebuildAllShells`, so a room placed beside an entrance narrows the
+leaf on the next pass. `EntranceView` now remembers `selectedId` across a
+rebuild, the way it already remembered `dimmed`. Measured on flat-1: the
+entrance at `13,5,north` derives a two-cell span over cells 13 and 14 and sits
+at world x 0.9, z −4.5.
+
+**The Structure view is the FIXED LAYER, not an x-ray** (`floorManager.ts`,
+`setStructureView`). Bathrooms, kitchens and stairs render exactly as built,
+walls and furniture included; every other space, dry rooms and circulation and
+outdoor alike, drops to a bare `STRUCTURE_PLATE` (0xc9c5bb) with no walls and no
+furniture. The filter is FIXEDNESS (`isFixedLayer` = `category === "stair"` or
+`isWet`) rather than elasticity, which is why the Kitchen now survives whole.
+Cluster walls are stripped through `floor.clusterGroup` because that is where
+they live; the cluster instances keep their floor tiles, so a corridor reads as
+bare plate rather than vanishing. Furniture modules (`category === "module"`)
+are left alone, being neither a space nor its contents. Mesh visibility is
+enough here where it was not enough for the interface view, because this removes
+a stripped space's walls WHOLE and never has to split one merged mesh into
+facade and partition.
+
+**Structure and Interface are MUTUALLY EXCLUSIVE**, enforced in the manager
+(each setter turns the other off) and reflected by `syncViewToggles` in
+`main.ts`, which re-reads `floors.structureViewOn` / `floors.interfaceViewOn`
+rather than tracking the pair itself. The reason is mechanical before it is
+conceptual: both express a stripped room through `material.userData.baseColor`,
+so a shared slot with two owners means one view's exit clears the other's tint.
+Conceptually the overlap also answers nothing, since one view asks what the
+building fixes and the other asks what the unit contract binds.
+
+**Plans compose lawfully.** TOP VIEW with the Interface view gives a plan of the
+contract, TOP VIEW with the Structure view gives a plan of the fixed layer, and
+nothing refuses. One asymmetry is by design and worth knowing: the interface
+plan has NO door-swing arcs, because that view hides interior doors entirely
+(`DoorView.setVisible`), and an interior door is exactly what it drops. The
+entrance still reads in all three plans, through the new threshold strip; the
+leaf and the labels are in the wall plane and go edge-on from directly above.
+Switching the active floor while in plan mode requires `applyPlanVisibility()`
+alongside `setActive`, since plan visibility is computed from the active index;
+`main.ts:254` does this on the floor-tab path, and any other caller must too.
+
+**Dev-only capture path.** `vite.config.ts` gains a `capture-sink` plugin under
+`apply: "serve"`: POST a data URL to `/__capture?name=…` and it writes under
+`captures/`. `main.ts`'s `import.meta.env.DEV` block, which already held the
+`?project=` loader, now also exposes `window.__app` with the floors, camera,
+scene, controls, renderer, the plan-mode entry points, and `capture(name)`,
+which renders one frame and posts the canvas. The render and the read have to
+share a turn because the context is created without `preserveDrawingBuffer`.
+Both are dropped from a production build. This exists because four consecutive
+runs deferred visual work for want of a way to check it: `?project=` made
+fixtures scriptable, and this makes their RESULT scriptable, so a span width or
+a toggle state is a number rather than a picture someone has to squint at.
 
 ## 3. Key data structures / formats (written out)
 
@@ -1737,9 +1825,27 @@ Two rooms of the same type on one floor previously rendered identically, so a re
 could name two different rooms with the same string.
 
 **Testing.** `vitest` is a devDependency and `npm test` runs `vitest run`. No config
-file: vitest reads `vite.config.ts` and needed nothing added. The suite is one file,
-`src/core/exteriorEdges.test.ts`, covering `isFacadeEdge` with four cases (open sky, open
-adjacent balcony, sealed empty pocket, sealed courtyard). It exercises the REAL
+file: vitest reads `vite.config.ts` and needed nothing added. Two files, eight cases,
+3.29 s.
+
+`src/core/unitExport.test.ts` (run 0013, three cases) is about the export glazing
+invariant, which is that the glazed edge set a unit EXPORTS equals the set the wall
+pass BUILDS. It broke once at f2af130, when corridors gained french windows and
+`unitExport.ts` still carried a rooms-only filter. Read its header before trusting it:
+it does NOT call `buildUnitExport`, so it cannot fail on a regression there. That was
+tried and measured rather than assumed. The import graph loads and a layout places
+fine; the run stops at `floorManager.ts:764`, where `recomputeStack` reads
+`this.deps.groundPlane` before `attach()` has been called, and stubbing `FloorDeps` is
+about a dozen lines. The reason it was refused is the import cost: 11.94 s for the
+probe against 1.65 s for the pure tests, so the whole render layer would enter a suite
+about edge keys for a tenfold slowdown. What the file does pin is that a corridor
+beside a balcony glazes at all, that its band is disjoint from the room's, and that a
+rooms-only filter drops exactly three named edges on that layout, which turns f2af130's
+cost into a number.
+
+`src/core/exteriorEdges.test.ts` covers `isFacadeEdge` with five cases (open sky, open
+adjacent balcony, sealed empty pocket, sealed courtyard, circulation onto a balcony).
+It exercises the REAL
 derivations — `borderReachableEmpty` for the open-sky half and the real
 `connectedComponents` plus the `reachesSky` gate for the outdoor half — rather than
 stubs, because both defects this function ever had were failures to defer to those

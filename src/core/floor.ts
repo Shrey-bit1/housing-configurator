@@ -7,7 +7,7 @@ import { EntranceView } from "../scene/entranceView";
 import { DoorView } from "../scene/doorView";
 import type { Entrance } from "./entrance";
 import { doorId, doorOverlaps, nextSwing, type Door, type DoorSwing } from "./door";
-import { edgeKey, type Side } from "./exteriorEdges";
+import { edgeKey, SIDE_DELTA, type Side } from "./exteriorEdges";
 import type { GlazingStat } from "./windows";
 import type { SemiExteriorPlan } from "./semiExterior";
 
@@ -183,14 +183,14 @@ export class Floor {
     const id = edgeKey(cell.cx, cell.cz, side);
     if (this.entrances.some((e) => e.id === id)) return;
     this.entrances.push({ id, cell: { cx: cell.cx, cz: cell.cz }, side });
-    this.entranceView.rebuild(this.entrances);
+    this.entranceView.rebuild(this.entrances, this.widenEntrance);
   }
 
   /** Replace the whole entrance list (used by load); rebuilds the markers. */
   setEntrances(list: Entrance[]): void {
     this.entrances.length = 0;
     this.entrances.push(...list);
-    this.entranceView.rebuild(this.entrances);
+    this.entranceView.rebuild(this.entrances, this.widenEntrance);
   }
 
   /** Remove the entrance with `id`; rebuilds the markers. Returns true if one
@@ -200,13 +200,65 @@ export class Floor {
     const i = this.entrances.findIndex((e) => e.id === id);
     if (i < 0) return false;
     this.entrances.splice(i, 1);
-    this.entranceView.rebuild(this.entrances);
+    this.entranceView.rebuild(this.entrances, this.widenEntrance);
     return true;
+  }
+
+  /** Re-derive the entrance markers against current occupancy. The leaf's
+   *  second cell is derived, so a room placed beside an entrance would
+   *  otherwise leave the door drawn across a party wall until the next reload.
+   *  Called from the FloorManager's shell rebuild, alongside the walls whose
+   *  occupancy it reads. No-op when this floor has no entrances. */
+  refreshEntranceMarkers(): void {
+    if (this.entrances.length === 0) return;
+    this.entranceView.rebuild(this.entrances, this.widenEntrance);
   }
 
   /** Marker meshes for raycast picking (entrance selection). */
   get entranceMarkers(): THREE.Object3D[] {
     return this.entranceView.markers;
+  }
+
+  /**
+   * May an entrance leaf anchored on (`anchor`, `side`) widen onto `next`?
+   *
+   * A front door is two cells wide but an {@link Entrance} stores one, so the
+   * second cell is derived at draw time and this is the test that decides it
+   * (see scene/entranceView.ts `entranceSpan`). Two conditions, both needed.
+   * `next` has to be the SAME space as the anchor, or another module of the same
+   * connector cluster, because a corridor is several instances merged and a leaf
+   * that straddled two different rooms would draw one opening where the graph
+   * roots reachability in a single node. And `next`'s own edge on this side has
+   * to face open sky by the same {@link isOutside} test every exterior edge uses,
+   * because otherwise the far half of the leaf would sit in a party wall.
+   *
+   * Nothing here is stored: the answer is recomputed on every marker rebuild, so
+   * a room placed beside an entrance narrows the leaf again on the next pass.
+   */
+  canWidenEntrance(anchor: Cell, next: Cell, side: Side): boolean {
+    const a = this.spaceDefAt(anchor.cx, anchor.cz);
+    const b = this.spaceDefAt(next.cx, next.cz);
+    if (!a || !b) return false;
+    if (a.id !== b.id && !(a.cluster && a.cluster === b.cluster)) return false;
+    const [dx, dz] = SIDE_DELTA[side];
+    const ox = next.cx + dx;
+    const oz = next.cz + dz;
+    return !this.effectiveOwnerAt(ox, oz) && this.isOutside(ox, oz);
+  }
+
+  /** {@link canWidenEntrance} as a bound callback, so the marker view can ask
+   *  without holding a reference to this floor's class shape. */
+  private readonly widenEntrance = (anchor: Cell, next: Cell, side: Side): boolean =>
+    this.canWidenEntrance(anchor, next, side);
+
+  /** The ROOM-category instance owning (cx,cz) under effective occupancy, as
+   *  its id plus its cluster tag (undefined for a plain room). Furniture and
+   *  stairs answer undefined — neither hosts an entrance. */
+  private spaceDefAt(cx: number, cz: number): { id: string; cluster?: string } | undefined {
+    const id = this.effectiveOwnerAt(cx, cz);
+    const inst = id ? this.store.instances.get(id) : undefined;
+    if (!id || !inst || inst.def.category !== "room") return undefined;
+    return { id, cluster: inst.def.cluster };
   }
 
   /** Apply the selection highlight to the entrance marker `id` (null clears). */

@@ -106,17 +106,28 @@ export class EntranceController {
     this.clearPreview();
     if (!this.candidate) return;
     const floor = this.getFloor();
-    this.preview = makeEntranceMesh(floor.grid, this.candidate.cell, this.candidate.side, true);
+    // Same derivation as the placed marker, so the ghost shows the width the
+    // door will actually have rather than a one-cell stand-in that then grows.
+    this.preview = makeEntranceMesh(
+      floor.grid, this.candidate.cell, this.candidate.side, true,
+      (anchor, next, side) => floor.canWidenEntrance(anchor, next, side)
+    );
     floor.group.add(this.preview);
   }
 
   private clearPreview(): void {
-    if (this.preview) {
-      this.preview.removeFromParent();
-      this.preview.geometry.dispose();
-      (this.preview.material as THREE.Material).dispose();
-      this.preview = null;
-    }
+    if (!this.preview) return;
+    this.preview.removeFromParent();
+    // Traverse rather than disposing the leaf alone: the marker now carries a
+    // threshold, an outline and two label plates as children, and a ghost is
+    // rebuilt on every pointermove, so missing them leaks per mouse move.
+    this.preview.traverse((o) => {
+      const m = o as THREE.Mesh;
+      m.geometry?.dispose();
+      const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+      if (mat) (Array.isArray(mat) ? mat : [mat]).forEach((x) => x.dispose());
+    });
+    this.preview = null;
   }
 
   /** Leave placement mode, whether a placement just succeeded or the user

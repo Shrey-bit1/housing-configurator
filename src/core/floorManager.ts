@@ -52,6 +52,10 @@ export const INTERFACE_TINT_BEDROOMS = true;
 const OPEN_PLATE = 0xd8d4cb;
 /** The bedroom position tint, used only when {@link INTERFACE_TINT_BEDROOMS}. */
 const BEDROOM_TINT = 0xa9bcd0;
+/** The bare plate every non-fixed space falls back to in the Structure view.
+ *  A touch darker than {@link OPEN_PLATE} so the two views never produce the
+ *  same picture from a screenshot alone. */
+const STRUCTURE_PLATE = 0xc9c5bb;
 
 interface FloorDeps {
   picker: Picker;
@@ -338,6 +342,9 @@ export class FloorManager {
         }
       }
       floor.rebuildSeedOutlines(seedRects);
+      // The entrance leaf's second cell is derived from the same occupancy the
+      // walls just used, so it re-derives here rather than only at placement.
+      floor.refreshEntranceMarkers();
     });
     // Walls are brand-new meshes after this pass — re-apply the x-ray view.
     this.applyStructureView();
@@ -397,6 +404,8 @@ export class FloorManager {
    * plain visibility and material state, applied here.
    */
   setInterfaceView(on: boolean): void {
+    // Mutually exclusive with the Structure view — see setStructureView for why.
+    if (on && this.structureView) this.setStructureView(false);
     this.interfaceView = on;
     this.rebuildAllShells();  // walls: partitions dissolve, perimeter stays
     this.applyInterfaceView(); // furniture, colour, door markers
@@ -426,29 +435,92 @@ export class FloorManager {
   }
 
   /**
-   * "Structure" x-ray view (view state, never serialized): hide the wall AND
-   * glazing meshes of ELASTIC rooms, leaving their floor slabs, props, and
-   * picking untouched, so the serviced/structural core (bathrooms, kitchen,
-   * circulation, stairs, entrances, doors) reads on its own with the soft
-   * rooms as open floor. Composes with the cutaway by outranking it (see
-   * cutaway.ts) and needs no special case for dimming, plan view, or Seeds.
+   * STRUCTURE VIEW (view state, never serialized): the FIXED LAYER of a unit,
+   * meaning the parts whose position is decided by servicing and by the section
+   * rather than by how a household chooses to live. Bathrooms, kitchens and
+   * stairs render exactly as built, walls and furniture included. Everything
+   * else, which is the dry rooms and the circulation and outdoor clusters
+   * alike, drops to a bare neutral plate with no walls and no furniture, so the
+   * fixed parts stand alone on the footprint they have to hold.
+   *
+   * WHAT THIS REPLACED. Until this change the view was an elastic x-ray: it hid
+   * the wall and glazing meshes of instances passing {@link isElastic}, which is
+   * Living Room, Bedroom and Recreation Room, and touched nothing else. That
+   * left corridor and balcony walls standing, because cluster walls are built
+   * once per merged component into `floor.clusterGroup` and were never in the
+   * loop, and it left every stripped room in its own colour, so the picture read
+   * as a partly demolished flat rather than as a layer. The new filter is by
+   * FIXEDNESS instead of by elasticity, which is why a Kitchen, which is neither
+   * elastic nor previously special-cased here, now survives whole.
+   *
+   * Two mechanisms, mirroring {@link setInterfaceView}. Room walls, glazing and
+   * cluster shells hide by mesh visibility, which works here where it did not
+   * work for the interface view, because this view removes a stripped space's
+   * walls WHOLE and never has to split one merged mesh into facade and
+   * partition. Furniture and plate colour are visibility and material state.
+   * `structureHidden` is also what tells the cutaway pass to leave a hidden wall
+   * alone (see scene/cutaway.ts), so the two never fight over the same mesh.
+   *
+   * Mutually exclusive with the interface view rather than composing: both
+   * express a stripped room through `material.userData.baseColor`, so a shared
+   * on/off would have one view's exit clear the other's tint, and the overlap
+   * itself answers no question, since one view asks what the building fixes and
+   * the other asks what the unit contract binds.
    */
   setStructureView(on: boolean): void {
+    if (on && this.interfaceView) this.setInterfaceView(false);
     this.structureView = on;
     this.applyStructureView();
   }
 
+  /** Whether the structure view is on, so the UI can drop the other toggle's
+   *  active state when one view turns the other off. */
+  get structureViewOn(): boolean {
+    return this.structureView;
+  }
+  get interfaceViewOn(): boolean {
+    return this.interfaceView;
+  }
+
+  /** The FIXED layer: what the structure view renders as built. Wet rooms are
+   *  fixed because their drains bind them to a stack, and stairs because the
+   *  section binds them to the floor above. */
+  private isFixedLayer(def: ModuleDef): boolean {
+    return def.category === "stair" || isWet(def);
+  }
+
   private applyStructureView(): void {
     const on = this.structureView;
-    for (const floor of this.floors)
+    for (const floor of this.floors) {
       for (const inst of floor.store.instances.values()) {
-        if (!isElastic(inst.def)) continue;
+        // Furniture modules are neither a space nor its contents, so the view
+        // has nothing to say about them and leaves them exactly as placed.
+        if (inst.def.category !== "room") continue;
+        const stripped = on && !this.isFixedLayer(inst.def);
         for (const child of inst.group.children) {
-          if (!child.userData.isWall) continue;
-          child.userData.structureHidden = on;
-          child.visible = !on;
+          if (child.userData.isWall) {
+            child.userData.structureHidden = stripped;
+            child.visible = !stripped;
+          } else if (child.userData.props) {
+            child.visible = !stripped;
+          }
+        }
+        const mat = inst.group.userData.material as THREE.Material | undefined;
+        if (mat) {
+          if (stripped) mat.userData.baseColor = STRUCTURE_PLATE;
+          else delete mat.userData.baseColor;
         }
       }
+      // Circulation and outdoor walls are merged per component into the floor's
+      // cluster group, not into any instance, so they are stripped here. Their
+      // floor tiles live on the instances above and stay, which is what makes a
+      // corridor read as bare plate rather than disappear.
+      for (const child of floor.clusterGroup.children) {
+        child.userData.structureHidden = on;
+        child.visible = !on;
+      }
+      floor.refreshColors(); // re-run `fade` so the baseColor change lands
+    }
     markCutawayDirty(); // let the cutaway pass re-take control of what's shown
   }
 
