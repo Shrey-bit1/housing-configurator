@@ -13,9 +13,12 @@ completed: 2026-07-30
 All eight tasks were carried out and both builds are clean, so the code side is
 complete. Run 0006's seven files are committed as `60b3b47`. The balcony defect is
 fixed by defining `isFacadeEdge` once and using it in both the view's skip set and the
-new FAC1 rule. E1 already covers the missing entrance, so nothing was added there. WET1
+new FAC1 rule. A later review of that helper found two defects in it, a sealed empty
+pocket and a sealed courtyard both reading as facade, and both are fixed by rebuilding
+it as the union of `floor.isOutside` and `floor.semiExterior.boundary`, which finding 3b
+covers in full. E1 already covers the missing entrance, so nothing was added there. WET1
 and FAC1 exist, the README table is regenerated from the code at 39 rules, and
-`PROJECT_STATE.md` records both.
+`PROJECT_STATE.md` records all of it.
 
 The verification is where this run is short. The browser pane was displayed at task 0
 and disappeared partway through the interactive check, after two rooms had been placed
@@ -40,9 +43,9 @@ which was not obvious at the start: the graph node already carries `cells`, `flo
 `roomTypeId`, so both rules read geometry through nodes rather than through a new
 context field.
 
-- `src/core/exteriorEdges.ts` gained `isFacadeEdge`.
-- `src/core/floorManager.ts` rewrote `partitionEdges` around it and gained
-  `outdoorCellKeys`.
+- `src/core/exteriorEdges.ts` gained `isFacadeEdge`, later rewritten by the amendment.
+- `src/core/floorManager.ts` rewrote `partitionEdges` around it. It briefly gained an
+  `outdoorCellKeys` helper, which the amendment deleted.
 - `src/core/adjacencyGraph.ts` gained the `hasFacadeEdge` node field and its derivation.
 - `src/core/rules.ts` gained WET1 and FAC1.
 - `README.md` rule table regenerated from `RULES`.
@@ -88,9 +91,13 @@ commit takes, and three untracked files under `docs/` (`research-precedents.md`,
 `research-swiss-regulations.md`, `review-storyline-2026-08-04.md`) written outside this
 run and outside its remit.
 
-### 3. The facade-edge helper
+### 3. The facade-edge helper, first version
 
-`isFacadeEdge`, at `src/core/exteriorEdges.ts:50-79`. Signature:
+**Superseded by finding 3b.** Kept here because the reasoning that led to it is still
+the reasoning behind the corrected version, and because the defects only make sense
+against what they replaced.
+
+`isFacadeEdge`, as first written. Signature:
 
 ```
 export function isFacadeEdge(
@@ -128,12 +135,117 @@ skip set is subtractive, and an edge absent from it takes the ordinary path that
 builds the wall and its french-window glazing in the normal view. It was not observed on
 screen, for the reason in finding 1.
 
-One thing worth recording about the wider definition. `exteriorEdges` answers "does this
-edge see open sky" and correctly says no for a balcony boundary; `hasSemiExteriorEdge`
-answers "does this room have french-window glass" and requires the balcony run to have
-qualified. `isFacadeEdge` answers a third question, "is this edge part of the
-enclosure", and needs neither. The three now sit next to each other and the doc comments
+One thing worth recording about the wider definition, and it survives the amendment.
+`exteriorEdges` answers "does this edge see open sky" and correctly says no for a balcony
+boundary; `hasSemiExteriorEdge` answers "does this room have french-window glass" and
+requires the balcony run to have qualified. `isFacadeEdge` answers a third question, "is
+this edge part of the enclosure". The three sit next to each other and the doc comments
 say which is which.
+
+### 3b. Amendment: two defects in the helper, found by review
+
+Review of the first version of `isFacadeEdge` found two defects, and both were the same
+mistake made twice, which was reading "no room here" as "outside". Neither was observed
+failing, because task 8's browser checks never ran.
+
+The first version tested `!occupied.has(neighbour) || isOutdoor(neighbour)`. Branch one
+says only that no space occupies the cell, while open sky additionally requires the cell
+to be reachable from the grid border, which is what `Floor.isOutside` means and why
+`exteriorEdges` takes both `occupied` and `isOutside` and requires both. A room walling
+off an empty pocket therefore had a facade onto that pocket, so the interface view kept
+the wall and FAC1 passed the room. Branch two scanned for outdoor-cluster cells with a
+bespoke `outdoorCellKeys()`, which counts a sealed courtyard, while
+`computeSemiExterior` already rejects outdoor clusters that reach no sky at
+`semiExterior.ts:126-132`, commented "sealed courtyard — no sky, confers nothing". So a
+balcony enclosed on all sides conferred nothing anywhere else in the app and facade here.
+
+The corrected helper takes the union of two derived answers and decides nothing itself.
+`src/core/exteriorEdges.ts:88-100`:
+
+```
+export function isFacadeEdge(
+  cx: number,
+  cz: number,
+  side: Side,
+  occupied: Set<string>,
+  isOutside: (cx: number, cz: number) => boolean,
+  isSemiExterior: (cx: number, cz: number, side: Side) => boolean
+): boolean {
+  const [dx, dz] = SIDE_DELTA[side];
+  const nx = cx + dx;
+  const nz = cz + dz;
+  return (!occupied.has(`${nx},${nz}`) && isOutside(nx, nz)) || isSemiExterior(cx, cz, side);
+}
+```
+
+All three call sites after rewiring. In `src/core/floorManager.ts:272-273`, the
+predicate built once per floor:
+
+```
+      const isSemiExterior = (x: number, z: number, s: Side) =>
+        floor.semiExterior?.boundary.has(edgeKey(x, z, s)) ?? false;
+```
+
+at `floorManager.ts:328`, where the view builds its skip set:
+
+```
+            ? { skip: this.partitionEdges(cells, occupied, inst.origin, floor.isOutside, isSemiExterior) }
+```
+
+and inside `partitionEdges` at `floorManager.ts:374`:
+
+```
+        if (isFacadeEdge(c.cx, c.cz, side, occupied, isOutside, isSemiExterior)) continue;
+```
+
+In `src/core/adjacencyGraph.ts:253-254` and `:263`, where FAC1's node flag is derived:
+
+```
+  const isSemiExterior = (x: number, z: number, sd: Side) =>
+    floor.semiExterior?.boundary.has(edgeKey(x, z, sd)) ?? false;
+...
+      SIDES.some((s) => isFacadeEdge(c.cx, c.cz, s, occupied, floor.isOutside, isSemiExterior))
+```
+
+`outdoorCellKeys()` is deleted, along with both `outdoorKeys` / `isOutdoor` pairs. The
+search run over the whole source tree was
+`grep -rn "outdoorCellKeys\|isOutdoor\|outdoorKeys" src/`, which printed `NONE`.
+
+**The stair-hole question is confirmed, and the answer did not simplify the signature.**
+`semiExterior.ts:100` builds its occupancy as
+`const spaces = new Set(buildSpaceTargets(floor, floorBelow).keys());`, commented "spaces
+only (rooms + clusters + stairs + hole projections)". That is the same call with the same
+arguments that produces `occupied` in both consumers, so hole projections are accounted
+for identically and an occupied in-bounds cell can never be border-reachable-empty. On
+that basis `isOutside` does subsume `!occupied.has(...)`. It was still kept, for a
+different reason found while checking: `Floor.isOutside` at `floor.ts:123-124` is
+`this.semiExterior?.isOutside(cx, cz) ?? true`, so before the first derive pass, when no
+plan exists, it returns true for every cell including occupied ones. Dropping `occupied`
+would make every edge facade in that window. Both conditions are kept deliberately, and
+the doc comment records the reasoning so the next reader does not re-open it.
+
+**The bathroom asymmetry is documented rather than fixed**, as instructed. `boundary`
+skips bathroom-to-outdoor boundaries at source for privacy (`semiExterior.ts:151`,
+`if (isBathroom(def)) continue`), so the predicate is really "is this a glazable
+room-to-outdoor boundary". Neither consumer can reach that case today, because the
+interface view keeps wet rooms whole and FAC1 only tests habitable rooms. The doc comment
+on the helper says so and names the case a third consumer would hit.
+
+**Which browser check would have caught these.** Honestly, neither. Task 8's three checks
+were a room beside a balcony, a split kitchen and bathroom, and a bedroom enclosed by
+other rooms. A room beside an open balcony exercises the semi-exterior branch on its
+qualifying path, which both versions get right. A sealed courtyard needs a balcony ringed
+by rooms on all four sides, and a sealed empty pocket needs rooms placed around a gap
+they leave deliberately; neither happens while clicking around, and the third check comes
+closest only by accident, since a bedroom enclosed on all four sides also creates the
+pocket, but only if a gap is left rather than the rooms being flush.
+
+What would catch them is a unit test on `isFacadeEdge` itself, given a hand-built
+occupancy set: one case with an empty pocket, one with a sealed courtyard, one with open
+sky, one with an open balcony. That is four assertions and no rendering. This repository
+has no test suite at all, which is exactly why both defects had to be found by reading,
+and a rule that reads geometry and has no test is the thing this repository is currently
+least able to verify. Two rules now read geometry.
 
 ### 4. The entrance rule already exists
 
@@ -353,10 +465,11 @@ npx vite build
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 11.17s
+✓ built in 10.83s
 ```
 
-The chunk-size warning predates this run.
+Both were re-run after the amendment and both are still clean; the times quoted are the
+later run. The chunk-size warning predates this run.
 
 ### 10. What contradicts the Assumptions section
 
@@ -397,6 +510,18 @@ Four, none covered by the Assumptions section.
    `hasFacadeEdge` costs one boolean per node on every graph build, whether or not FAC1
    is consulted. Affects graph build cost by a negligible amount and keeps the rule
    trivial.
+5. **That `semiExterior.boundary` is the right predicate for the room-to-outdoor half**
+   (added by the amendment). It is populated at `semiExterior.ts:167-168` before the
+   band-width logic, so solid returns and single-cell contacts are in it, and it holds
+   both representations of each physical boundary so either side matches. What it also
+   carries is the bathroom exclusion, which makes the predicate narrower than "touches a
+   balcony". Affects any future consumer that asks about a bathroom's balcony wall, and
+   is documented on the helper rather than worked around.
+6. **That keeping `occupied` beside `isOutside` is worth the redundancy** (added by the
+   amendment). The two are redundant once a semi-exterior plan exists and are not
+   redundant before the first derive pass, where `Floor.isOutside` falls back to `true`
+   for every cell. Affects only the pre-derive window, which no user ever sees, so this
+   is insurance rather than a live correctness fix.
 
 ## Evidence
 
@@ -418,12 +543,20 @@ Rungs stated separately.
   `RULES` and by grepping the README table rows. Counted.
 - `tsc` and `npm run build`: both executed, output quoted.
 - The balcony wall standing, WET1 firing, FAC1 firing: **not verified**.
+- The two helper defects and their fix: found and checked by READING the code, with
+  `semiExterior.ts:100`, `:126-132`, `:151` and `:167-168` and `floor.ts:123-124` quoted
+  above. Read, not executed. Neither defect has a test and neither would have been caught
+  by task 8's three checks.
+- `outdoorCellKeys()` and both `isOutdoor` pairs are gone: `grep -rn` over `src/`
+  returned `NONE`. Executed.
 
 ## Artifacts produced
 
 - `src/core/exteriorEdges.ts`, `src/core/floorManager.ts`, `src/core/adjacencyGraph.ts`,
   `src/core/rules.ts`, `README.md`, `PROJECT_STATE.md`, all modified and left
-  uncommitted for a person to read.
+  uncommitted for a person to read. `exteriorEdges.ts`, `floorManager.ts`,
+  `adjacencyGraph.ts` and `PROJECT_STATE.md` were touched twice, once for the original
+  fix and once for the amendment.
 - `_cowork/outbox/0007-balcony-edge-fix-entrance-check-and-the-two-wet-rules.report.md`.
 - `_cowork/done/0007-balcony-edge-fix-entrance-check-and-the-two-wet-rules.md`.
 - `_cowork/LOG.md`, one row appended.
@@ -501,3 +634,13 @@ build by dropping each piece where it belongs than by placing and then arranging
 prompt wants an exact layout, loading a prepared project file through the Import button
 would remove the interaction problem entirely, and it is worth deciding whether the
 bridge should keep a small library of test flats for exactly this.
+
+Consider pairing it with the smallest possible test for `isFacadeEdge`. Two defects in
+that one function were found by reading, and neither of the browser checks would have
+caught either, because a sealed courtyard and a sealed empty pocket are not layouts
+anyone builds while clicking around. Four assertions over a hand-built occupancy set
+would cover open sky, an open balcony, a sealed pocket and a sealed courtyard, with no
+rendering and no framework. That would be the first test in this repository, which is
+the reason to weigh it rather than assume it: it means choosing a runner, and the
+argument for choosing one now is that two rules and one view all read geometry through a
+single function whose failures are invisible on screen.
