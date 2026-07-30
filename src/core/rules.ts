@@ -128,12 +128,55 @@ interface RuleContext {
   /** Entry-root node ids (floor-0 nodes carrying a NON-BLOCKED entrance). */
   entryIds: string[];
   hasEntrance: boolean;
+  /** Occupied floors NOT reachable from the entrance floor over stair links —
+   *  ST3's subject. Rules whose finding would merely restate "that floor has no
+   *  stair" consult this and stay quiet, the same way the reachability family
+   *  consults {@link hasEntrance} and lets E1 speak. */
+  disconnectedFloors: Set<number>;
   /**
    * Ids reachable from `seeds` over edges, never entering nodes for which
    * `blocked` is true (the "remove all X, still reachable?" checks H2/H3/H6).
    * See the module doc comment for the any-entrance-suffices semantics.
    */
   reachableFrom: (seeds: string[], blocked?: (n: GraphNode) => boolean) => Set<string>;
+}
+
+/**
+ * Occupied floors that no chain of stairs connects to the ENTRANCE FLOOR.
+ *
+ * Floors, not rooms: a stair is the only thing that joins two storeys, so a
+ * floor with rooms on it and no stair reaching it is cut off wholesale, and
+ * every room on it is orphaned for exactly one reason. Built from the ACCESS
+ * graph's `viaStair` edges, which are already door-gated, so a stair nobody can
+ * open onto does not count as a connection.
+ *
+ * Returns empty when the dwelling is single-floor or has no entrance, because
+ * there is then nothing to be cut off FROM and E1 owns that case.
+ */
+function computeDisconnectedFloors(graph: DwellingGraph): Set<number> {
+  const occupied = new Set(graph.nodes.map((n) => n.floor));
+  if (occupied.size < 2 || graph.entryIds.length === 0) return new Set();
+  const byId = new Map(graph.nodes.map((n) => [n.id, n] as const));
+  // Floor-level adjacency: a stair edge joins the floors of its two endpoints.
+  const linked = new Map<number, Set<number>>();
+  for (const f of occupied) linked.set(f, new Set());
+  for (const e of graph.edges) {
+    if (!e.viaDoor || !e.viaStair) continue;
+    const a = byId.get(e.a)?.floor;
+    const b = byId.get(e.b)?.floor;
+    if (a === undefined || b === undefined || a === b) continue;
+    linked.get(a)?.add(b);
+    linked.get(b)?.add(a);
+  }
+  // Flood from the floor(s) carrying an entrance.
+  const seeds = graph.entryIds.map((id) => byId.get(id)?.floor).filter((f): f is number => f !== undefined);
+  const seen = new Set<number>(seeds);
+  const stack = [...seeds];
+  while (stack.length) {
+    const f = stack.pop()!;
+    for (const n of linked.get(f) ?? []) if (!seen.has(n)) { seen.add(n); stack.push(n); }
+  }
+  return new Set([...occupied].filter((f) => !seen.has(f)));
 }
 
 function buildContext(graph: DwellingGraph): RuleContext {
@@ -239,6 +282,7 @@ function buildContext(graph: DwellingGraph): RuleContext {
     is,
     entryIds: graph.entryIds,
     hasEntrance: graph.entryIds.length > 0,
+    disconnectedFloors: computeDisconnectedFloors(graph),
     reachableFrom,
   };
 }
@@ -568,6 +612,8 @@ export const RULES: Rule[] = [
       const reach = ctx.reachableFrom(ctx.entryIds);
       return graph.nodes
         .filter((n) => ctx.is.room(n) && !reach.has(n.id))
+        // ST3 owns a whole cut-off floor; repeating it per room says nothing new.
+        .filter((n) => !ctx.disconnectedFloors.has(n.floor))
         .map((n) => violation("H1", "hard", n));
     },
   },
@@ -678,6 +724,7 @@ export const RULES: Rule[] = [
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => ctx.is.circulation(n) && ctx.degree(n.id) === 0)
+        .filter((n) => !ctx.disconnectedFloors.has(n.floor)) // ST3 owns it
         .map((n) => violation("C1", "soft", n));
     },
   },
@@ -760,11 +807,39 @@ export const RULES: Rule[] = [
       const reach = ctx.reachableFrom(ctx.entryIds);
       return graph.nodes
         .filter((n) => ctx.is.outdoor(n) && !reach.has(n.id))
+        .filter((n) => !ctx.disconnectedFloors.has(n.floor)) // ST3 owns it
         .map((n) => violation("OD1", "hard", n));
     },
   },
 
   // ===== Stairs as checkable spaces =====
+  {
+    // ROOT CAUSE, ahead of the symptoms. A floor with no stair reaching it makes
+    // every room on it orphaned, every corridor on it dead and every balcony on
+    // it unreachable, so the report used to say the same thing once per space.
+    // This says it once, and H1, C1 and OD1 stay quiet about subjects on those
+    // floors (see `disconnectedFloors`). A1 keeps firing, because a corridor's
+    // width is true whether or not anyone can reach it.
+    id: "ST3",
+    severity: "hard",
+    description: "A floor is not reachable by stairs from the entrance floor.",
+    check(graph, ctx) {
+      if (ctx.disconnectedFloors.size === 0) return [];
+      const floors = [...ctx.disconnectedFloors].sort((a, b) => a - b);
+      const list = floors.map((f) => `Floor ${f}`).join(", ");
+      return [
+        {
+          ruleId: "ST3",
+          severity: "hard" as const,
+          description:
+            `${list} ${floors.length === 1 ? "is" : "are"} not reachable by stairs from the ` +
+            `entrance floor. Every space there is cut off for this one reason.`,
+          nodeIds: graph.nodes.filter((n) => ctx.disconnectedFloors.has(n.floor)).map((n) => n.id),
+          layout: true,
+        },
+      ];
+    },
+  },
   {
     id: "ST1",
     severity: "soft",

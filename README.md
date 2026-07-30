@@ -43,6 +43,7 @@ All rules are advisory (never block placement) and run on demand via **Check Lay
 | OD1 | 🔴 hard | Outdoor space is not reachable from the dwelling. |
 | ST1 | 🟡 soft | Stair connects to nothing on one or both floors it should link. |
 | ST2 | 🔴 hard | Stair not reachable from any entrance. |
+| ST3 | 🔴 hard | A floor is not reachable by stairs from the entrance floor. Fires once for the whole dwelling; H1, C1 and OD1 stay quiet about spaces on that floor, since they would all be restating the same cause. |
 | D1 | 🔴 hard | Room has no exterior wall — no daylight possible. |
 | D2 | 🟡 soft | Kitchen has no exterior wall — no natural ventilation. |
 | W1 | 🟡 soft | Room's glazing is below its daylight target. |

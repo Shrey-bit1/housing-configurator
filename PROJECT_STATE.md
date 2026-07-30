@@ -2451,6 +2451,25 @@ survives being reduced to a node and its edges. Both read `GraphNode.cells` /
 `README.md`'s rule table is generated from `RULES` and now lists all 39; before this
 session it listed 24 and included a phantom `S4`.
 
+**ST3, the stair root-cause rule (run 0012).** Hard. A dwelling whose occupied floors
+are not all reachable by stairs from the ENTRANCE floor fires ONE violation naming the
+cut-off floors, instead of the report restating the same cause once per space on them.
+`computeDisconnectedFloors` (rules.ts) builds floor-level adjacency from the ACCESS
+graph's `viaStair` edges, which are already door-gated, floods from the floor(s) carrying
+an entrance, and returns the occupied floors it never reaches. It returns empty for a
+single-floor dwelling or one with no entrance, because E1 owns that case.
+
+The gating follows E1's precedent exactly and adds no engine machinery: the fact lands on
+`RuleContext.disconnectedFloors` and H1, C1 and OD1 each add one `.filter()` consulting
+it, the same way the reachability family consults `hasEntrance`. A1 deliberately keeps
+firing, because a corridor's width is true whether or not anyone can reach it.
+
+Measured on `testflats/flat-1-two-storey.json` and its derived `flat-1-no-stair.json`:
+the connected fixture is unchanged at `12 issues (1 hard, 11 soft)`, so ST3 is silent and
+nothing was suppressed; the no-stair fixture reads `7 issues (1 hard, 6 soft)` with H1 and
+C1 replaced by the single ST3 line. WET1's floor-0 line is byte-identical across both,
+which is the invariant a stair should not affect.
+
 **E1 is now HARD** (`rules.ts`, entrance prerequisite). It was `note`, meaning
 "validation could not run"; under the interface reading of a unit the entrance is what
 the flat offers the building, so its absence is a failure of the binding level. Base
