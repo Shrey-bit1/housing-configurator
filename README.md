@@ -69,6 +69,76 @@ Bedroom + Living Room) for the daylight and facade rules (`ctx.is.habitable`).
 Listed in the order they appear in `RULES`, which groups them by theme. This table is
 generated from the code; if it disagrees with `src/core/rules.ts`, the code is right.
 
+## Views and modes
+
+Every control in the interface, and what it does. Nothing here changes the saved
+project unless it says so: the view toggles are session state and are never written to
+a `.json` file.
+
+**Top left.**
+
+- **DIAGRAM** replaces the 3D view with the bubble diagram, a force-directed graph of
+  the whole dwelling. Rooms, clusters and stairs are nodes; a solid line is an access
+  edge (a door, or a french window onto a balcony) and a dashed line is spaces merely
+  touching. Cross-floor stair links appear as "↑/↓ Floor N" stubs. Check Layout stays
+  available while it is open.
+- **TOP VIEW** switches from the axonometric to a straight-down plan, and it works.
+  Pressing it hides every floor above the active one, keeps the ones at or below it,
+  turns on the door-swing arcs, which are a plan symbol and are hidden otherwise, locks
+  camera rotation so the view cannot be tumbled off axis, and re-frames onto the
+  building's extent from above. The button then reads **Axo View**, and pressing it
+  again restores every floor's previous visibility, hides the arcs, unlocks rotation and
+  re-frames to the axonometric. It is mutually exclusive with DIAGRAM.
+
+**Top right.**
+
+- **CHECK LAYOUT** runs the layout rules once, on demand, and opens the report panel.
+  It is advisory: nothing it says blocks placement, saving or export. Results also tint
+  the implicated rooms in 3D and highlight the matching nodes in the bubble diagram.
+  Any change to the layout clears the report, because it would otherwise describe a
+  building that no longer exists.
+- **RESET VIEW** frames the camera on whatever is currently placed, rather than jumping
+  to a fixed position, so it stays useful however large the grid gets.
+- **?** lists the keyboard shortcuts.
+
+**Bottom right.** These four are pure view state.
+
+- **CUTAWAY** (on by default) hides whichever walls face the camera so you can see into
+  the rooms. Turning it off renders every wall, which is how to look at the building as
+  a solid object with its facades and windows.
+- **Seeds** outlines each elastic room's authored rectangle inside the shape it grew
+  into. Living rooms, bedrooms and recreation rooms expand to absorb enclosed leftover
+  space, and this shows what was actually placed versus what was derived.
+- **Structure** is an x-ray: it hides the walls and glazing of those same elastic rooms,
+  leaving the serviced and structural parts, meaning bathrooms, kitchen, circulation,
+  stairs and entrances, reading on their own.
+- **Interface view** shows only what the flat owes the building around it. The
+  perimeter stands with its glazing, and wet rooms, the stair, balconies and the
+  entrance stay as they are; every other room loses its partitions, furniture, door
+  markers and colour, so the rest reads as one open plate. Bedrooms keep a tinted plate
+  marking position.
+- The **compass** below them sets the north direction. This one is not view state: it is
+  saved with the project and it moves the windows, because glazing is biased toward the
+  south.
+
+**Left sidebar.**
+
+- **EXPORT** writes the whole project, every floor and everything on it, to a `.json`
+  file. **IMPORT** reads one back; a file can also be dragged onto the view. **EXPORT
+  UNIT** writes a different and much smaller file, a `dwelling-unit` bridge file
+  describing this flat as one unit for the building packer in the companion repository.
+- **FLOORS** lists the floors. One is active and interactive at a time and the rest
+  render dimmed; the eye icon hides a floor entirely. Add and delete floors here. A
+  stair placed on the top floor creates the floor above automatically.
+- **ROOMS**, **MODULES** and **STAIRS** are the palette. Drag an entry onto the grid to
+  place it. A green ghost means the position is legal and a red one means it collides.
+  Once placed, click to select, `R` rotates by 90°, `M` mirrors, dragging moves, and
+  `Delete` removes. Shift-click adds to a selection and the whole selection moves or
+  deletes together.
+
+Three example flats live in `testflats/`. Open one with IMPORT to see a finished layout
+rather than starting from an empty grid.
+
 ## Run locally
 
 Requires Node.js (18+).

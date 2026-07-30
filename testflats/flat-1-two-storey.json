@@ -1,0 +1,594 @@
+{
+  "format": "flat-configurator-project",
+  "version": 1,
+  "northAngle": 0,
+  "floors": [
+    {
+      "cols": 25,
+      "rows": 25,
+      "instances": [
+        {
+          "type": "living",
+          "cx": 8,
+          "cz": 5,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "kitchen",
+          "cx": 7,
+          "cz": 6,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "bedroom_small",
+          "cx": 7,
+          "cz": 14,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "bedroom_large",
+          "cx": 19,
+          "cz": 12,
+          "rotation": 0,
+          "mirrored": true
+        },
+        {
+          "type": "recreation",
+          "cx": 15,
+          "cz": 9,
+          "rotation": 3,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 18,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 16,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 14,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 12,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 10,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 8,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 8,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 10,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 12,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 14,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 16,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 18,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "bathroom_small",
+          "cx": 11,
+          "cz": 14,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "bathroom_small",
+          "cx": 8,
+          "cz": 14,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "stair",
+          "cx": 8,
+          "cz": 13,
+          "rotation": 3,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 6,
+          "cz": 13,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 6,
+          "cz": 12,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 6,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 6,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        }
+      ],
+      "entrances": [
+        {
+          "cx": 13,
+          "cz": 5,
+          "side": "north"
+        }
+      ],
+      "doors": [
+        {
+          "cx": 7,
+          "cz": 7,
+          "side": "east",
+          "swing": {
+            "hinge": "a",
+            "into": "A"
+          }
+        },
+        {
+          "cx": 14,
+          "cz": 7,
+          "side": "east",
+          "swing": {
+            "hinge": "a",
+            "into": "B"
+          }
+        },
+        {
+          "cx": 17,
+          "cz": 10,
+          "side": "north",
+          "swing": {
+            "hinge": "a",
+            "into": "B"
+          }
+        },
+        {
+          "cx": 17,
+          "cz": 11,
+          "side": "south",
+          "swing": {
+            "hinge": "a",
+            "into": "B"
+          }
+        },
+        {
+          "cx": 7,
+          "cz": 15,
+          "side": "east",
+          "swing": {
+            "hinge": "a",
+            "into": "B"
+          }
+        },
+        {
+          "cx": 14,
+          "cz": 15,
+          "side": "west",
+          "swing": {
+            "hinge": "a",
+            "into": "B"
+          }
+        },
+        {
+          "cx": 8,
+          "cz": 12,
+          "side": "west",
+          "swing": {
+            "hinge": "a",
+            "into": "A"
+          }
+        },
+        {
+          "cx": 6,
+          "cz": 14,
+          "side": "north",
+          "swing": {
+            "hinge": "b",
+            "into": "A"
+          }
+        }
+      ]
+    },
+    {
+      "cols": 25,
+      "rows": 25,
+      "instances": [
+        {
+          "type": "circulation_double",
+          "cx": 14,
+          "cz": 13,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 14,
+          "cz": 12,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "bathroom_large",
+          "cx": 10,
+          "cz": 14,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 16,
+          "cz": 12,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "bedroom_small",
+          "cx": 7,
+          "cz": 10,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "bathroom_small",
+          "cx": 5,
+          "cz": 15,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 8,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 8,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 10,
+          "cz": 10,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 11,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 11,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 13,
+          "cz": 10,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 14,
+          "cz": 10,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 14,
+          "cz": 11,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 16,
+          "cz": 10,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 4,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 5,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 7,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 6,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 11,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 10,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 9,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 8,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 15,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 14,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 13,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 12,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 19,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 18,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 17,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 16,
+          "cz": 8,
+          "rotation": 1,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 4,
+          "cz": 7,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 6,
+          "cz": 7,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 10,
+          "cz": 7,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 8,
+          "cz": 7,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 14,
+          "cz": 7,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 12,
+          "cz": 7,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 18,
+          "cz": 7,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "outdoor_double",
+          "cx": 16,
+          "cz": 7,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "bedroom_large",
+          "cx": 14,
+          "cz": 14,
+          "rotation": 0,
+          "mirrored": false
+        },
+        {
+          "type": "circulation_double",
+          "cx": 8,
+          "cz": 14,
+          "rotation": 0,
+          "mirrored": false
+        }
+      ],
+      "entrances": [],
+      "doors": [
+        {
+          "cx": 13,
+          "cz": 12,
+          "side": "east",
+          "swing": {
+            "hinge": "a",
+            "into": "A"
+          }
+        },
+        {
+          "cx": 7,
+          "cz": 10,
+          "side": "east",
+          "swing": {
+            "hinge": "a",
+            "into": "A"
+          }
+        },
+        {
+          "cx": 6,
+          "cz": 15,
+          "side": "north",
+          "swing": {
+            "hinge": "b",
+            "into": "A"
+          }
+        },
+        {
+          "cx": 15,
+          "cz": 14,
+          "side": "north",
+          "swing": {
+            "hinge": "a",
+            "into": "A"
+          }
+        }
+      ]
+    }
+  ]
+}
