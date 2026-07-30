@@ -55,6 +55,12 @@ rules engine and the export format are the mature parts, the UI is not.
 - `dist/`, `node_modules/` — build output and dependencies, both gitignored.
 - `.claude/` — dev-server launch configs, and this bridge. **Gitignored** (see
   Non-obvious things).
+- `testflats/` — three example project files (`flat-configurator-project` v1) added in
+  run 0009: `flat-1-two-storey.json` (2 floors, a corridor against a balcony on the
+  upper one), `flat-2-single-storey.json`, `flat-3-terrace.json`. Open one with IMPORT
+  to get a finished layout instead of an empty grid. NOTE: a run cannot load these
+  without a human clicking IMPORT; injecting a file through the hidden picker or a
+  synthetic drop both fail, so any fixture-based check is currently a manual step.
 - `_cowork/` — the bridge traffic. Tracked in git on purpose.
 
 ## Entry points

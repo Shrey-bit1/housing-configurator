@@ -16,3 +16,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0006 | 2026-07-29 | Interface view and a soft rule for split wet areas | partial | 0006-interface-view-and-a-soft-rule-for-split-wet-areas.report.md |
 | 0007 | 2026-07-30 | Balcony edge fix, entrance check, and the two wet rules | partial | 0007-balcony-edge-fix-entrance-check-and-the-two-wet-rules.report.md |
 | 0008 | 2026-07-30 | Four checks, E1 hard, entrance marker, first test | partial | 0008-four-checks-e1-hard-entrance-marker-first-test.report.md |
+| 0009 | 2026-07-30 | Circulation wall bug, test flats, modes guide, rules QA | partial | 0009-circulation-wall-bug-test-flats-modes-guide-rules-qa.report.md |
