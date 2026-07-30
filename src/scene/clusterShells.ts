@@ -102,8 +102,16 @@ export function rebuildClusterShells(
  *    segment), matching the other side's own dissolve.
  *
  * CIRCULATION (corridor):
- *  - facing a ROOM, a STAIR, or an Outdoor cluster → DISSOLVED — the corridor
- *    flows into what it touches;
+ *  - facing a ROOM or a STAIR → DISSOLVED — the corridor flows into what it
+ *    touches;
+ *  - facing an OUTDOOR cluster → a FULL wall STAYS. A balcony is outside the
+ *    enclosure, so the corridor needs an envelope there exactly as a room does.
+ *    This used to dissolve, and because the Outdoor side dissolves toward
+ *    circulation too, NEITHER side built a segment and the flat stood open to
+ *    its own balcony along the corridor. The dissolve is meant to be ONE-SIDED
+ *    (§2n): a room keeps all its walls and only the connector gives way. Two
+ *    clusters facing each other each deferred to the other, which is the one
+ *    case that convention did not cover.
  *  - facing open space → a FULL-height wall stays (deliberately NO railing: a
  *    free-standing corridor edge is a solid wall exactly as before).
  *
@@ -133,9 +141,12 @@ function clusterWallOpts(floor: Floor, component: Cell[], key: string): Boundary
       const def = ownerId ? floor.store.instances.get(ownerId)?.def : undefined;
       if (!def) continue;
       const isRoom = def.category === "room" && !def.cluster;
+      // Outdoor still gives way to circulation, so the boundary keeps exactly
+      // ONE segment: the corridor's. Circulation no longer gives way to
+      // outdoor, which is what left the boundary with none.
       const dissolves = outdoor
         ? isRoom || def.cluster === "circulation"
-        : isRoom || def.category === "stair" || def.cluster === "outdoor";
+        : isRoom || def.category === "stair";
       if (dissolves) skip.add(edgeKey(c.cx, c.cz, side));
     }
   }

@@ -356,7 +356,29 @@ existing wall-rebuild pass, so move/rotate/delete of any room — OR a north-dia
 change (`FloorManager.setNorthAngle` → `refreshWalls`, §2k) — regenerates them
 automatically. Entrance placement doesn't go through `store.onChange`, so it
 calls `FloorManager.refreshWalls()` (public) to re-skip the door's edge. Cluster
-shells (Circulation/Outdoor) never get windows.
+shells (Circulation/Outdoor) never get windows from the EXTERIOR generator (they
+have no daylight target). That sentence is about §2d only, and it should not be
+read as a decision about the SEMI-EXTERIOR (french-window) pass, which is a
+different system — see the circulation-to-outdoor note below.
+
+**Circulation-to-outdoor (run 0009).** A corridor meeting a balcony used to build
+NO wall at all, so a flat stood open to its own balcony along the corridor. The
+dissolve in `clusterShells.ts` `clusterWallOpts` was TWO-SIDED there: outdoor
+dissolved toward circulation and circulation dissolved toward outdoor, so each
+deferred to the other and neither built a segment. Every other case is one-sided
+(a room keeps all its walls, only the connector gives way), and two clusters
+facing each other is the case that convention did not cover. Circulation now
+KEEPS its wall toward outdoor; outdoor still gives way to circulation, so the
+boundary carries exactly one segment, the corridor's.
+
+The second half of that boundary is NOT fixed. `semiExterior.ts` filters its
+per-room loop with `if (def.category !== "room" || def.cluster) continue;`, so
+circulation clusters never enter `plan.boundary` and never receive french-window
+glazing. A corridor therefore gets a solid wall to its balcony where a room would
+get glass. Fixing it needs a keying decision: `glazedByRoom` is keyed by ROOM
+INSTANCE id, while a cluster is a merged component drawn per component by
+`rebuildClusterShells`, which currently passes `undefined // clusters never get
+windows` to `buildBoundaryWalls`.
 
 ### 2e. Undo / redo (snapshot history, `history.ts`)
 
