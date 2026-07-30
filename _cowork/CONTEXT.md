@@ -58,9 +58,11 @@ rules engine and the export format are the mature parts, the UI is not.
 - `testflats/` — three example project files (`flat-configurator-project` v1) added in
   run 0009: `flat-1-two-storey.json` (2 floors, a corridor against a balcony on the
   upper one), `flat-2-single-storey.json`, `flat-3-terrace.json`. Open one with IMPORT
-  to get a finished layout instead of an empty grid. NOTE: a run cannot load these
-  without a human clicking IMPORT; injecting a file through the hidden picker or a
-  synthetic drop both fail, so any fixture-based check is currently a manual step.
+  to get a finished layout instead of an empty grid. In DEV, `?project=<name>` loads one
+  straight from the URL (a bare name resolves against `testflats/`), so a run can set up
+  any layout it wants without a human. Run 0009 reported the opposite; the cause was
+  `importProjectText`'s unconditional `window.confirm`, which run 0010 made conditional
+  on there being something to replace.
 - `_cowork/` — the bridge traffic. Tracked in git on purpose.
 
 ## Entry points
@@ -84,9 +86,11 @@ rules engine and the export format are the mature parts, the UI is not.
   `vitest run`; it takes under a second and needs no config file. The one file is
   `src/core/exteriorEdges.test.ts`, four cases over the `isFacadeEdge` predicate.
   Everything else is still verified the old way: `tsc` clean, `npm run build` clean, and
-  driving the app in a real browser and looking at it. So a prompt asking for a test of
-  pure logic under `src/core/` now has somewhere to put it, while anything involving
-  geometry on screen still comes back as screenshots.
+  driving the app in a real browser. Since run 0010 the Check Layout panel is fully
+  scriptable: write a fixture into `testflats/`, open `?project=<name>`, and read
+  `#validation-panel` from the DOM. That works even with the Browser pane hidden, because
+  the panel is DOM rather than pixels, so rule work no longer depends on the pane. Only
+  geometry still needs screenshots.
 - Python is needed for exactly one thing: `docs/build-pdf.py`, which regenerates the
   rules PDF when `rules.ts` changes.
 - `CLAUDE.md` requires that `PROJECT_STATE.md` be updated before any feature is
