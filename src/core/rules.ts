@@ -434,8 +434,13 @@ export const RULES: Rule[] = [
   // ===== Entrance prerequisite / validity (informational + hard) =====
   {
     id: "E1",
-    severity: "note",
-    description: "Place an entrance to validate circulation/reachability.",
+    // HARD since the interface reading of a unit: the entrance is what the flat
+    // offers the building around it, so its absence is a failure of the binding
+    // level rather than a note that validation could not run. Rules only
+    // evaluate when Check Layout is pressed, so a hard severity here costs
+    // nothing during authoring.
+    severity: "hard",
+    description: "No entrance defined — the entrance is the unit's interface to the building.",
     check(graph, ctx) {
       if (ctx.hasEntrance) return [];
       // Distinguish "never placed one" from "placed one but it's now blocked" —
@@ -444,7 +449,7 @@ export const RULES: Rule[] = [
         graph.entrances.length > 0
           ? "All entrances are blocked — none currently open to the outside. Reachability can't be validated."
           : RULES_BY_ID.E1.description;
-      return [{ ruleId: "E1", severity: "note", description, nodeIds: [], layout: true }];
+      return [{ ruleId: "E1", severity: "hard", description, nodeIds: [], layout: true }];
     },
   },
   {

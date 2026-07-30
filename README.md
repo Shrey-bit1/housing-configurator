@@ -22,7 +22,7 @@ All rules are advisory (never block placement) and run on demand via **Check Lay
 
 | ID | Severity | Rule |
 |---|---|---|
-| E1 | 🟢 note | Place an entrance to validate circulation/reachability. |
+| E1 | 🔴 hard | No entrance defined — the entrance is the unit's interface to the building. |
 | E2 | 🔴 hard | Entrance is blocked — its edge no longer faces outside. |
 | DR1 | 🟢 note | No doors placed — reachability requires doors. |
 | DR2 | 🟢 note | Bedroom has an unusual number of doors for a private room. |

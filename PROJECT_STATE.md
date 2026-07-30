@@ -1692,6 +1692,22 @@ auto-repositioned. Undo/redo snapshots are same-session and can never skip.
 
 ## 4. Conventions & decisions
 
+**Testing.** `vitest` is a devDependency and `npm test` runs `vitest run`. No config
+file: vitest reads `vite.config.ts` and needed nothing added. The suite is one file,
+`src/core/exteriorEdges.test.ts`, covering `isFacadeEdge` with four cases (open sky, open
+adjacent balcony, sealed empty pocket, sealed courtyard). It exercises the REAL
+derivations — `borderReachableEmpty` for the open-sky half and the real
+`connectedComponents` plus the `reachesSky` gate for the outdoor half — rather than
+stubs, because both defects this function ever had were failures to defer to those
+derivations and a stub would have agreed with the broken code. A whole `Floor` is not
+constructed: `src/core/floor.ts` imports `../scene/*`, so building one drags the render
+layer into a test about a geometric predicate. Both defects were confirmed caught by
+reverting each in turn and watching exactly the corresponding case fail.
+
+NOTE for anyone updating `_cowork/CONTEXT.md`: its claim that `src/core/` imports no
+three.js is wrong. `src/core/grid.ts:1` is `import * as THREE from "three"`, and
+`floor.ts` additionally imports from `../scene/`.
+
 - **0.6 m structural cell = 12 voxels @ 5 cm.** Structural grid uses `CELL_SIZE = 0.6`; authored props use `VOXEL_SIZE = 0.05`, so `VOXELS_PER_CELL = 12`.
 - **One shared occupancy map per floor** for rooms, furniture modules, AND stairs — collision is checked uniformly. Owned by `Grid`; mutated only via `ModuleStore`. A stair's footprint additionally reserves a matching hole (`Grid.holeCells`) on the floor directly above.
 - **One central footprint transform: MIRROR FIRST, THEN ROTATE** (§2g). `transformCell`/`rotatedCells`/`occupiedCells` in `modules.ts` are the only place a `(rotation, mirrored)` pose becomes cells. Mirror-then-rotate ≠ rotate-then-mirror, so no consumer may reimplement it. Everything downstream (exterior edges, windows, clusters, holes, graph, props, stair geometry) derives from the transformed cells.
@@ -2390,6 +2406,15 @@ survives being reduced to a node and its edges. Both read `GraphNode.cells` /
 
 `README.md`'s rule table is generated from `RULES` and now lists all 39; before this
 session it listed 24 and included a phantom `S4`.
+
+**E1 is now HARD** (`rules.ts`, entrance prerequisite). It was `note`, meaning
+"validation could not run"; under the interface reading of a unit the entrance is what
+the flat offers the building, so its absence is a failure of the binding level. Base
+description is now `No entrance defined — the entrance is the unit's interface to the
+building.`; the all-entrances-blocked variant message is unchanged. E2 was already hard
+and is untouched. The concern that a hard severity would fire during authoring does not
+apply: rules evaluate only when Check Layout is pressed. Measured on an empty floor with
+no entrance, the counts line reads `3 issues (3 hard)` (E1, P1, P2).
 
 
 All rules are **advisory** (never block placement), run on-demand via
