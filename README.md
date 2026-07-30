@@ -137,7 +137,10 @@ a `.json` file.
   deletes together.
 
 Three example flats live in `testflats/`. Open one with IMPORT to see a finished layout
-rather than starting from an empty grid.
+rather than starting from an empty grid. In development only, `?project=` loads one
+straight from the URL, for example `http://localhost:5173/?project=flat-1-two-storey.json`;
+a bare name resolves against `testflats/`. It goes through the same import path as the
+button and is stripped from production builds.
 
 ## Run locally
 

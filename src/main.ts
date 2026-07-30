@@ -675,6 +675,17 @@ function exportUnit(name: string, color: string): void {
   showToast("info", `Unit "${name}" exported (${result.file.storeys.length} storey(s)).`);
 }
 
+/** Nothing authored yet: one floor, nothing placed, no doors, no entrances. Used
+ *  to decide whether an import has anything to destroy. */
+function isEmptyProject(): boolean {
+  return (
+    floors.floors.length <= 1 &&
+    floors.floors.every(
+      (f) => f.store.instances.size === 0 && f.doors.length === 0 && f.entrances.length === 0
+    )
+  );
+}
+
 /** Validate, confirm, then load — keeping the app's state intact on any failure. */
 function importProjectText(text: string): void {
   let parsed;
@@ -691,13 +702,24 @@ function importProjectText(text: string): void {
 
   // Newer-than-app files: warn prominently and fold the replace confirm in, so
   // the user makes one informed decision.
-  let confirmMsg = "This will replace your current layout. Continue?";
-  if (parsed.status === "newer")
-    confirmMsg =
-      `This file was created with a newer version (v${parsed.fileVersion}) of the app ` +
-      `than you're running (v${APP_PROJECT_VERSION}). Some elements may not load correctly.\n\n` +
-      `This will also replace your current layout. Continue?`;
-  if (!window.confirm(confirmMsg)) return;
+  //
+  // The confirm exists to protect work in progress, so it is skipped when there
+  // is none: importing into a freshly opened app has nothing to replace. That
+  // also makes this whole path usable without a human present, which is what the
+  // ?project= loader depends on rather than routing around.
+  const replacing = !isEmptyProject();
+  if (replacing || parsed.status === "newer") {
+    let confirmMsg = replacing
+      ? "This will replace your current layout. Continue?"
+      : "Load this project?";
+    if (parsed.status === "newer")
+      confirmMsg =
+        `This file was created with a newer version (v${parsed.fileVersion}) of the app ` +
+        `than you're running (v${APP_PROJECT_VERSION}). Some elements may not load correctly.` +
+        (replacing ? " This will also replace your current layout." : "") +
+        " Continue?";
+    if (!window.confirm(confirmMsg)) return;
+  }
 
   let skippedRooms = 0;
   try {
@@ -753,6 +775,29 @@ fileInput.addEventListener("change", () => {
   fileInput.value = ""; // allow re-importing the same file
 });
 document.body.appendChild(fileInput);
+
+// ---- Dev-only `?project=` loader ------------------------------------------
+// Opens the app with a project already loaded, so a fixture can be examined
+// without a human operating the file picker. `import.meta.env.DEV` is replaced by
+// the literal `false` in a production build, so this whole block is dropped by
+// tree-shaking and never ships.
+//
+// It goes through `readAndImport`, the SAME function the Import button calls, so
+// parsing, the confirm, error handling and history behave identically. Only where
+// the File comes from differs. A bare name resolves against `testflats/`.
+if (import.meta.env.DEV) {
+  const wanted = new URLSearchParams(location.search).get("project");
+  if (wanted) {
+    const url = wanted.includes("/") ? wanted : `/testflats/${wanted}`;
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        return r.blob();
+      })
+      .then((blob) => readAndImport(new File([blob], url.split("/").pop() ?? "project.json")))
+      .catch((err) => showToast("error", `?project= could not load ${url}: ${err.message}`));
+  }
+}
 
 // Drag-and-drop a .json onto the viewport. A depth counter keeps the highlight
 // stable as the pointer moves over child elements (each fires dragenter/leave).

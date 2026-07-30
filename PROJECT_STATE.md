@@ -1714,6 +1714,28 @@ auto-repositioned. Undo/redo snapshots are same-session and can never skip.
 
 ## 4. Conventions & decisions
 
+**Dev-only project loader (`?project=`, run 0010).** `src/main.ts` reads a `?project=`
+query parameter behind `if (import.meta.env.DEV)`, fetches the named file (a bare name
+resolves against `/testflats/`) and hands it to `readAndImport`, the SAME function the
+Import button calls, so parsing, the confirm, error handling and history are identical
+and only file acquisition differs. Vite replaces `import.meta.env.DEV` with `false` in a
+production build and tree-shakes the block; verified by grepping the built bundle for
+`project=`, which returns 0.
+
+It exists because run 0009 established that NO injection route can feed the Import
+button from a script, which cost that run three tasks. The reason turned out to be
+`importProjectText`'s unconditional `window.confirm`. That confirm now only fires when
+there is something to lose: `isEmptyProject()` (one floor, no instances, no doors, no
+entrances) skips it. That is a change to the shared path, not a loader bypass, so the
+button behaves the same way when importing into a freshly opened app.
+
+**Violation label disambiguation (run 0010).** `src/ui/validationPanel.ts` has one
+`makeLabeller(graph)` used by all three places that render a node name. A label keeps its
+plain form when unique, gains `(F<n>)` when the dwelling is multi-floor, and gains the
+footprint's anchor cell ONLY when that still collides: `Bathroom — Small (F0, 8,14)`.
+Two rooms of the same type on one floor previously rendered identically, so a report
+could name two different rooms with the same string.
+
 **Testing.** `vitest` is a devDependency and `npm test` runs `vitest run`. No config
 file: vitest reads `vite.config.ts` and needed nothing added. The suite is one file,
 `src/core/exteriorEdges.test.ts`, covering `isFacadeEdge` with four cases (open sky, open

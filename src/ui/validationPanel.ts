@@ -32,11 +32,9 @@ export function renderValidationPanel(
   onClose: () => void,
   onHoverViolation: (v: Violation | null) => void
 ): void {
-  // Disambiguate same-named rooms across floors when the dwelling is multi-floor.
   const multi = graph.floorCount > 1;
-  const labelById = new Map(
-    graph.nodes.map((n) => [n.id, multi ? `${n.label} (F${n.floor})` : n.label] as const)
-  );
+  const disambiguate = makeLabeller(graph);
+  const labelById = new Map(graph.nodes.map((n) => [n.id, disambiguate(n)] as const));
 
   const hard = violations.filter((v) => v.severity === "hard");
   const soft = violations.filter((v) => v.severity === "soft");
@@ -88,12 +86,43 @@ export function renderValidationPanel(
   panel.style.display = "block";
 }
 
+/**
+ * THE label a violation message shows for a node, disambiguated only as far as it
+ * has to be.
+ *
+ * The floor suffix separates rooms across floors when the dwelling is
+ * multi-floor. Two rooms of the SAME type on the SAME floor still rendered
+ * identically, so a report could say "Room: Bathroom — Small (F0)" twice and name
+ * two different rooms with no way to tell them apart. Where a label collides, and
+ * only there, the room's anchor cell is appended: `Bathroom — Small (F0, 8,14)`.
+ * Labels that are already unique are untouched, so the common case reads exactly
+ * as before.
+ *
+ * The anchor is the footprint's minimum cell: stable under redraw, and unlike an
+ * instance id it is something the user can find on the grid.
+ */
+function makeLabeller(graph: DwellingGraph): (n: DwellingGraph["nodes"][number]) => string {
+  const multi = graph.floorCount > 1;
+  const base = (n: DwellingGraph["nodes"][number]) =>
+    multi ? `${n.label} (F${n.floor})` : n.label;
+  const counts = new Map<string, number>();
+  for (const n of graph.nodes) counts.set(base(n), (counts.get(base(n)) ?? 0) + 1);
+  return (n) => {
+    const b = base(n);
+    if ((counts.get(b) ?? 0) < 2) return b;
+    const cx = Math.min(...n.cells.map((c) => c.cx));
+    const cz = Math.min(...n.cells.map((c) => c.cz));
+    return multi ? `${n.label} (F${n.floor}, ${cx},${cz})` : `${n.label} (${cx},${cz})`;
+  };
+}
+
 /** Per-room glazing orientation, e.g. "Living Room: glazing S + E" — the derived
  *  compass sectors each room's windows face (most-southern first, from
  *  `node.glazing.sectors`, computed under the project north). Only rooms that
  *  actually have glazing are listed; a corner-wrapped band shows both its
  *  sectors. OR1 (lit only from the north) reads the same underlying data. */
-function appendOrientation(panel: HTMLElement, graph: DwellingGraph, multi: boolean): void {
+function appendOrientation(panel: HTMLElement, graph: DwellingGraph, _multi: boolean): void {
+  const disambiguate = makeLabeller(graph);
   const rooms = graph.nodes.filter(
     (n) => n.kind === "room" && n.glazing && n.glazing.sectors.length > 0
   );
@@ -105,7 +134,7 @@ function appendOrientation(panel: HTMLElement, graph: DwellingGraph, multi: bool
 
   for (const n of rooms) {
     const row = el("div", "vp-metric");
-    const label = multi ? `${n.label} (F${n.floor})` : n.label;
+    const label = disambiguate(n);
     row.textContent = `${label}: glazing ${n.glazing!.sectors.join(" + ")}`;
     panel.appendChild(row);
   }
@@ -141,12 +170,13 @@ function appendDepthSection(
   panel: HTMLElement,
   graph: DwellingGraph,
   depths: Map<string, number>,
-  multi: boolean
+  _multi: boolean
 ): void {
+  const disambiguate = makeLabeller(graph);
   const rooms = graph.nodes
     .filter((n) => n.kind === "room" && depths.has(n.id))
     .map((n) => ({
-      label: multi ? `${n.label} (F${n.floor})` : n.label,
+      label: disambiguate(n),
       depth: depths.get(n.id)!,
     }))
     .sort((a, b) => a.depth - b.depth || a.label.localeCompare(b.label));
