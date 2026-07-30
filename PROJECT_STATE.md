@@ -1785,9 +1785,27 @@ View, Top View, Diagram) are all mutually aware of each other's state.
     and every wall segment sitting on the flat's OUTER boundary with its glazing.
   - **Stripped from every non-wet room:** interior partitions, furniture props,
     interior door markers and arcs, and the room's own colour.
+  - **FACADE EDGES STAY, including toward balconies.** `isFacadeEdge()`
+    (exteriorEdges.ts) is THE definition, and it decides nothing itself: it is
+    the union of two DERIVED answers. An edge is facade when it faces open sky
+    (`!occupied` AND `floor.isOutside`, both required) OR is in
+    `floor.semiExterior.boundary` (a qualifying room↔outdoor boundary). A balcony
+    sits outside the enclosure and its boundary carries the french-window
+    glazing, so that wall is facade and stays. Circulation neighbours are
+    interior and still dissolve. Both halves must come from the derived data: an
+    earlier version tested `!occupied` alone and scanned for outdoor cells
+    itself, which called a SEALED EMPTY POCKET and a SEALED COURTYARD facade —
+    the two cases `isOutside` and `reachesSky` exist to reject. `occupied` is
+    kept beside `isOutside` because `Floor.isOutside` falls back to `?? true`
+    before the first derive pass. `boundary` excludes bathroom↔outdoor
+    boundaries at source (privacy), so the predicate is really "glazable
+    room↔outdoor boundary"; no current consumer reaches that case. Deliberately WIDER than `exteriorEdges` (open sky only), which
+    windows, D1/D2, W1 and the export keep using. The FAC1 rule reads the same
+    function via `GraphNode.hasFacadeEdge`, so the drawing and the check cannot
+    disagree about where the enclosure runs.
   - **Two mechanisms, both filters.** Walls go through the shell rebuild:
-    `partitionEdges()` returns the LOCAL edge keys whose neighbour cell is
-    occupied, and those are handed to `rebuildRoomWalls` as the existing
+    `partitionEdges()` returns the LOCAL edge keys that are NOT facade, and
+    those are handed to `rebuildRoomWalls` as the existing
     `BoundaryWallOpts.skip` set (the same dissolve the Outdoor boundary uses),
     so no new geometry path exists. Mesh visibility cannot do this job: a room's
     walls are merged ONE MESH PER DIRECTION (moduleMesh.ts ~L451-498), so a
@@ -2358,6 +2376,21 @@ recorded so they survive context loss — NO code exists for these yet):
 ---
 
 ## 8. Layout rules — current table (`src/core/rules.ts`)
+
+**39 rules as of this session.** Two were added for the INTERFACE level, and both
+read CELL GEOMETRY rather than only the access graph, which departs from the other
+37 on purpose: each asks where something sits in the plan, and neither question
+survives being reduced to a node and its edges. Both read `GraphNode.cells` /
+`GraphNode.hasFacadeEdge`, so nothing was added to `RuleContext`.
+
+| ID | Severity | Rule |
+|---|---|---|
+| WET1 | 🟡 soft | Wet rooms (`WET_TYPES` — bathrooms + kitchen) form more than one connected group on a floor. 4-neighbour connectivity via the shared `connectedComponents` (cluster.ts); corner contact does not connect. One violation per floor, naming the group count and each group's min-cell. Scoped to ONE floor — whether wet cells stack across storeys is a separate question. Carries its reason: long installation runs, shafts that cannot bundle. |
+| FAC1 | 🔴 hard | A habitable room (`ctx.is.habitable` — bedrooms, living, recreation) has no facade edge. Reads `GraphNode.hasFacadeEdge`, derived in adjacencyGraph.ts with the same `isFacadeEdge` the interface view uses. Kitchens are excluded on purpose (wet, and an interior kitchen is common practice); D2 covers them softly. Description ends with the citation `(PBG LS 700.1 § 302)`. |
+
+`README.md`'s rule table is generated from `RULES` and now lists all 39; before this
+session it listed 24 and included a phantom `S4`.
+
 
 All rules are **advisory** (never block placement), run on-demand via
 "Check Layout", and read the whole-dwelling graph (§2c/§3). This table must match

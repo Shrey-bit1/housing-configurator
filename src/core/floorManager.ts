@@ -3,7 +3,7 @@ import { CELL_SIZE, cellKey, type Grid, type Cell } from "./grid";
 import { Floor } from "./floor";
 import { MODULE_DEFS, occupiedCells, type ModuleDef } from "./modules";
 import type { ProjectFile } from "./projectIO";
-import { edgeKey, parseEdgeKey, SIDES, SIDE_DELTA } from "./exteriorEdges";
+import { edgeKey, parseEdgeKey, SIDES, isFacadeEdge, type Side } from "./exteriorEdges";
 import { computeWindows, type WindowVariant } from "./windows";
 import {
   buildSpaceTargets,
@@ -266,6 +266,11 @@ export class FloorManager {
       const entranceEdges = new Set(
         fi === 0 ? floor.entrances.map((e) => edgeKey(e.cell.cx, e.cell.cz, e.side)) : []
       );
+      // The room↔outdoor half of the facade test, read off the derived
+      // semi-exterior plan so a SEALED COURTYARD (an outdoor cluster that
+      // reaches no sky) confers nothing here either.
+      const isSemiExterior = (x: number, z: number, s: Side) =>
+        floor.semiExterior?.boundary.has(edgeKey(x, z, s)) ?? false;
 
       floor.windowStats.clear();
       const seedRects: { min: Cell; max: Cell }[] = [];
@@ -320,7 +325,7 @@ export class FloorManager {
           // the Outdoor dissolve already introduced, which is why the view needs
           // no new geometry path (see setInterfaceView).
           this.interfaceView && !isWet(inst.def)
-            ? { skip: this.partitionEdges(cells, occupied, inst.origin) }
+            ? { skip: this.partitionEdges(cells, occupied, inst.origin, floor.isOutside, isSemiExterior) }
             : undefined
         );
         if (elastic) {
@@ -339,27 +344,39 @@ export class FloorManager {
   }
 
   /**
-   * The LOCAL edge keys of `cells` that face another occupied space rather than
-   * the outside, which is exactly the set of interior partitions. An edge whose
-   * neighbour cell is unoccupied is on the flat's outer boundary and is kept.
+   * The LOCAL edge keys of `cells` that are NOT facade, which is exactly the set
+   * of interior partitions the interface view dissolves. Facade is decided by
+   * {@link isFacadeEdge}, the one definition this and the room-has-facade rule
+   * (F2) both use, so the drawing and the check can never disagree about where
+   * the enclosure runs.
    *
-   * Walls are only ever built where a room's own footprint ends, so testing the
-   * neighbour against the floor's occupied set is enough to classify every
-   * segment that exists. Local keys, because walls are built in the room's local
-   * frame (absolute − origin), matching the window and door key convention.
+   * A balcony boundary is facade and stays. The first version tested only
+   * whether the neighbour cell was occupied, which dissolved the wall between a
+   * room and its balcony along with its french-window glazing, because an
+   * outdoor cell is occupied like any other. An edge onto CIRCULATION is
+   * interior and still dissolves.
+   *
+   * Walls are only ever built where a room's own footprint ends, so classifying
+   * the neighbour is enough to cover every segment that exists. Local keys,
+   * because walls are built in the room's local frame (absolute − origin),
+   * matching the window and door key convention.
    */
   private partitionEdges(
-    cells: Cell[], occupied: Set<string>, origin: Cell
+    cells: Cell[],
+    occupied: Set<string>,
+    origin: Cell,
+    isOutside: (cx: number, cz: number) => boolean,
+    isSemiExterior: (cx: number, cz: number, side: Side) => boolean
   ): Set<string> {
     const skip = new Set<string>();
     for (const c of cells)
       for (const side of SIDES) {
-        const [dx, dz] = SIDE_DELTA[side];
-        if (!occupied.has(`${c.cx + dx},${c.cz + dz}`)) continue; // faces outside
+        if (isFacadeEdge(c.cx, c.cz, side, occupied, isOutside, isSemiExterior)) continue;
         skip.add(edgeKey(c.cx - origin.cx, c.cz - origin.cz, side));
       }
     return skip;
   }
+
 
   /**
    * INTERFACE VIEW (view state, never serialized). The thesis reads a unit at

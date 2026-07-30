@@ -20,68 +20,54 @@ A browser-based 3D flat / housing configurator built with **TypeScript + Three.j
 
 All rules are advisory (never block placement) and run on demand via **Check Layout**. Severity: 🔴 hard (likely failure), 🟡 soft (atypical, not wrong), 🟢 note (informational). Defined as data in `src/core/rules.ts` (`RULES`) — add/edit/remove entries there without touching the validation engine.
 
-**Entrance validity**
 | ID | Severity | Rule |
 |---|---|---|
-| E1 | 🟢 note | No (working) entrance placed yet — reachability can't be validated. |
-| E2 | 🔴 hard | An entrance's edge no longer faces outside (a room was later built against it) — it stops counting as a reachability root. |
-
-**Program completeness**
-| ID | Severity | Rule |
-|---|---|---|
+| E1 | 🟢 note | Place an entrance to validate circulation/reachability. |
+| E2 | 🔴 hard | Entrance is blocked — its edge no longer faces outside. |
+| DR1 | 🟢 note | No doors placed — reachability requires doors. |
+| DR2 | 🟢 note | Bedroom has an unusual number of doors for a private room. |
 | P1 | 🔴 hard | A dwelling needs a bathroom. |
 | P2 | 🔴 hard | A dwelling needs a kitchen. |
 | P3 | 🟢 note | More than one kitchen — atypical, but not a problem. |
-
-**Reachability** (entrance-rooted, whole dwelling, across stairs — corridors are *not* required; a direct room-to-room path is valid)
-| ID | Severity | Rule |
-|---|---|---|
-| H1 | 🔴 hard | Orphaned room — no path of adjacencies reaches any entrance. |
-| H2 | 🔴 hard | A room or stair is reachable from an entrance only by passing through a bathroom. |
-| H3 | 🔴 hard | A room or stair is reachable from an entrance only by passing through a bedroom. |
-| H6 | 🔴 hard | A room or stair is reachable from an entrance only by passing through an outdoor space. |
-| ST2 | 🔴 hard | A stair itself is not reachable from any entrance. |
-
-**Adjacency / privacy**
-| ID | Severity | Rule |
-|---|---|---|
-| H4 | 🔴 hard | Bathroom directly adjacent to a kitchen. |
-| S3 | 🟡 soft | Bedroom directly adjacent to a kitchen, living room, or recreation room (privacy). |
-| S4 | 🟡 soft | Two bedrooms directly adjacent. |
-| S5 | 🟢 note | Kitchen and living room adjacent — open-plan; noted, not a problem. |
-| G1 | 🟡 soft | No bathroom is reachable without passing through a bedroom (no guest access). |
-| G2 | 🟡 soft | An entrance opens directly into a bedroom or bathroom. |
-
-**Corridor justification** (circulation clusters)
-| ID | Severity | Rule |
-|---|---|---|
-| C1 | 🔴 hard | Orphaned corridor — connects to nothing (dead space). |
+| MB1 | 🟡 soft | A floor has bedrooms but no bathroom. |
+| H1 | 🔴 hard | Orphaned room — no path of adjacencies (including stairs) reaches an entrance. |
+| H2 | 🔴 hard | A room or stair reachable from an entrance only by passing through a bathroom. |
+| H3 | 🔴 hard | A room or stair reachable from an entrance only by passing through a bedroom. |
+| H4 | 🔴 hard | Direct door between a bathroom and a kitchen — food prep opening onto a toilet. |
+| S6 | 🟢 note | Shared wet wall between kitchen and bathroom — efficient services. |
+| H6 | 🔴 hard | A room or stair reachable from an entrance only by passing through an outdoor space. |
+| C1 | 🟡 soft | Orphaned corridor — a circulation space connected to nothing (dead space). |
 | C2 | 🟡 soft | Under-used corridor — connects to only one space, so it doesn't circulate. |
+| A1 | 🟡 soft | Circulation narrower than 1.2 m (below accessible width). |
+| O1 | 🟡 soft | Outdoor space is unconnected — nothing opens onto it. |
+| OD1 | 🔴 hard | Outdoor space is not reachable from the dwelling. |
+| ST1 | 🟡 soft | Stair connects to nothing on one or both floors it should link. |
+| ST2 | 🔴 hard | Stair not reachable from any entrance. |
+| D1 | 🔴 hard | Room has no exterior wall — no daylight possible. |
+| D2 | 🟡 soft | Kitchen has no exterior wall — no natural ventilation. |
+| W1 | 🟡 soft | Room's glazing is below its daylight target. |
+| OR1 | 🟡 soft | Room is lit only from the north (no direct sun). |
+| G1 | 🟡 soft | No bathroom is reachable without passing through a bedroom (guest access). |
+| G2 | 🟡 soft | Entrance opens directly into a private room. |
+| S1 | 🟡 soft | Outdoor / balcony over-connected (more than two doors) — usually a leaf space. |
+| S2 | 🟡 soft | Living room under-connected (one or no doors) — typically a social hub. |
+| S3 | 🟡 soft | Bedroom directly adjacent to a kitchen, living room, or recreation room (privacy — prefer mediated access). |
+| AC1 | 🟡 soft | Bedroom shares a wall with a stair — stair noise against a sleeping room. |
+| S5 | 🟢 note | Kitchen and living room connected by a door — open-plan. Perfectly fine, noted for confirmation. |
+| S7 | 🟢 note | En-suite bathroom (accessed via bedroom). |
+| DP1 | 🟡 soft | Room is unusually deep in the layout (≥5 hops from the entrance, tunable via `DEEP_ROOM_THRESHOLD_HOPS`). |
+| N1 | 🟡 soft | Circulation-heavy layout — too much of the interior is circulation. |
+| PG1 | 🟡 soft | Inverted privacy gradient — bedrooms are shallower than living spaces. |
+| F1 | 🟡 soft | Room is far from any exit (more than 4 hops from the nearest entrance or stair, tunable via `ESCAPE_DEPTH_MAX`). |
+| WET1 | 🟡 soft | Wet rooms (bathrooms, kitchen) are split across separate groups on a floor. Split wet areas mean long installation runs and shafts that cannot bundle to the next storey. |
+| FAC1 | 🔴 hard | Habitable room has no facade — it touches neither open sky nor a balcony. (PBG LS 700.1 § 302: every habitable room needs a facade window) |
 
-**Stairs**
-| ID | Severity | Rule |
-|---|---|---|
-| ST1 | 🟡 soft | Stair connects to nothing on one or both of the floors it should link. |
-| ST2 | 🔴 hard | (see Reachability above) |
+Recreation Room is classified as a **public/social room** (same category as Living Room)
+for the privacy rules above (`ctx.is.public`), and as **habitable** (same category as
+Bedroom + Living Room) for the daylight and facade rules (`ctx.is.habitable`).
 
-**Daylight / ventilation** (a room's footprint must have at least one exterior wall)
-| ID | Severity | Rule |
-|---|---|---|
-| D1 | 🔴 hard | A habitable room (Bedroom, Living Room, or Recreation Room) has no exterior wall — no daylight possible. |
-| D2 | 🟡 soft | A Kitchen has no exterior wall — no natural ventilation. |
-
-**Room-count / connectivity balance**
-| ID | Severity | Rule |
-|---|---|---|
-| S1 | 🟡 soft | Outdoor/balcony over-connected (more than two adjacencies) — usually a leaf space. |
-| S2 | 🟡 soft | Living room under-connected (one or no adjacencies) — typically a social hub. |
-
-**Space-syntax depth** (informational metric: BFS hop-count from the nearest entrance, shown per-room in the report and as a small badge on each diagram node)
-| ID | Severity | Rule |
-|---|---|---|
-| DP1 | 🟡 soft | A room is unusually deep in the layout (≥5 hops from the nearest entrance — tunable via `DEEP_ROOM_THRESHOLD_HOPS`). |
-
-Recreation Room is classified as a **public/social room** (same category as Living Room) for the privacy rules above (`ctx.is.public`), and as **habitable** (same category as Bedroom + Living Room) for the daylight rule (`ctx.is.habitable`).
+Listed in the order they appear in `RULES`, which groups them by theme. This table is
+generated from the code; if it disagrees with `src/core/rules.ts`, the code is right.
 
 ## Run locally
 

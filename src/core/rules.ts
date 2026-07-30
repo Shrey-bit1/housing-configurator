@@ -1,5 +1,6 @@
 import type { DwellingGraph, GraphNode } from "./adjacencyGraph";
-import { BATHROOM_TYPES } from "./modules";
+import { BATHROOM_TYPES, WET_TYPES } from "./modules";
+import { connectedComponents } from "./cluster";
 
 /**
  * Layout-rules validation — ADVISORY ONLY.
@@ -1114,6 +1115,77 @@ export const RULES: Rule[] = [
           });
       }
       return out;
+    },
+  },
+
+  // ===== The interface level — what the unit owes the building around it =====
+  // These two read CELL GEOMETRY rather than only the access graph, which is a
+  // departure from the 37 rules above and is deliberate. Both ask where things
+  // sit in the plan, and neither question survives being reduced to a node and
+  // its edges: whether two wet rooms touch is a fact about their footprints, and
+  // whether a room reaches the enclosure is a fact about its boundary. Both read
+  // that geometry off `GraphNode.cells` and `GraphNode.hasFacadeEdge`, so nothing
+  // was added to `RuleContext`.
+  {
+    id: "WET1",
+    severity: "soft",
+    description:
+      "Wet rooms (bathrooms, kitchen) are split across separate groups on a floor. " +
+      "Split wet areas mean long installation runs and shafts that cannot bundle to the next storey.",
+    check(graph) {
+      const out: Violation[] = [];
+      // Per floor: whether wet cells form one connected group. Deliberately one
+      // floor at a time — whether wet cells STACK across storeys is a separate
+      // question and is not asked here.
+      const byFloor = new Map<number, GraphNode[]>();
+      for (const n of graph.nodes) {
+        if (n.kind !== "room" || !WET_TYPES.includes(n.roomTypeId)) continue;
+        const list = byFloor.get(n.floor) ?? [];
+        list.push(n);
+        byFloor.set(n.floor, list);
+      }
+      for (const [floor, nodes] of [...byFloor].sort((a, b) => a[0] - b[0])) {
+        // `connectedComponents` is the shared 4-neighbour fill (cluster.ts):
+        // cells touching only at a corner are NOT connected, which is what the
+        // pipework question means by touching.
+        const groups = connectedComponents(nodes.flatMap((n) => n.cells));
+        if (groups.length < 2) continue;
+        const where = groups
+          .map((g) => {
+            const cx = Math.min(...g.map((c) => c.cx));
+            const cz = Math.min(...g.map((c) => c.cz));
+            return `(${cx},${cz})`;
+          })
+          .join(", ");
+        out.push({
+          ruleId: "WET1",
+          severity: "soft",
+          description:
+            `Floor ${floor}: wet rooms form ${groups.length} separate groups, at ${where}. ` +
+            `Split wet areas mean long installation runs and shafts that cannot bundle to the next storey.`,
+          nodeIds: nodes.map((n) => n.id),
+        });
+      }
+      return out;
+    },
+  },
+  {
+    id: "FAC1",
+    severity: "hard",
+    description:
+      "Habitable room has no facade — it touches neither open sky nor a balcony. " +
+      "(PBG LS 700.1 § 302: every habitable room needs a facade window)",
+    check(graph, ctx) {
+      return graph.nodes
+        .filter((n) => ctx.is.habitable(n) && !n.hasFacadeEdge)
+        .map((n) => ({
+          ruleId: "FAC1",
+          severity: "hard" as const,
+          description:
+            `${n.label} has no facade — it touches neither open sky nor a balcony. ` +
+            `(PBG LS 700.1 § 302: every habitable room needs a facade window)`,
+          nodeIds: [n.id],
+        }));
     },
   },
 ];

@@ -2,7 +2,7 @@ import { cellKey, type Cell } from "./grid";
 import type { Floor } from "./floor";
 import { occupiedCells } from "./modules";
 import { connectedComponents, clusterNodeId } from "./cluster";
-import { exteriorEdges } from "./exteriorEdges";
+import { exteriorEdges, isFacadeEdge, SIDES, edgeKey, type Side } from "./exteriorEdges";
 import { buildSpaceTargets, resolveDoorSpaces, BELOW_PREFIX } from "./door";
 import type { GlazingStat } from "./windows";
 
@@ -57,6 +57,11 @@ export interface GraphNode {
    *  will want to know which is which. */
   hasTrueExteriorEdge: boolean;
   hasSemiExteriorEdge: boolean;
+  /** At least one FACADE edge: open sky OR a balcony/terrace boundary, per the
+   *  shared {@link isFacadeEdge}. Wider than {@link hasExteriorEdge}, which
+   *  needs a balcony run to carry actual glass. FAC1 consumes this, and the
+   *  interface view builds its skip set from the same function. */
+  hasFacadeEdge: boolean;
   /** Achieved-vs-target glazing for this room (rooms only), from the derived
    *  window generator (`floor.windowStats`) — the W1 rule consumes this rather
    *  than recomputing windows. Undefined for clusters/stairs and rooms whose
@@ -169,6 +174,7 @@ function buildFloorNodes(
         hasExteriorEdge: false, // filled in below, once the floor's occupied set exists
         hasTrueExteriorEdge: false,
         hasSemiExteriorEdge: false,
+        hasFacadeEdge: false,
       });
       continue;
     }
@@ -200,6 +206,7 @@ function buildFloorNodes(
         hasExteriorEdge: false,
         hasTrueExteriorEdge: false,
         hasSemiExteriorEdge: false,
+        hasFacadeEdge: false,
         glazing: floor.windowStats.get(inst.id), // derived by the wall/window pass
       });
     }
@@ -220,6 +227,7 @@ function buildFloorNodes(
         hasExteriorEdge: false,
         hasTrueExteriorEdge: false,
         hasSemiExteriorEdge: false,
+        hasFacadeEdge: false,
       });
     }
   }
@@ -240,8 +248,20 @@ function buildFloorNodes(
   // REACH THE GRID BORDER (`floor.isOutside`): a room that walls off an empty
   // pocket has no facade there, so D1 fires and no window is generated onto it.
   const occupied = new Set(buildSpaceTargets(floor, floorBelow).keys());
+  // The room↔outdoor half of the facade test, from the derived semi-exterior
+  // plan rather than a local scan, so a sealed courtyard confers nothing.
+  const isSemiExterior = (x: number, z: number, sd: Side) =>
+    floor.semiExterior?.boundary.has(edgeKey(x, z, sd)) ?? false;
   for (const node of nodes) {
     node.hasTrueExteriorEdge = exteriorEdges(node.cells, occupied, floor.isOutside).length > 0;
+    // FACADE, the wider test: open sky OR a balcony boundary, using the same
+    // `isFacadeEdge` the interface view's skip set uses, so the rule (FAC1) and
+    // the drawing agree about where the enclosure runs. Unlike
+    // `hasSemiExteriorEdge` this does not require the balcony run to have
+    // qualified for french-window glass; touching a balcony at all is facade.
+    node.hasFacadeEdge = node.cells.some((c) =>
+      SIDES.some((s) => isFacadeEdge(c.cx, c.cz, s, occupied, floor.isOutside, isSemiExterior))
+    );
     // A GLAZED semi-exterior edge (french window onto a qualifying balcony) is
     // real daylight, so it satisfies D1/D2 and opens W1's gate exactly like a
     // true exterior edge. The solid returns at a run's ends confer nothing —
