@@ -27,7 +27,7 @@ Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
 **Branch:** `main`
-**Last updated:** 2026-07-28
+**Last updated:** 2026-07-30
 
 ## What this project is
 
@@ -41,9 +41,9 @@ rules engine and the export format are the mature parts, the UI is not.
 
 ## Layout
 
-- `src/core/` — the model and all logic, no three.js: grid and occupancy, room-type
-  presets, floors, doors, entrances, the adjacency graph, the rules engine, window
-  generation, save/load, and the flat export.
+- `src/core/` — the model and all logic: grid and occupancy, room-type presets,
+  floors, doors, entrances, the adjacency graph, the rules engine, window generation,
+  save/load, and the flat export. It does import three.js; see Non-obvious things.
 - `src/scene/` — three.js geometry builders: room shells, walls and glazing, stairs,
   door and entrance markers, the camera-aware cutaway, voxel furniture.
 - `src/interaction/` — pointer and keyboard controllers: palette drag-drop,
@@ -74,16 +74,27 @@ rules engine and the export format are the mature parts, the UI is not.
 - **Node is not on PATH** in shells spawned by tooling. It lives at
   `C:\Program Files\nodejs` and has to be prepended before `npm` will resolve.
   `.claude/dev.cmd` exists purely to work around this.
-- **There is no test suite.** None. Verification means: `tsc` clean, `npm run build`
-  clean, and driving the app in a real browser and looking at it. A prompt that says
-  "add a test for X" has no harness to add it to — ask for a runnable check or a
-  browser verification instead, and expect the answer to come back as screenshots.
+- **There is a test suite as of run 0008, and it is one file.** `npm test` runs
+  `vitest run`; it takes under a second and needs no config file. The one file is
+  `src/core/exteriorEdges.test.ts`, four cases over the `isFacadeEdge` predicate.
+  Everything else is still verified the old way: `tsc` clean, `npm run build` clean, and
+  driving the app in a real browser and looking at it. So a prompt asking for a test of
+  pure logic under `src/core/` now has somewhere to put it, while anything involving
+  geometry on screen still comes back as screenshots.
 - Python is needed for exactly one thing: `docs/build-pdf.py`, which regenerates the
   rules PDF when `rules.ts` changes.
 - `CLAUDE.md` requires that `PROJECT_STATE.md` be updated before any feature is
   reported as done. Assume that is part of the cost of every prompt.
 
 ## Non-obvious things
+
+0. **`src/core/` DOES import three.js**, despite what an earlier version of this file
+   said. `src/core/grid.ts:1` is `import * as THREE from "three"`, and `src/core/floor.ts`
+   additionally imports from `../scene/`. The separation is about responsibility rather
+   than about dependencies: `core/` owns the model and the logic, `scene/` owns the
+   geometry builders. It matters when writing a headless test, because constructing a
+   `Floor` pulls the render layer in, while the pure predicates and `Grid` are fine
+   under Node.
 
 1. **This is one of two repos, and you can only reach this one.** This repo authors
    a *single flat*. A separate repo, `bottom-up-design`, packs many flats into a
