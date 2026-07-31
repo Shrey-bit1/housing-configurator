@@ -6,14 +6,47 @@
     <title>Grid Module Configurator</title>
   </head>
   <body>
+    <!-- Top bar (handoff Part 2, 1a). Every control here existed before; they
+         are regrouped, not added. The segmented control replaces the separate
+         Diagram and Top View buttons, so their mutual exclusivity, which the
+         code always enforced, is finally visible. -->
+    <header id="topbar">
+      <div class="tb-left">
+        <span class="tb-mark" aria-hidden="true"><i></i></span>
+        <span class="tb-project">
+          <span class="tb-name">Flat Configurator</span>
+          <span class="tb-meta" id="tb-meta">0.6 m grid</span>
+        </span>
+      </div>
+      <div class="tb-centre">
+        <div id="view-segments" role="group" aria-label="View mode">
+          <button id="model-view-toggle" type="button" class="active">Model</button>
+          <button id="top-view-toggle" type="button">Plan</button>
+          <button id="view-toggle" type="button">Diagram</button>
+        </div>
+      </div>
+      <div class="tb-right">
+        <button id="check-layout" type="button">Check Layout</button>
+        <button id="reset-view" type="button">Frame View</button>
+        <div class="tb-menu">
+          <button id="saveopen-btn" type="button" aria-haspopup="true" aria-expanded="false">
+            Save / Open <span class="tb-caret" aria-hidden="true">▾</span>
+          </button>
+          <div id="saveopen-menu" role="menu">
+            <button id="menu-export" type="button" role="menuitem">Export project</button>
+            <button id="menu-import" type="button" role="menuitem">Open project</button>
+            <button id="menu-export-unit" type="button" role="menuitem">Export unit</button>
+          </div>
+        </div>
+        <button id="shortcuts-btn" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+      </div>
+    </header>
     <div id="app">
       <aside id="sidebar"></aside>
       <main id="viewport">
         <canvas id="scene"></canvas>
         <canvas id="graph-canvas"></canvas>
         <div id="view-mode-toggles">
-          <button id="view-toggle" type="button">Diagram</button>
-          <button id="top-view-toggle" type="button">Top View</button>
           <button id="graph-relayout" type="button">Re-layout</button>
         </div>
         <div id="graph-floor-label"></div>
@@ -31,10 +64,7 @@
             <label class="gl-toggle"><input type="checkbox" id="graph-toggle-depth" />Show depth</label>
           </div>
         </div>
-        <button id="check-layout" type="button">Check Layout</button>
         <div id="validation-panel"></div>
-        <button id="reset-view" type="button">Reset View</button>
-        <button id="shortcuts-btn" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
         <div id="shortcuts-panel">
           <div class="vp-header">
             <span class="vp-title">Shortcuts</span>

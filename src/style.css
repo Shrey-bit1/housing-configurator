@@ -66,9 +66,16 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The shell is now a column: the top bar, then the sidebar+viewport row. */
+body {
+  display: flex;
+  flex-direction: column;
+}
+
 #app {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   width: 100vw;
 }
 
@@ -542,29 +549,9 @@ button.primary:hover {
 }
 
 /* ---- Check Layout button (top-right, above Reset) ---- */
-#check-layout {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 2;
-  padding: 9px 16px;
-  background: var(--paper);
-  color: var(--black);
-  border: 2px solid var(--paper);
-  border-radius: 0;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s;
-}
+/* #check-layout: moved into #topbar (Part 2). Styled in the top-bar block below. */
 
-#check-layout:hover {
-  background: transparent;
-  color: var(--paper);
-}
+
 
 /* ---- Validation report panel (top-left, under the view toggle) ---- */
 #validation-panel {
@@ -747,50 +734,12 @@ button.primary:hover {
 }
 
 /* ---- Reset View button (top-right of viewport, below Check Layout) ---- */
-#reset-view {
-  position: absolute;
-  top: 58px;
-  right: 16px;
-  padding: 9px 16px;
-  background: var(--black);
-  color: var(--text);
-  border: 2px solid var(--black);
-  border-radius: 0;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s;
-}
+/* #reset-view: moved into #topbar (Part 2). Styled in the top-bar block below. */
 
-#reset-view:hover {
-  background: var(--paper);
-  color: var(--black);
-}
+
 
 /* ---- Shortcuts legend (top-right of viewport, below Reset View) ---- */
-#shortcuts-btn {
-  position: absolute;
-  top: 100px;
-  right: 16px;
-  z-index: 2;
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  background: var(--black);
-  color: var(--text);
-  border: 2px solid var(--line-soft);
-  border-radius: 0;
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
-}
+/* #shortcuts-btn: moved into #topbar (Part 2). Styled in the top-bar block below. */
 
 #shortcuts-btn:hover {
   background: var(--paper);
@@ -1308,4 +1257,194 @@ button.primary:hover {
    describes are the same colour in both states. */
 #drag-label.invalid {
   background: var(--accent);
+}
+
+/* ============================================================
+   Top bar (handoff Part 2, 1a)
+   52px, hairline under. Left: mark + project line. Centre: the
+   MODEL / PLAN / DIAGRAM segmented control. Right: the actions.
+   ============================================================ */
+
+#topbar {
+  flex: 0 0 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line-paper);
+}
+
+.tb-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 22px ink square with an 8px accent square inside it. */
+.tb-mark {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  background: var(--ink);
+  display: grid;
+  place-items: center;
+}
+.tb-mark i {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  display: block;
+}
+
+.tb-project {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.tb-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.tb-meta {
+  font-size: 10px;
+  color: var(--meta);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tb-centre {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+/* The segmented control. One 1px ink border around the group, hairlines
+   between the cells, the active cell filled ink. */
+#view-segments {
+  display: flex;
+  border: 1px solid var(--ink);
+}
+#view-segments button {
+  padding: 8px 18px;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  border-left: 1px solid var(--ink);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--dur-tap) var(--ease-out),
+    color var(--dur-tap) var(--ease-out);
+}
+#view-segments button:first-child {
+  border-left: 0;
+}
+#view-segments button:hover {
+  background: var(--plate);
+}
+#view-segments button.active {
+  background: var(--ink);
+  color: #edece8;
+}
+
+.tb-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tb-right > button,
+.tb-menu > button {
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--dur-tap) var(--ease-out),
+    color var(--dur-tap) var(--ease-out);
+}
+.tb-right > button:hover,
+.tb-menu > button:hover {
+  background: var(--plate);
+}
+
+/* CHECK LAYOUT is the one accent-outlined control: it is the action that
+   reports failure, and the red marks the active and the failing. */
+#check-layout {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+#check-layout:hover {
+  background: var(--accent) !important;
+  color: #edece8 !important;
+}
+
+#shortcuts-btn {
+  width: 32px;
+  padding: 0 !important;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  font-size: 13px !important;
+}
+
+/* Save / Open menu. */
+.tb-menu {
+  position: relative;
+}
+#saveopen-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 168px;
+  background: var(--bg);
+  border: 1px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  display: none;
+  flex-direction: column;
+  z-index: 40;
+}
+#saveopen-menu.open {
+  display: flex;
+}
+#saveopen-menu button {
+  padding: 9px 12px;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  border-bottom: 1px solid var(--line-paper);
+  font-family: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+#saveopen-menu button:last-child {
+  border-bottom: 0;
+}
+#saveopen-menu button:hover {
+  background: var(--plate);
+}
+
+/* Focus rings are --violet everywhere, never the accent. */
+#topbar button:focus-visible,
+#sidebar button:focus-visible,
+#viewport button:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 1px;
 }

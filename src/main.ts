@@ -46,6 +46,9 @@ const resetBtn = document.getElementById("reset-view") as HTMLButtonElement;
 const graphCanvas = document.getElementById("graph-canvas") as HTMLCanvasElement;
 const viewToggle = document.getElementById("view-toggle") as HTMLButtonElement;
 const topViewBtn = document.getElementById("top-view-toggle") as HTMLButtonElement;
+const modelViewBtn = document.getElementById("model-view-toggle") as HTMLButtonElement;
+const saveOpenBtn = document.getElementById("saveopen-btn") as HTMLButtonElement;
+const saveOpenMenu = document.getElementById("saveopen-menu") as HTMLElement;
 const graphFloorLabel = document.getElementById("graph-floor-label") as HTMLElement;
 const graphLegend = document.getElementById("graph-legend") as HTMLElement;
 const graphToggleTouch = document.getElementById("graph-toggle-touch") as HTMLInputElement;
@@ -423,6 +426,19 @@ function applyPlanVisibility(): void {
   });
 }
 
+/**
+ * Light the one segment that matches the current mode. The three view modes were
+ * always mutually exclusive in the code; the segmented control is what makes
+ * that visible, so it reads its state from the modes rather than tracking its
+ * own. Called from every place that can change a mode.
+ */
+function syncViewSegments(): void {
+  const diagram = graphView.visible;
+  modelViewBtn.classList.toggle("active", !diagram && !planMode);
+  topViewBtn.classList.toggle("active", !diagram && planMode);
+  viewToggle.classList.toggle("active", diagram);
+}
+
 function enterPlanMode(): void {
   if (planMode) return;
   setDiagramVisible(false); // mutually exclusive with the bubble-diagram view
@@ -432,8 +448,7 @@ function enterPlanMode(): void {
   floors.setDoorArcsVisible(true); // door-swing arcs are a plan-view symbol
   controls.enableRotate = false;
   ctx.frameBox(floors.contentBox(), "top");
-  topViewBtn.textContent = "Axo View";
-  topViewBtn.classList.add("active");
+  syncViewSegments();
 }
 
 /** Leave plan mode: restore every floor's pre-plan visibility, unlock orbit,
@@ -444,14 +459,19 @@ function exitPlanMode(): void {
   prePlanVisibility.forEach((v, i) => floors.setFloorVisible(i, v));
   floors.setDoorArcsVisible(false); // arcs are plan-only
   controls.enableRotate = true;
-  topViewBtn.textContent = "Top View";
-  topViewBtn.classList.remove("active");
   ctx.frameBox(floors.contentBox(), "axo");
+  syncViewSegments();
 }
 
+modelViewBtn.addEventListener("click", () => {
+  setDiagramVisible(false);
+  exitPlanMode();
+  syncViewSegments();
+});
 topViewBtn.addEventListener("click", () => {
-  if (planMode) exitPlanMode();
-  else enterPlanMode();
+  setDiagramVisible(false); // plan and diagram are exclusive
+  enterPlanMode();
+  syncViewSegments();
 });
 
 // ---- Bubble-diagram (adjacency graph) view ----
@@ -470,15 +490,43 @@ function setDiagramVisible(show: boolean): void {
   if (graphView.visible === show) return;
   if (show && planMode) exitPlanMode(); // mutually exclusive with plan view
   graphView.toggle();
-  viewToggle.textContent = graphView.visible ? "3D View" : "Diagram";
   // Hide the 3D-only chrome while in diagram mode (Check Layout stays available).
   const hide = graphView.visible ? "none" : "";
   resetBtn.style.display = hide;
   document.getElementById("hint")!.style.display = hide;
   viewControls.style.display = hide; // cutaway toggle + compass dial
   northBadge.style.display = hide; // camera-aware north arrow
+  syncViewSegments();
 }
-viewToggle.addEventListener("click", () => setDiagramVisible(!graphView.visible));
+viewToggle.addEventListener("click", () => {
+  setDiagramVisible(true);
+  syncViewSegments();
+});
+
+// ---- Save / Open menu ----
+// Export, Import and Export unit collapse into one menu in the top bar. The
+// actions themselves are unchanged; only where they are reached from moved.
+function setSaveOpenOpen(open: boolean): void {
+  saveOpenMenu.classList.toggle("open", open);
+  saveOpenBtn.setAttribute("aria-expanded", String(open));
+}
+saveOpenBtn.addEventListener("click", (e) => {
+  e.stopPropagation(); // the document handler below would close it again
+  setSaveOpenOpen(!saveOpenMenu.classList.contains("open"));
+});
+document.addEventListener("click", () => setSaveOpenOpen(false));
+document.getElementById("menu-export")!.addEventListener("click", () => {
+  setSaveOpenOpen(false);
+  exportProject();
+});
+document.getElementById("menu-import")!.addEventListener("click", () => {
+  setSaveOpenOpen(false);
+  fileInput.click();
+});
+document.getElementById("menu-export-unit")!.addEventListener("click", () => {
+  setSaveOpenOpen(false);
+  openUnitExportDialog();
+});
 
 // ---- North compass + orientation-aware windows ----
 // The compass DIAL is the control (drag to set north); the camera-aware north
