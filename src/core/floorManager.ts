@@ -107,7 +107,7 @@ export class FloorManager {
   private syncing = false;
   /** "Show seeds" view flag (see {@link setSeedOutlinesVisible}). */
   private seedOutlinesVisible = false;
-  /** "Structure" x-ray view flag (see {@link setStructureView}). */
+  /** "Structure" fixed-layer view flag (see {@link setStructureView}). */
   private structureView = false;
 
   /** "Interface view" flag (see {@link setInterfaceView}). */
@@ -353,7 +353,7 @@ export class FloorManager {
       // walls just used, so it re-derives here rather than only at placement.
       floor.refreshEntranceMarkers();
     });
-    // Walls are brand-new meshes after this pass — re-apply the x-ray view.
+    // Walls are brand-new meshes after this pass — re-apply the Structure view.
     this.applyStructureView();
   }
 

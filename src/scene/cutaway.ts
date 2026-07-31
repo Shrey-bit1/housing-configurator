@@ -72,7 +72,7 @@ export function updateCutaway(
 
   scene.traverse((o) => {
     const normal = o.userData.wallNormal as THREE.Vector3 | undefined;
-    // `structureHidden` (the Structure x-ray view, FloorManager) outranks the
+    // `structureHidden` (the Structure fixed-layer view, FloorManager) outranks the
     // cutaway: hidden is hidden — this pass simply has less to hide. Railings
     // carry no `wallNormal` at all, so they are never touched here.
     if (normal && !o.userData.structureHidden) o.visible = normal.dot(viewDir) <= THRESHOLD;

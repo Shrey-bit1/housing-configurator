@@ -27,9 +27,15 @@ import {
  * `onHoverViolation` on mouseenter/mouseleave.
  */
 
+/**
+ * The tier words the user reads. `Severity` itself still carries
+ * `"hard" | "soft" | "note"` and nothing downstream of `validate()` changed —
+ * this is the only place the internal names become English, so a rule that
+ * fires under `hard` reads as "Must fix" and the rules tests never see it.
+ */
 const SEVERITY_LABEL: Record<Severity, string> = {
-  hard: "Hard",
-  soft: "Soft",
+  hard: "Must fix",
+  soft: "Worth a look",
   note: "Note",
 };
 

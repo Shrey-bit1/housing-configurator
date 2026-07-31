@@ -777,7 +777,7 @@ function exportUnit(name: string, color: string): void {
   ).filter((v) => v.severity === "hard");
   if (hard.length > 0) {
     const ok = window.confirm(
-      `Check Layout reports ${hard.length} HARD violation(s) in this dwelling.\n` +
+      `Check Layout reports ${hard.length} MUST FIX issue(s) in this dwelling.\n` +
         `The unit will export anyway (rules are advisory). Continue?`
     );
     if (!ok) return;

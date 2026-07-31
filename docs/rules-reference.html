@@ -104,7 +104,7 @@
   <p class="sub">How the 36 checks in the configurator's layout validator came together — the order they arrived in, what each one answers, and what earlier versions got wrong.</p>
   <div class="facts">
     <div><span class="k">Rules</span><span>36, told as ten passages, plus a reference appendix</span></div>
-    <div><span class="k">Tiers</span><span><span class="tier hard">Hard</span>&nbsp; <span class="tier soft">Soft</span>&nbsp; <span class="tier note">Note</span></span></div>
+    <div><span class="k">Tiers</span><span><span class="tier hard">Must fix</span>&nbsp; <span class="tier soft">Worth a look</span>&nbsp; <span class="tier note">Note</span></span></div>
     <div><span class="k">Written from</span><span><code>src/core/rules.ts</code>, <code>src/core/windows.ts</code>, <code>src/core/orientation.ts</code></span></div>
     <div><span class="k">Date</span><span>July 2026</span></div>
   </div>
@@ -124,7 +124,7 @@
     <li><span class="n">8</span>Adjacency by touch</li>
     <li><span class="n">9</span>Program</li>
     <li><span class="n">10</span>Daylight and glazing</li>
-    <li><span class="n">A</span>All 36 rules, for lookup</li>
+    <li><span class="n">A</span>All 41 rules, for lookup</li>
     <li><span class="n">B</span>Metrics the report prints</li>
     <li><span class="n">C</span>Assumptions and limits</li>
     <li><span class="n">D</span>References</li>
@@ -139,7 +139,7 @@
 
 <p>Every rule reads one graph built from the whole dwelling. Its nodes are rooms, merged circulation and outdoor clusters, and stairs. Two spaces can be joined by a touch edge, meaning they share a wall, or an access edge, meaning a door connects them — a distinction the next section is really about, because most of what follows depends on it. Entrances sit on ground-floor exterior edges and are re-derived on every run, so building a room against an old entrance invalidates it.</p>
 
-<p>What follows is roughly the order the rules arrived in. Most of them answer a question the previous one raised, or correct something the previous one got wrong. Each carries one of three tiers: hard, meaning the dwelling fails on it; soft, meaning the plan is unusual but often works fine anyway; or a note, meaning the tool recognised a pattern and is telling you it saw it, without judging. I'll say more about each tier as the rules that carry it come up.</p>
+<p>What follows is roughly the order the rules arrived in. Most of them answer a question the previous one raised, or correct something the previous one got wrong. Each carries one of three tiers. The app calls them Must fix, meaning the dwelling fails on it; Worth a look, meaning the plan is unusual but often works fine anyway; and Note, meaning the tool recognised a pattern and is telling you it saw it, without judging. In the code they are <code>hard</code>, <code>soft</code> and <code>note</code>, and this account uses those shorter words where it is talking about the code. I'll say more about each tier as the rules that carry it come up.</p>
 
 <!-- ============================ 2 ============================ -->
 <h2 class="sec">2 · Entrances</h2>
@@ -267,48 +267,48 @@
 
 <!-- ============================ APPENDIX A ============================ -->
 <div class="appendix">
-<h2 class="sec">A · All 36 rules, for lookup</h2>
+<h2 class="sec">A · All 41 rules, for lookup</h2>
 <div class="sec-rule"></div>
 <table>
   <thead><tr><th style="width:56px">Id</th><th>What it checks</th><th style="width:64px">Tier</th></tr></thead>
   <tbody>
-    <tr><td class="rid-cell">A1</td><td>A circulation cluster contains a cell narrower than 1.2 m clear width.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">AC1</td><td>A bedroom shares a wall with a stair.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">C1</td><td>A circulation cluster has no doors onto it (orphaned corridor).</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">C2</td><td>A circulation cluster is reached by a single door.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">D1</td><td>A habitable room (bedroom, living, recreation) has no exterior wall.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">D2</td><td>A kitchen has no exterior wall.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">DP1</td><td>A room is 5 or more door-hops from the entrance.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">A1</td><td>A circulation cluster contains a cell narrower than 1.2 m clear width.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">AC1</td><td>A bedroom shares a wall with a stair.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">C1</td><td>A circulation cluster has no doors onto it (orphaned corridor).</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">C2</td><td>A circulation cluster is reached by a single door.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">D1</td><td>A habitable room (bedroom, living, recreation) has no exterior wall.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">D2</td><td>A kitchen has no exterior wall.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">DP1</td><td>A room is 5 or more door-hops from the entrance.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
     <tr><td class="rid-cell">DR1</td><td>No doors are placed yet; explains the reachability flags this causes.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
     <tr><td class="rid-cell">DR2</td><td>A bedroom has three or more doors.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
     <tr><td class="rid-cell">E1</td><td>No working entrance exists yet to validate reachability from.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
-    <tr><td class="rid-cell">E2</td><td>An entrance's edge no longer faces outside.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">F1</td><td>A room is more than 4 door-hops from the nearest entrance or stair.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">G1</td><td>No bathroom is reachable without crossing a bedroom.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">G2</td><td>An entrance opens directly into a bedroom or bathroom.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">H1</td><td>A room has no doored path from any entrance (orphaned room).</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">H2</td><td>A room or stair is reachable from an entrance only by crossing a bathroom.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">H3</td><td>A room or stair (bathrooms exempt) is reachable only by crossing a bedroom.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">H4</td><td>A door joins a bathroom and a kitchen directly.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">H6</td><td>A room or stair is reachable only by crossing outdoor space.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">MB1</td><td>A floor has bedrooms and no bathroom (checked once a bathroom exists somewhere).</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">N1</td><td>Circulation area exceeds 25% of the interior — whole-dwelling, and independently on any single floor of a multi-floor plan.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">O1</td><td>Nothing opens onto an outdoor cluster (pre-entrance only — OD1 owns it afterwards).</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">OD1</td><td>An outdoor cluster is not reachable from the entrance.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">OR1</td><td>A habitable room or kitchen is glazed only toward the north (all windows within 45° of due north).</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">P1</td><td>No bathroom exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">P2</td><td>No kitchen exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
+    <tr><td class="rid-cell">E2</td><td>An entrance's edge no longer faces outside.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">F1</td><td>A room is more than 4 door-hops from the nearest entrance or stair.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">G1</td><td>No bathroom is reachable without crossing a bedroom.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">G2</td><td>An entrance opens directly into a bedroom or bathroom.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">H1</td><td>A room has no doored path from any entrance (orphaned room).</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">H2</td><td>A room or stair is reachable from an entrance only by crossing a bathroom.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">H3</td><td>A room or stair (bathrooms exempt) is reachable only by crossing a bedroom.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">H4</td><td>A door joins a bathroom and a kitchen directly.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">H6</td><td>A room or stair is reachable only by crossing outdoor space.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">MB1</td><td>A floor has bedrooms and no bathroom (checked once a bathroom exists somewhere).</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">N1</td><td>Circulation area exceeds 25% of the interior — whole-dwelling, and independently on any single floor of a multi-floor plan.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">O1</td><td>Nothing opens onto an outdoor cluster (pre-entrance only — OD1 owns it afterwards).</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">OD1</td><td>An outdoor cluster is not reachable from the entrance.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">OR1</td><td>A habitable room or kitchen is glazed only toward the north (all windows within 45° of due north).</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">P1</td><td>No bathroom exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">P2</td><td>No kitchen exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
     <tr><td class="rid-cell">P3</td><td>More than one kitchen exists in the dwelling.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
-    <tr><td class="rid-cell">PG1</td><td>The mean depth of public rooms exceeds the mean depth of bedrooms.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">S1</td><td>An outdoor cluster has more than two AUTHORED doors onto it (french windows don't count).</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">S2</td><td>A living room has one door or none.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">S3</td><td>A bedroom shares a wall with a kitchen or a public room.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">PG1</td><td>The mean depth of public rooms exceeds the mean depth of bedrooms.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">S1</td><td>An outdoor cluster has more than two AUTHORED doors onto it (french windows don't count).</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">S2</td><td>A living room has one door or none.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">S3</td><td>A bedroom shares a wall with a kitchen or a public room.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
     <tr><td class="rid-cell">S5</td><td>A door joins a kitchen and a living room (open plan).</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
     <tr><td class="rid-cell">S6</td><td>A kitchen and bathroom share a wall with no door between them.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
     <tr><td class="rid-cell">S7</td><td>A bathroom is reachable from an entrance only through its bedroom (en-suite).</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
-    <tr><td class="rid-cell">ST1</td><td>A stair has no door on its bottom and/or top landing.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
-    <tr><td class="rid-cell">ST2</td><td>A stair is not reachable by doors from any entrance.</td><td class="tier-cell"><span class="tier hard">Hard</span></td></tr>
-    <tr><td class="rid-cell">W1</td><td>A room's achieved glazing falls short of its daylight target.</td><td class="tier-cell"><span class="tier soft">Soft</span></td></tr>
+    <tr><td class="rid-cell">ST1</td><td>A stair has no door on its bottom and/or top landing.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
+    <tr><td class="rid-cell">ST2</td><td>A stair is not reachable by doors from any entrance.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
+    <tr><td class="rid-cell">W1</td><td>A room's achieved glazing falls short of its daylight target.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
   </tbody>
 </table>
 </div>

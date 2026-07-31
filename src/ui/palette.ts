@@ -224,6 +224,7 @@ function createPaletteItem(def: ModuleDef, cb: PaletteCallbacks): HTMLElement {
   const item = document.createElement("div");
   item.className = "palette-item";
   item.dataset.moduleType = def.type;
+  item.title = def.name; // the underlying preset name, for anyone who needs it
 
   const swatch = document.createElement("div");
   swatch.className = "palette-swatch";
@@ -236,7 +237,7 @@ function createPaletteItem(def: ModuleDef, cb: PaletteCallbacks): HTMLElement {
   // footprint is what someone choosing a room actually reads.
   const w = Math.max(...def.cells.map((c) => c.cx)) + 1;
   const d = Math.max(...def.cells.map((c) => c.cz)) + 1;
-  label.innerHTML = `<span class="name">${def.name}</span><span class="desc">${w}×${d}</span>`;
+  label.innerHTML = `<span class="name">${paletteName(def)}</span><span class="desc">${w}×${d}</span>`;
 
   item.appendChild(swatch);
   item.appendChild(label);
@@ -248,6 +249,22 @@ function createPaletteItem(def: ModuleDef, cb: PaletteCallbacks): HTMLElement {
   });
 
   return item;
+}
+
+/**
+ * The name a palette entry shows, which is `def.name` for everything except
+ * circulation, where it reads "Hall".
+ *
+ * The rename is confined to this one function ON PURPOSE. `def.name` is not
+ * only a caption: `adjacencyGraph.ts:170` and `:202` copy it into every graph
+ * node's `label`, and `unitExport.ts:213` copies it into the exported unit's
+ * `roomTypes`, which is a bridge-format payload another repository reads.
+ * Renaming the preset itself would therefore change a file format, so the word
+ * changes where it is read and nowhere else. The type id stays `circulation`,
+ * as does every rule that reasons about it.
+ */
+function paletteName(def: ModuleDef): string {
+  return def.name.replace(/^Circulation/, "Hall");
 }
 
 
