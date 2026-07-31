@@ -436,6 +436,17 @@ The prompt did not ask for the scrollbars or the hint line. Both arrived from
 Shrey during the run and both were built, each as its own commit so the record
 separates them from stages 2e and 2f.
 
+Task 7 asked for the record to land on `main` and the tree to be left on
+`reskin-1a`, and doing exactly that would have left the planning session reading
+a stale file. `_cowork/CONTEXT.md` is tracked, so its content is branch-scoped,
+and the copy in the working tree is whichever branch is checked out. Checking
+`reskin-1a` back out therefore restored a CONTEXT.md that still said
+`**Branch:** main` and knew nothing of either reskin run. So after the record
+commit on `main`, `main` was merged into `reskin-1a`. The two commits it brought
+across touch nothing but `_cowork/`, which means no code moved and the branch is
+now a strict superset of `main`. The branch's own CONTEXT.md was then updated to
+describe where the tree actually is.
+
 Two stale numbers in the documents were corrected in passing, which the prompt
 did not ask for either. The rule total read 35 or 36 in four places against an
 actual 41, and the tier index read 11/19/7 against an actual 14/21/6. Both sat
