@@ -26,7 +26,10 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** `main`
+**Branch:** `main`. There is ALSO an unmerged branch `reskin-1a` (tip `6245c08`,
+six commits) carrying the "Paper studio" chrome reskin from run 0016. `main` is
+demo-ready and does not contain it. Whether it merges is Shrey's call after the
+4 August review; if it is dropped, PROJECT_STATE's §2s goes with it.
 **Last updated:** 2026-07-31
 
 ## What this project is
