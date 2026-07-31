@@ -138,42 +138,6 @@ export function lShape(w: number, d: number, nw: number, nd: number): Cell[] {
 // ---- Definitions -------------------------------------------------------------
 
 export const MODULE_DEFS: Record<string, ModuleDef> = {
-  // ----- Furniture modules (unchanged mechanics, 0.6 m tall) -----
-  single: {
-    type: "single",
-    name: "Single",
-    description: "1 cube",
-    category: "module",
-    color: 0x6e6a64,
-    cells: rect(1, 1),
-    height: 1,
-  },
-  domino: {
-    type: "domino",
-    name: "Domino",
-    description: "2 cubes in a line",
-    category: "module",
-    color: 0xb0aaa0,
-    cells: [
-      { cx: 0, cz: 0 },
-      { cx: 1, cz: 0 },
-    ],
-    height: 1,
-  },
-  ltriomino: {
-    type: "ltriomino",
-    name: "L-Triomino",
-    description: "3 cubes, L shape",
-    category: "module",
-    color: 0x3a3a3a,
-    cells: [
-      { cx: 0, cz: 0 },
-      { cx: 1, cz: 0 },
-      { cx: 0, cz: 1 },
-    ],
-    height: 1,
-  },
-
   // ----- Stairs (two-floor structural object) -----
   // A 180° DOGLEG: two 1-cell-wide flights running side by side in opposite
   // directions, with a full-width half-landing at the far end (the 180° turn).
@@ -305,12 +269,6 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
   },
 };
 
-/** Furniture modules, in palette order. */
-export const MODULE_LIST: ModuleDef[] = [
-  MODULE_DEFS.single,
-  MODULE_DEFS.domino,
-  MODULE_DEFS.ltriomino,
-];
 
 /** Stairs, in palette order (its own category — spans two floors). */
 export const STAIR_LIST: ModuleDef[] = [MODULE_DEFS.stair];

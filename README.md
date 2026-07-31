@@ -6,7 +6,6 @@ A browser-based 3D flat / housing configurator built with **TypeScript + Three.j
 
 - **Grid system** — 0.6 m cells; per-floor grid size is adjustable (width × depth) with live re-fit of placed items.
 - **Room-type presets** — fixed-footprint rooms defined as data: Living Room, Kitchen, Bedroom (Small/Large), Bathroom (Small/Large), Recreation Room, Circulation (Single/Double), and Outdoor/Balcony (Single/Double). L-shaped and rectangular footprints, rendered as hollow shells (floor + perimeter walls) with a camera-aware dynamic cutaway so interiors stay visible while orbiting. The Kitchen is furnished with authored voxel furniture (counter, cabinets, stove, sink, fridge).
-- **Furniture modules** — small 0.6 m shape modules (Single, Domino, L-Triomino).
 - **Stairs** — a 180° dogleg stair (2×6 footprint, two flights + half-landing) connecting a floor to the one above. Cuts a matching hole in the floor plate above (kept in sync on move/rotate/delete), auto-creates a floor above when placed on the topmost floor, and is blocked if the floor above has no clear plate to open into.
 - **Entrances** — a door marker bound to an exterior edge of a ground-floor room or circulation cluster. Roots reachability for the layout rules below; multiple entrances are allowed. Re-validated on every check (see rule **E2**).
 - **Placement & editing** — drag from the palette with a green/red validity ghost, snap to grid, collision-checked against everything on the floor; click to select, `R` to rotate 90°, drag to move, `Delete`/`Backspace` to remove.

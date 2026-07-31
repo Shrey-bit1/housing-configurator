@@ -1460,7 +1460,8 @@ button.primary:hover {
   position: relative;
   padding: 0;
   gap: 0;
-  overflow: visible; /* the resize handle sits on the edge */
+  overflow: hidden; /* the scroller clips; without this its content paints over
+                       the viewport instead of scrolling */
   border-right: 0; /* the handle draws the hairline now */
 }
 
@@ -1591,7 +1592,7 @@ button.primary:hover {
 #palette-resize {
   position: absolute;
   top: 0;
-  right: -3px;
+  right: 0;
   width: 6px;
   height: 100%;
   cursor: col-resize;
@@ -1615,4 +1616,157 @@ button.primary:hover {
     var(--accent) 3px,
     transparent 3px
   );
+}
+
+/* ============================================================
+   Viewport overlays (handoff Part 2, 1a)
+   Six clusters become three: selection top-left, undo/redo +
+   hint bottom-left, and one Display card bottom-right.
+   ============================================================ */
+
+#bottom-left {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  right: 256px; /* clear of the Display card */
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+#bottom-left #hint {
+  position: static;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The Display card. 224px, collapsed by default; the header summarises what is
+   on, so the state is readable without opening it. */
+#view-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2;
+  width: 224px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--ink);
+}
+
+#display-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line-paper);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+#display-header .dh-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+#display-header .dh-summary {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--meta);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#display-header .dh-caret {
+  font-size: 9px;
+  color: var(--meta);
+  transition: transform var(--dur-tap) var(--ease-out);
+}
+#display-header.open .dh-caret {
+  transform: rotate(180deg);
+}
+
+/* The four toggles as a 2x2 grid, revealed when the card opens. */
+#display-body {
+  display: none;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid var(--line-paper);
+}
+#display-body.open {
+  display: grid;
+}
+#display-body button {
+  padding: 8px 6px;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line-paper);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--dur-tap) var(--ease-out),
+    color var(--dur-tap) var(--ease-out);
+}
+#display-body button:hover {
+  border-color: var(--ink);
+}
+#display-body button.active {
+  background: var(--ink);
+  color: #edece8;
+  border-color: var(--ink);
+}
+
+/* The compass row is ALWAYS visible, open or collapsed: north moves glazing, so
+   it is design state rather than a view toggle, and hiding it behind a
+   disclosure would file it with things that only change what you see. */
+#compass-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+/* The interactive dial (the control) at 52px, and the camera-aware badge beside
+   it at 34px. They show different things: the dial is the north that is SET, the
+   badge is where north points ON SCREEN under the current camera. Folding the
+   badge into this row is what removes it as a sixth floating cluster. */
+#compass-row #compass-dial {
+  flex: 0 0 52px;
+}
+#compass-row #north-badge {
+  position: static;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+}
+#compass-row #north-badge svg {
+  width: 34px;
+  height: 34px;
+}
+#compass-row .cr-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+#compass-row .cr-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+#compass-row .cr-hint {
+  font-size: 9px;
+  color: var(--meta);
+  line-height: 1.2;
 }

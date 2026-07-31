@@ -64,6 +64,10 @@ const shortcutsPanel = document.getElementById("shortcuts-panel") as HTMLElement
 const shortcutsClose = document.getElementById("shortcuts-close") as HTMLButtonElement;
 const viewControls = document.getElementById("view-controls") as HTMLElement;
 const cutawayToggle = document.getElementById("cutaway-toggle") as HTMLButtonElement;
+const displayHeader = document.getElementById("display-header") as HTMLButtonElement;
+const displayBody = document.getElementById("display-body") as HTMLElement;
+const displaySummary = document.getElementById("display-summary") as HTMLElement;
+const compassValue = document.getElementById("compass-value") as HTMLElement;
 const northBadge = document.getElementById("north-badge") as HTMLElement;
 const northBadgeRot = northBadge.querySelector(".nb-rot") as SVGElement;
 
@@ -432,6 +436,18 @@ function applyPlanVisibility(): void {
  * that visible, so it reads its state from the modes rather than tracking its
  * own. Called from every place that can change a mode.
  */
+/** The Display card's header summary: what is on, in the order the toggles sit,
+ *  or "all off". It is what makes a collapsed card readable, so it is recomputed
+ *  wherever a toggle changes rather than only when the card opens. */
+function syncDisplaySummary(): void {
+  const on: string[] = [];
+  if (cutawayToggle.classList.contains("active")) on.push("Cutaway");
+  if (seedsToggle.classList.contains("active")) on.push("Seeds");
+  if (floors.structureViewOn) on.push("Structure");
+  if (floors.interfaceViewOn) on.push("Interface");
+  displaySummary.textContent = on.length ? on.join(" · ") : "all off";
+}
+
 function syncViewSegments(): void {
   const diagram = graphView.visible;
   modelViewBtn.classList.toggle("active", !diagram && !planMode);
@@ -495,12 +511,21 @@ function setDiagramVisible(show: boolean): void {
   resetBtn.style.display = hide;
   document.getElementById("hint")!.style.display = hide;
   viewControls.style.display = hide; // cutaway toggle + compass dial
-  northBadge.style.display = hide; // camera-aware north arrow
   syncViewSegments();
 }
 viewToggle.addEventListener("click", () => {
   setDiagramVisible(true);
   syncViewSegments();
+});
+
+// ---- Display card ----
+// Collapsed by default: the summary in the header is what makes that readable,
+// so the card only has to open when something is being changed.
+displayHeader.addEventListener("click", () => {
+  const open = !displayBody.classList.contains("open");
+  displayBody.classList.toggle("open", open);
+  displayHeader.setAttribute("aria-expanded", String(open));
+  displayHeader.classList.toggle("open", open);
 });
 
 // ---- Save / Open menu ----
@@ -547,13 +572,14 @@ const compassDial = createCompassDial({
     commitHistory(); // one snapshot per dial gesture (no-op if angle unchanged)
   },
 });
-viewControls.appendChild(compassDial.el);
+document.getElementById("compass-row")!.prepend(compassDial.el);
 
 /** Re-sync the dial + live badge angle to the model's north (after load/undo,
  *  which set `floors.northAngle` through the rebuild path). */
 function syncNorthUI(): void {
   displayNorthAngle = floors.northAngle;
   compassDial.setAngle(floors.northAngle);
+  compassValue.textContent = `North ${Math.round(floors.northAngle)}°`;
 }
 
 /** Rotate the north badge to point at TRUE north on screen: project the world
@@ -578,6 +604,7 @@ cutawayToggle.addEventListener("click", () => {
   cutawayOn = !cutawayOn;
   setCutawayEnabled(cutawayOn);
   cutawayToggle.classList.toggle("active", cutawayOn);
+  syncDisplaySummary();
 });
 
 // "Show seeds" toggle (default OFF): thin outlines of each elastic room's
@@ -589,6 +616,7 @@ seedsToggle.addEventListener("click", () => {
   seedsOn = !seedsOn;
   floors.setSeedOutlinesVisible(seedsOn);
   seedsToggle.classList.toggle("active", seedsOn);
+  syncDisplaySummary();
 });
 
 // "Structure" toggle (default OFF): renders the FIXED layer as built — wet
@@ -609,6 +637,7 @@ const interfaceToggle = document.getElementById("interface-toggle") as HTMLButto
 function syncViewToggles(): void {
   structureToggle.classList.toggle("active", floors.structureViewOn);
   interfaceToggle.classList.toggle("active", floors.interfaceViewOn);
+  syncDisplaySummary();
 }
 structureToggle.addEventListener("click", () => {
   floors.setStructureView(!floors.structureViewOn);

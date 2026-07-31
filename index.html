@@ -83,36 +83,53 @@
             <li class="shortcut-note">Reset View &amp; Top View are buttons only — no shortcut.</li>
           </ul>
         </div>
-        <div id="history-controls">
-          <button id="undo-btn" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
-          <button id="redo-btn" type="button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">↷</button>
+        <!-- Bottom-left cluster: undo/redo with the hint inline beside them. -->
+        <div id="bottom-left">
+          <div id="history-controls">
+            <button id="undo-btn" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+            <button id="redo-btn" type="button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">↷</button>
+          </div>
+          <div id="hint">
+            Drag rooms &amp; modules onto the grid &middot; Click to select &middot;
+            <kbd>R</kbd> rotate &middot; <kbd>M</kbd> mirror &middot; drag to move &middot;
+            <kbd>Del</kbd> delete &middot; <kbd>?</kbd> shortcuts
+          </div>
         </div>
-        <!-- Camera-aware north arrow overlay (true on-screen north in axo + plan;
-             updated each frame by main.ts). Hidden in diagram mode. -->
-        <div id="north-badge" title="North" aria-hidden="true">
-          <svg viewBox="0 0 40 40" width="46" height="46">
-            <circle cx="20" cy="20" r="18.5" class="nb-ring" />
-            <g class="nb-rot">
-              <polygon points="20,4 15.5,22 24.5,22" class="nb-arrow" />
-              <line x1="20" y1="20" x2="20" y2="34" class="nb-tail" />
-              <text x="20" y="15" class="nb-n">N</text>
-            </g>
-          </svg>
-        </div>
-        <!-- View controls: cutaway toggle + the north-setting compass dial
-             (dial element appended by main.ts). Hidden in diagram mode. -->
+        <!-- Bottom-right: ONE Display card. Collapsed by default; the header
+             summarises what is on so the state is readable without opening it.
+             The compass row is ALWAYS visible, collapsed or not, because north
+             moves glazing and is design state rather than a view toggle. The
+             camera-aware north arrow folds into that row. -->
         <div id="view-controls">
-          <button id="cutaway-toggle" type="button" class="active" title="Toggle dollhouse cutaway">Cutaway</button>
-          <button id="seeds-toggle" type="button" title="Outline each elastic room's authored seed rectangle">Seeds</button>
-          <button id="structure-toggle" type="button" title="X-ray: hide elastic-room walls, showing the serviced core">Structure</button>
-          <button id="interface-toggle" type="button" title="Show only the binding level: perimeter, wet cells, stair, balconies, entrance — the rest as one open plate">Interface view</button>
+          <button id="display-header" type="button" aria-expanded="false" aria-controls="display-body">
+            <span class="dh-label">Display</span>
+            <span class="dh-summary" id="display-summary">Cutaway</span>
+            <span class="dh-caret" aria-hidden="true">▾</span>
+          </button>
+          <div id="display-body">
+            <button id="cutaway-toggle" type="button" class="active" title="Dollhouse cutaway: hide the walls facing the camera">Cutaway</button>
+            <button id="seeds-toggle" type="button" title="Outline each elastic room's authored seed rectangle">Seeds</button>
+            <button id="structure-toggle" type="button" title="The fixed layer: wet rooms and stairs as built, everything else a bare plate">Structure</button>
+            <button id="interface-toggle" type="button" title="The binding level: perimeter, wet cells, stair, balconies, entrance — the rest as one open plate">Interface</button>
+          </div>
+          <div id="compass-row">
+            <div id="north-badge" title="North" aria-hidden="true">
+              <svg viewBox="0 0 40 40" width="46" height="46">
+                <circle cx="20" cy="20" r="18.5" class="nb-ring" />
+                <g class="nb-rot">
+                  <polygon points="20,4 15.5,22 24.5,22" class="nb-arrow" />
+                  <line x1="20" y1="20" x2="20" y2="34" class="nb-tail" />
+                  <text x="20" y="15" class="nb-n">N</text>
+                </g>
+              </svg>
+            </div>
+            <div class="cr-text">
+              <span class="cr-value" id="compass-value">North 0°</span>
+              <span class="cr-hint">drag to set · moves glazing</span>
+            </div>
+          </div>
         </div>
         <div id="selection-readout"></div>
-        <div id="hint">
-          Drag rooms &amp; modules onto the grid &middot; Click to select &middot;
-          <kbd>R</kbd> rotate &middot; <kbd>M</kbd> mirror &middot; drag to move &middot;
-          <kbd>Del</kbd> delete &middot; <kbd>?</kbd> shortcuts
-        </div>
         <div id="drop-overlay"><span>Drop project file to import</span></div>
         <div id="toast"></div>
         <!-- Unit-export dialog (flat → building bridge, docs/bridge-format.md):

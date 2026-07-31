@@ -1,6 +1,5 @@
 import { COMPASS_SECTORS, type CompassSector, type OrientationPreference } from "../core/orientation";
 import {
-  MODULE_LIST,
   ROOM_LIST,
   STAIR_LIST,
   type ModuleType,
@@ -83,9 +82,9 @@ function sectionHeading(text: string): HTMLElement {
   return h;
 }
 
-/** STRUCTURE & ACCESS: the stair, the furniture modules, and the two placement
- *  tools. They sit together because none of them is a room, and all four are
- *  things a plan needs before it is finished. */
+/** STRUCTURE & ACCESS: the stair and the two placement tools. They sit together
+ *  because none of them is a room, and all three are things a plan needs before
+ *  it is finished. */
 function buildStructureGroup(cb: PaletteCallbacks): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "palette-group";
@@ -96,7 +95,7 @@ function buildStructureGroup(cb: PaletteCallbacks): HTMLElement {
 
   const grid = document.createElement("div");
   grid.className = "palette-grid";
-  for (const def of [...STAIR_LIST, ...MODULE_LIST]) grid.appendChild(createPaletteItem(def, cb));
+  for (const def of STAIR_LIST) grid.appendChild(createPaletteItem(def, cb));
 
   // Entrance and Doorway are TOOLS rather than draggable presets, so they are
   // buttons that arm a placement mode. They are outlined in their own accent
