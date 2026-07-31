@@ -1,0 +1,64 @@
+<!-- @dsCard group="Foundations" name="Tokens" subtitle="Colour, type, spacing" -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#ECE8E0;--ink:#141317;--panel:#141317;--panel-ink:#EDECE8;--line:#C9C5BB;
+--accent:#D2232E;--entry:#E91E63;--violet:#7C5CE6;
+--living:#C13A2E;--kitchen:#E8B117;--bedS:#16336E;--bedL:#274A9E;--bath:#D8D4CB;--rec:#B98A2F;--out:#2E6B4F;--circ:#141414;--plate:#D8D4CB;--plate2:#C9C5BB;
+--dur-tap:150ms;--dur-panel:260ms;--dur-hero:420ms;
+--ease-out:cubic-bezier(.22,.9,.24,1);--ease-spring:cubic-bezier(.34,1.56,.64,1)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:13px/1.45 ui-sans-serif,system-ui,"Inter",sans-serif;padding:28px}
+h1{font-size:11px;letter-spacing:.14em;text-transform:uppercase;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:20px}
+h2{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6d6a62;margin:22px 0 10px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.sw{width:92px;opacity:0;transform:translateY(10px)}
+.sw i{display:block;height:56px;border:1px solid rgba(0,0,0,.18)}
+.sw b{display:block;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-top:6px}
+.sw span{font-size:10px;color:#6d6a62}
+.type div{opacity:0;transform:translateY(10px)}
+.t1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.t2{font-size:14px;font-weight:600}
+.t3{font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.t4{font-size:11px;color:#6d6a62}
+.sp{display:flex;align-items:flex-end;gap:8px}
+.sp i{background:var(--ink);width:18px;opacity:0;transform:scaleY(0);transform-origin:bottom}
+.note{margin-top:24px;padding-top:10px;border-top:1px dashed var(--line);font-size:10px;color:#6d6a62}
+</style></head><body>
+<h1>Re_Configure · Tokens</h1>
+<h2>Interface</h2>
+<div class="row" id="r1">
+  <div class="sw"><i style="background:var(--bg)"></i><b>Ground</b><span>#ECE8E0</span></div>
+  <div class="sw"><i style="background:var(--panel)"></i><b>Panel</b><span>#141317</span></div>
+  <div class="sw"><i style="background:var(--accent)"></i><b>Accent</b><span>#D2232E</span></div>
+  <div class="sw"><i style="background:var(--entry)"></i><b>Entry</b><span>#E91E63</span></div>
+  <div class="sw"><i style="background:var(--violet)"></i><b>Door arc</b><span>#7C5CE6</span></div>
+  <div class="sw"><i style="background:var(--plate)"></i><b>Plate</b><span>#D8D4CB</span></div>
+  <div class="sw"><i style="background:var(--plate2)"></i><b>Fixed plate</b><span>#C9C5BB</span></div>
+</div>
+<h2>Rooms</h2>
+<div class="row" id="r2">
+  <div class="sw"><i style="background:var(--living)"></i><b>Living</b></div>
+  <div class="sw"><i style="background:var(--kitchen)"></i><b>Kitchen</b></div>
+  <div class="sw"><i style="background:var(--bedS)"></i><b>Bed S</b></div>
+  <div class="sw"><i style="background:var(--bedL)"></i><b>Bed L</b></div>
+  <div class="sw"><i style="background:var(--bath)"></i><b>Bath</b></div>
+  <div class="sw"><i style="background:var(--rec)"></i><b>Recreation</b></div>
+  <div class="sw"><i style="background:var(--out)"></i><b>Outdoor</b></div>
+  <div class="sw"><i style="background:var(--circ)"></i><b>Circulation</b></div>
+</div>
+<h2>Type</h2>
+<div class="type" id="r3">
+  <div class="t1">Re_Configure</div>
+  <div class="t2">Section title 14 / 600</div>
+  <div class="t3">Label · 11 · tracked wide</div>
+  <div class="t4">Meta 11 — quiet grey for counts and hints</div>
+</div>
+<h2>Spacing · 4 8 12 16 24 32</h2>
+<div class="sp" id="r4"><i style="height:4px"></i><i style="height:8px"></i><i style="height:12px"></i><i style="height:16px"></i><i style="height:24px"></i><i style="height:32px"></i></div>
+<p class="note">Motion knobs live in three variables: --dur-tap 150ms · --dur-panel 260ms · --dur-hero 420ms. Toning the system down later is editing these, nothing else.</p>
+<script>
+const rise=(sel,base=0)=>document.querySelectorAll(sel).forEach((el,i)=>el.animate(
+ [{opacity:0,transform:el.classList.contains('sp')||el.parentElement.id==='r4'?'scaleY(0)':'translateY(10px)'},
+  {opacity:1,transform:'none'}],
+ {duration:420,delay:base+i*45,easing:'cubic-bezier(.22,.9,.24,1)',fill:'forwards'}));
+rise('#r1 .sw',0);rise('#r2 .sw',260);rise('#r3 div',560);rise('#r4 i',760);
+</script></body></html>

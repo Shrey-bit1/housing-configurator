@@ -1,0 +1,40 @@
+<!-- @dsCard group="Foundations" name="Motion scale" subtitle="Tap 150 · Panel 260 · Hero 420" -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#ECE8E0;--ink:#141317;--line:#C9C5BB;--accent:#D2232E;
+--dur-tap:150ms;--dur-panel:260ms;--dur-hero:420ms;
+--ease-out:cubic-bezier(.22,.9,.24,1);--ease-spring:cubic-bezier(.34,1.56,.64,1)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:13px/1.45 ui-sans-serif,system-ui,sans-serif;padding:28px}
+h1{font-size:11px;letter-spacing:.14em;text-transform:uppercase;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:22px}
+.tiles{display:flex;gap:14px}
+.tile{flex:1;border:1px solid var(--line);background:#F4F1EA;padding:16px;cursor:pointer}
+.tile b{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.tile span{font-size:10px;color:#6d6a62}
+.stage{height:84px;display:flex;align-items:center;margin-top:14px}
+.dot{width:26px;height:26px;background:var(--ink)}
+#d1{border-radius:50%}
+#d2{background:var(--accent)}
+#d3{background:#7C5CE6}
+.hint{margin-top:22px;font-size:10px;color:#6d6a62;border-top:1px dashed var(--line);padding-top:10px}
+.play{margin-top:18px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--ink);background:none;padding:8px 14px;cursor:pointer;transition:transform var(--dur-tap) var(--ease-out),background var(--dur-tap)}
+.play:hover{background:var(--ink);color:#EDECE8}
+.play:active{transform:scale(.96)}
+</style></head><body>
+<h1>Motion scale · click a tile, or play all</h1>
+<div class="tiles">
+ <div class="tile" data-k="tap"><b>Tap · 150ms</b><span>press, hover, checks</span><div class="stage"><div class="dot" id="d1"></div></div><span>ease-out — instant, obedient</span></div>
+ <div class="tile" data-k="panel"><b>Panel · 260ms</b><span>lists, drawers, toasts</span><div class="stage"><div class="dot" id="d2"></div></div><span>ease-out-quart — one breath</span></div>
+ <div class="tile" data-k="hero"><b>Hero · 420ms</b><span>view changes, big reveals</span><div class="stage"><div class="dot" id="d3"></div></div><span>spring — noticeable, once</span></div>
+</div>
+<button class="play" id="all">Play all</button>
+<p class="hint">Rule of the system: many small motions at 150, few at 260, exactly one 420 on screen at a time. Tone-down day = lower the three numbers, or set hero to 260 and springs to ease-out.</p>
+<script>
+const runs={
+ tap:()=>d1.animate([{transform:'scale(1)'},{transform:'scale(.8)'},{transform:'scale(1)'}],{duration:150,easing:'cubic-bezier(.22,.9,.24,1)'}),
+ panel:()=>d2.animate([{transform:'translateX(0)',opacity:.4},{transform:'translateX(120px)',opacity:1}],{duration:260,easing:'cubic-bezier(.22,.9,.24,1)'}),
+ hero:()=>d3.animate([{transform:'translateX(0) rotate(0deg)'},{transform:'translateX(120px) rotate(90deg)'}],{duration:420,easing:'cubic-bezier(.34,1.56,.64,1)'})
+};
+document.querySelectorAll('.tile').forEach(t=>t.onclick=()=>runs[t.dataset.k]());
+all.onclick=()=>{runs.tap();setTimeout(runs.panel,180);setTimeout(runs.hero,480)};
+setTimeout(all.onclick,400);
+</script></body></html>

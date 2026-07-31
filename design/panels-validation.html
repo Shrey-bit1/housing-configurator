@@ -1,0 +1,47 @@
+<!-- @dsCard group="Panels" name="Check Layout" subtitle="Count roll-up, staggered issues, one hard pulse" -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#ECE8E0;--ink:#141317;--line:#C9C5BB;--accent:#D2232E;--soft:#B98A2F;--note:#4E7A5A;
+--dur-tap:150ms;--dur-panel:260ms;--ease-out:cubic-bezier(.22,.9,.24,1)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:13px ui-sans-serif,system-ui,sans-serif;padding:24px;max-width:420px}
+.btn{font:600 10px/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--ink);background:var(--ink);color:#EDECE8;padding:10px 16px;cursor:pointer;transition:transform var(--dur-tap) var(--ease-out)}
+.btn:active{transform:scale(.96)}
+.count{font-size:15px;font-weight:700;margin:16px 0 4px;min-height:20px}
+.count small{font-weight:400;color:#6d6a62;font-size:11px}
+.grp{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6d6a62;margin:14px 0 6px;opacity:0}
+.iss{display:flex;gap:10px;align-items:baseline;padding:8px 10px;border:1px solid var(--line);background:#F4F1EA;margin-bottom:6px;opacity:0;transform:translateY(8px)}
+.tag{font:700 9px/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;padding:4px 6px;color:#fff;flex:none}
+.hard{background:var(--accent)}.softt{background:var(--soft)}.notet{background:var(--note)}
+.iss b{font-size:12px;font-weight:600;display:block}
+.iss span{font-size:11px;color:#6d6a62}
+.note{margin-top:18px;font-size:10px;color:#6d6a62;border-top:1px dashed var(--line);padding-top:10px}
+</style></head><body>
+<button class="btn" id="run">Check layout</button>
+<div class="count" id="count"></div>
+<div id="out"></div>
+<p class="note">The count rolls up in 400ms, groups land hard-first, each issue enters at 45ms steps, and the single hard issue pulses exactly once. Nothing loops, nothing wiggles after arrival: the panel is a verdict, not a screensaver.</p>
+<script>
+const data=[["HARD — LIKELY FAILURES",[["H1","hard","Orphaned room — no path reaches an entrance.","Bathroom — Large (F1)"]]],
+["SOFT — ATYPICAL, NOT WRONG",[["WET1","softt","Wet rooms form 2 separate groups on floor 0.","Kitchen (F0) + bathrooms"],
+["OR2","softt","Room's glazing faces N, which this project asks to avoid.","Living Room (F0)"],
+["A1","softt","Circulation narrower than 1.2 m — 2 narrow cells.","Circulation (F1, 8,14)"]]],
+["NOTES",[["S7","notet","En-suite bathroom (accessed via bedroom).","Bathroom — Small (F0, 11,14)"]]]];
+run.onclick=()=>{out.innerHTML='';count.textContent='';
+ let n=0,total=12;const t0=performance.now();
+ const roll=t=>{const p=Math.min(1,(t-t0)/400);count.innerHTML=Math.round(total*(1-Math.pow(1-p,3)))+' issues <small>(1 hard, 11 soft)</small>';if(p<1)requestAnimationFrame(roll)};
+ requestAnimationFrame(roll);
+ let delay=200;
+ data.forEach(([g,items])=>{
+  const h=document.createElement('div');h.className='grp';h.textContent=g;out.appendChild(h);
+  h.animate([{opacity:0},{opacity:1}],{duration:200,delay,fill:'forwards'});delay+=90;
+  items.forEach(([id,cls,txt,room])=>{
+   const d=document.createElement('div');d.className='iss';
+   d.innerHTML=`<span class="tag ${cls}">${id}</span><div><b>${txt}</b><span>${room}</span></div>`;
+   out.appendChild(d);
+   d.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],
+    {duration:260,delay,easing:'cubic-bezier(.22,.9,.24,1)',fill:'forwards'});
+   if(cls==='hard')d.animate([{boxShadow:'0 0 0 0 rgba(210,35,46,.5)'},{boxShadow:'0 0 0 10px rgba(210,35,46,0)'}],{duration:700,delay:delay+260});
+   delay+=45;});});
+};
+setTimeout(run.onclick,500);
+</script></body></html>

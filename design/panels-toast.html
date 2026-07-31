@@ -1,0 +1,38 @@
+<!-- @dsCard group="Panels" name="Toasts" subtitle="Spring in, breathe, slide out" -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#ECE8E0;--ink:#141317;--panel-ink:#EDECE8;--accent:#D2232E;--out:#2E6B4F;--line:#C9C5BB;
+--dur-tap:150ms;--ease-out:cubic-bezier(.22,.9,.24,1);--ease-spring:cubic-bezier(.34,1.56,.64,1)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:13px ui-sans-serif,system-ui,sans-serif;padding:28px;min-height:300px}
+h1{font-size:11px;letter-spacing:.14em;text-transform:uppercase;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:18px}
+.row{display:flex;gap:10px}
+.btn{font:600 10px/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--ink);background:none;padding:9px 14px;cursor:pointer;transition:transform var(--dur-tap) var(--ease-out)}
+.btn:hover{background:var(--ink);color:var(--panel-ink)}
+.btn:active{transform:scale(.96)}
+#stack{position:fixed;left:28px;bottom:24px;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--ink);color:var(--panel-ink);padding:12px 16px;min-width:250px;position:relative;overflow:hidden;font-size:12px}
+.toast b{font-weight:600}
+.toast i{position:absolute;left:0;bottom:0;height:2px;background:var(--accent);width:100%;transform-origin:left}
+.toast.good i{background:var(--out)}
+.note{margin-top:18px;font-size:10px;color:#6d6a62;border-top:1px dashed var(--line);padding-top:10px;max-width:420px}
+</style></head><body>
+<h1>Toasts</h1>
+<div class="row">
+ <button class="btn" onclick="toast('Project saved — <b>flatproject…json</b>','good')">Save</button>
+ <button class="btn" onclick="toast('Unit exported for the building packer','good')">Export unit</button>
+ <button class="btn" onclick="toast('Import replaced the current layout')">Import</button>
+</div>
+<div id="stack"></div>
+<p class="note">Enter: 320ms slide with a small overshoot. Life: a red hairline drains as the timer. Exit: 200ms slide down, no fade-only deaths. Stack pushes older toasts up with the same spring so arrivals feel physical.</p>
+<script>
+function toast(html,cls=''){
+ const t=document.createElement('div');t.className='toast '+cls;t.innerHTML=html+'<i></i>';
+ stack.appendChild(t);
+ t.animate([{transform:'translateY(24px)',opacity:0},{transform:'translateY(-4px)',opacity:1,offset:.7},{transform:'none',opacity:1}],
+  {duration:320,easing:'cubic-bezier(.22,.9,.24,1)'});
+ t.querySelector('i').animate([{transform:'scaleX(1)'},{transform:'scaleX(0)'}],{duration:2600,easing:'linear',fill:'forwards'});
+ setTimeout(()=>{t.animate([{transform:'none',opacity:1},{transform:'translateY(16px)',opacity:0}],
+  {duration:200,easing:'cubic-bezier(.22,.9,.24,1)',fill:'forwards'}).onfinish=()=>t.remove()},2600);
+}
+setTimeout(()=>toast('Project saved — <b>flatproject…json</b>','good'),500);
+</script></body></html>

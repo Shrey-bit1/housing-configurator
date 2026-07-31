@@ -1,0 +1,35 @@
+<!-- @dsCard group="Panels" name="Room palette" subtitle="Stagger-in, hover lift, grab tilt" -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--panel:#141317;--panel-ink:#EDECE8;--line:#2A2830;--accent:#D2232E;
+--living:#C13A2E;--kitchen:#E8B117;--bedS:#16336E;--bedL:#274A9E;--bath:#D8D4CB;--rec:#B98A2F;--out:#2E6B4F;
+--dur-tap:150ms;--dur-panel:260ms;--ease-out:cubic-bezier(.22,.9,.24,1)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--panel);color:var(--panel-ink);font:13px ui-sans-serif,system-ui,sans-serif;padding:24px;max-width:290px}
+h1{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8b8894;border-bottom:1px solid var(--accent);padding-bottom:8px;margin-bottom:14px}
+.item{display:flex;align-items:center;gap:12px;padding:10px;border:1px solid transparent;cursor:grab;
+ opacity:0;transform:translateX(-14px);
+ transition:border-color var(--dur-tap),background var(--dur-tap),transform var(--dur-tap) var(--ease-out),box-shadow var(--dur-tap)}
+.item:hover{border-color:var(--line);background:#1B1A20;transform:translateX(3px)}
+.item:active{cursor:grabbing;transform:scale(1.03) rotate(-1.2deg);box-shadow:0 10px 24px rgba(0,0,0,.5);background:#1B1A20;border-color:#3A3844}
+.chip{width:34px;height:34px;border:1px solid rgba(255,255,255,.25);flex:none;transition:transform var(--dur-tap) var(--ease-out)}
+.item:hover .chip{transform:scale(1.12)}
+.item b{display:block;font-size:12px;font-weight:600}
+.item span{font-size:10px;color:#8b8894;letter-spacing:.06em}
+.note{margin-top:16px;font-size:10px;color:#8b8894;border-top:1px dashed var(--line);padding-top:10px}
+</style></head><body>
+<h1>Rooms</h1>
+<div id="list">
+ <div class="item"><div class="chip" style="background:var(--living)"></div><div><b>Living Room</b><span>RECTANGLE · 7×5</span></div></div>
+ <div class="item"><div class="chip" style="background:var(--kitchen)"></div><div><b>Kitchen</b><span>RECTANGLE · 4×4</span></div></div>
+ <div class="item"><div class="chip" style="background:var(--bedS)"></div><div><b>Bedroom — Small</b><span>RECTANGLE · 5×4</span></div></div>
+ <div class="item"><div class="chip" style="background:var(--bedL)"></div><div><b>Bedroom — Large</b><span>RECTANGLE · 6×5</span></div></div>
+ <div class="item"><div class="chip" style="background:var(--bath)"></div><div><b>Bathroom — Small</b><span>RECTANGLE · 3×3</span></div></div>
+ <div class="item"><div class="chip" style="background:var(--rec)"></div><div><b>Recreation Room</b><span>RECTANGLE · 5×5</span></div></div>
+ <div class="item"><div class="chip" style="background:var(--out)"></div><div><b>Outdoor — Double</b><span>BALCONY · 1×2</span></div></div>
+</div>
+<p class="note">List staggers in once (45ms steps). Grab tilts the card 1.2° and lifts a real shadow — the piece you drag should feel picked up. Drop target ghosts stay in the viewport, not here.</p>
+<script>
+document.querySelectorAll('.item').forEach((el,i)=>el.animate(
+ [{opacity:0,transform:'translateX(-14px)'},{opacity:1,transform:'none'}],
+ {duration:300,delay:120+i*45,easing:'cubic-bezier(.22,.9,.24,1)',fill:'forwards'}));
+</script></body></html>

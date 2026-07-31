@@ -1,0 +1,45 @@
+<!-- @dsCard group="Moments" name="Interface dissolve" subtitle="The hero: interiors fall away, the contract remains" -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#ECE8E0;--ink:#141317;--line:#C9C5BB;--accent:#D2232E;--entry:#E91E63;
+--living:#C13A2E;--kitchen:#E8B117;--bedS:#16336E;--bath:#D8D4CB;--out:#2E6B4F;--plate:#D8D4CB;--tint:#A9BCD0;
+--dur-hero:420ms;--ease-out:cubic-bezier(.22,.9,.24,1)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:13px ui-sans-serif,system-ui,sans-serif;padding:28px}
+h1{font-size:11px;letter-spacing:.14em;text-transform:uppercase;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:18px}
+.stage{position:relative;width:360px;height:240px;background:#F4F1EA;border:1px solid var(--line);margin-bottom:14px}
+.rm{position:absolute;border:2px solid rgba(0,0,0,.55)}
+.plate{position:absolute;background:var(--plate);opacity:0;border:1px solid rgba(0,0,0,.2)}
+.keep{position:absolute;border:2px solid rgba(0,0,0,.55)}
+.entry{position:absolute;width:34px;height:8px;background:var(--entry);left:150px;top:0}
+.furn{position:absolute;background:rgba(0,0,0,.35)}
+.btn{font:600 10px/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--ink);background:none;padding:10px 16px;cursor:pointer}
+.btn.on{background:var(--ink);color:#EDECE8;border-bottom:3px solid var(--accent)}
+.note{margin-top:16px;font-size:10px;color:#6d6a62;border-top:1px dashed var(--line);padding-top:10px;max-width:430px}
+</style></head><body>
+<h1>Moment · Interface view</h1>
+<div class="stage" id="stage">
+ <div class="rm" id="liv" style="left:12px;top:12px;width:150px;height:110px;background:var(--living)"></div>
+ <div class="furn" style="left:34px;top:40px;width:44px;height:20px" data-f></div>
+ <div class="rm" id="bed" style="left:12px;top:130px;width:110px;height:96px;background:var(--bedS)"></div>
+ <div class="furn" style="left:34px;top:160px;width:36px;height:30px" data-f></div>
+ <div class="plate" id="pl1" style="left:12px;top:12px;width:150px;height:110px"></div>
+ <div class="plate" id="pl2" style="left:12px;top:130px;width:110px;height:96px;background:var(--tint)"></div>
+ <div class="keep" style="left:170px;top:12px;width:86px;height:86px;background:var(--kitchen)"></div>
+ <div class="keep" style="left:170px;top:106px;width:60px;height:60px;background:var(--bath)"></div>
+ <div class="keep" style="left:264px;top:12px;width:84px;height:214px;background:var(--out)"></div>
+ <div class="entry"></div>
+</div>
+<button class="btn" id="tog">Interface view</button>
+<p class="note">The one 420ms motion in the app. Interiors and furniture sink and fade in a 60ms cascade, plates rise beneath them; wet rooms, balcony and the entry never move, which is the argument: what stays is what the building knows. Off reverses the cascade. Nothing else on screen may animate while this runs.</p>
+<script>
+let on=false;const E='cubic-bezier(.22,.9,.24,1)';
+tog.onclick=()=>{on=!on;tog.classList.toggle('on',on);
+ const rooms=[liv,bed],plates=[pl1,pl2],furn=[...document.querySelectorAll('[data-f]')];
+ rooms.forEach((r,i)=>r.animate(on?[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(6px) scale(.985)'}]
+  :[{opacity:0,transform:'translateY(6px) scale(.985)'},{opacity:1,transform:'none'}],
+  {duration:420,delay:i*60,easing:E,fill:'forwards'}));
+ furn.forEach((f,i)=>f.animate(on?[{opacity:1},{opacity:0}]:[{opacity:0},{opacity:1}],{duration:300,delay:i*40,easing:E,fill:'forwards'}));
+ plates.forEach((p,i)=>p.animate(on?[{opacity:0},{opacity:1}]:[{opacity:1},{opacity:0}],{duration:420,delay:80+i*60,easing:E,fill:'forwards'}));
+};
+setTimeout(tog.onclick,700);setTimeout(tog.onclick,2100);
+</script></body></html>

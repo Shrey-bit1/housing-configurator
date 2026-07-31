@@ -34,3 +34,6 @@ _cowork/CONTEXT.local.md
 .claude/*
 !.claude/bridge/
 !.claude/skills/
+
+# design-sync generated bundle (rebuild from design/)
+ds-bundle/
