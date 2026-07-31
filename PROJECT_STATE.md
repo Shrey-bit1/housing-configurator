@@ -1730,6 +1730,71 @@ Unchanged, and verified unchanged: `R` rotate, `M` mirror, Escape arbitration in
 `main.ts`, `controls.enabled = false` while placing, the export, the rules, and
 both canonical panels.
 
+### 2s. Paper studio reskin (run 0016, branch `reskin-1a`)
+
+Part 2 of the Claude Design handoff, direction 1a. THIS SECTION DESCRIBES THE
+BRANCH, not `main`. If the branch is dropped, delete this section with it.
+
+**TOKENS AND THE PALETTE.** `src/style.css` gains the design system by its own
+names (`--bg --ink --panel --panel-ink --line-paper --line-dark --meta --plate
+--plate2 --tint --accent --entry --violet --soft --note`, plus the three
+durations and two easings) and REPOINTS the old Bauhaus names at the new values
+rather than rewriting the roughly 140 declarations that read them. `--black` was
+the dark panel fill and is now the paper ground; `--paper` was the light text on
+dark and is now ink. New rules use the design names. Anyone adding a rule should
+NOT reach for `--black` or `--paper` expecting their old meaning.
+
+The scene background moved from 0xe4e0d6 to 0xe9e5dc in all six files that
+carried it as a dim-toward-background constant (`sceneSetup`, `floor`,
+`gridView`, `entranceView`, `doorView`, `holeView`). Those must stay in step with
+`--canvas-bg` or dimmed floors fade toward a colour the viewport is not.
+
+Room colours moved to the design values in `modules.ts`. This is what fixed the
+ghost collision run 0015 measured: Living Room's valid ghost against the invalid
+accent went from deltaE 5.4 to 14.7, past the ~10 at which two colours read as
+different. It is still the closest pair; kitchen is 70.8, bedroom 95.6, outdoor
+96.3.
+
+**THE THREE FURNITURE MODULES ARE GONE.** Single, Domino and L-Triomino were
+removed from `MODULE_DEFS`, `MODULE_LIST` was deleted with them, and the README
+bullet went too. `Category` still includes `"module"` and the code paths that
+branch on it remain, so re-adding a furniture preset needs only a def. No fixture
+referenced them.
+
+**TOP BAR.** 52px, in `index.html` above `#app`, which is now a flex column. The
+segmented MODEL / PLAN / DIAGRAM control replaces the separate Diagram and Top
+View buttons; each cell ENTERS its mode and `syncViewSegments()` in `main.ts`
+reads the modes rather than tracking its own state. Check Layout, Frame View, the
+Save / Open menu and the `?` sit on the right. The three controls that moved out
+of the viewport had their old absolute-position rules replaced by a comment
+naming where they went; a future edit must not reinstate `position: absolute` on
+them.
+
+**PALETTE.** PLACE / FLOORS / BRIEF, built by `ui/palette.ts`. PLACE has three
+groups in two-column grids. The panel is resizable 248 to 480 (default 296)
+through `#palette-resize`, a 6px handle on its right hairline; the width is
+session state and is never saved. The scroller is `direction: rtl` with `ltr` on
+its child, which puts the scrollbar on the left edge. `#sidebar` must stay
+`overflow: hidden` or the scroller paints over the viewport.
+
+Palette icons are footprint SILHOUETTES: cells fill with no gap so neighbours
+merge, the outline is stroked once around the shape, and interior divisions
+appear only above 3.5px per cell. The per-cell gapped rects that preceded this
+were legible at 36px and turned to mesh at 20px.
+
+**OVERLAYS.** Three clusters. Selection top-left, undo/redo plus the hint
+bottom-left, and one 224px Display card bottom-right, collapsed by default with a
+summary of what is on in its header (`syncDisplaySummary()`). The compass row is
+always visible, collapsed or not, because north moves glazing and is design state
+rather than a view toggle. Both circles live there: the dial is the north that is
+SET, the badge is where north points ON SCREEN under the current camera.
+
+**NOT DONE ON THIS BRANCH:** the layout-check bottom sheet (stage 2e) and the
+copy rewrite (stage 2f). The validation panel is still the pre-reskin vertical
+overlay, and severity words are still hard/soft/note everywhere. The one piece of
+2f that did land is the Structure toggle's tooltip, which had described the view
+as an elastic-room x-ray since run 0013 changed what it does.
+
 ## 3. Key data structures / formats (written out)
 
 ### Cell (`grid.ts`)
