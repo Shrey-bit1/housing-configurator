@@ -512,7 +512,6 @@ function setDiagramVisible(show: boolean): void {
   // Hide the 3D-only chrome while in diagram mode (Check Layout stays available).
   const hide = graphView.visible ? "none" : "";
   resetBtn.style.display = hide;
-  document.getElementById("hint")!.style.display = hide;
   viewControls.style.display = hide; // cutaway toggle + compass dial
   syncViewSegments();
 }

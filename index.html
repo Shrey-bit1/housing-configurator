@@ -71,6 +71,8 @@
             <button id="shortcuts-close" class="vp-close" type="button" aria-label="Close">✕</button>
           </div>
           <ul class="shortcut-list">
+            <li><kbd>Click</kbd><span>Select a placed module</span></li>
+            <li><kbd>Drag</kbd><span>Move the selection</span></li>
             <li><kbd>R</kbd><span>Rotate selection</span></li>
             <li><kbd>M</kbd><span>Mirror selection</span></li>
             <li><kbd>S</kbd><span>Cycle door swing (with a door selected)</span></li>
@@ -83,16 +85,14 @@
             <li class="shortcut-note">Reset View &amp; Top View are buttons only — no shortcut.</li>
           </ul>
         </div>
-        <!-- Bottom-left cluster: undo/redo with the hint inline beside them. -->
+        <!-- Bottom-left cluster: undo and redo. The hint line that used to run
+             beside them said nothing the palette caption and the shortcuts panel
+             do not, and it was long enough to be clipped at any usable window
+             width, so it now lives in those two places instead. -->
         <div id="bottom-left">
           <div id="history-controls">
             <button id="undo-btn" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
             <button id="redo-btn" type="button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">↷</button>
-          </div>
-          <div id="hint">
-            Drag rooms &amp; modules onto the grid &middot; Click to select &middot;
-            <kbd>R</kbd> rotate &middot; <kbd>M</kbd> mirror &middot; drag to move &middot;
-            <kbd>Del</kbd> delete &middot; <kbd>?</kbd> shortcuts
           </div>
         </div>
         <!-- Bottom-right: ONE Display card. Collapsed by default; the header

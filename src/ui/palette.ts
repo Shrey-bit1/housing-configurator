@@ -61,6 +61,11 @@ export function buildPalette(
   const scroll = document.createElement("div");
   scroll.id = "palette-scroll";
   scroll.appendChild(sectionHeading("Place"));
+  // The one thing the old viewport hint line said that nothing else did. It sits
+  // here, above the tiles it is about, instead of across the bottom of the
+  // viewport where it was clipped and where it competed with undo/redo. The rest
+  // of what it listed is in the shortcuts panel behind the ? button.
+  scroll.appendChild(caption("Drag a tile onto the grid to place it. Press ? for every shortcut."));
   scroll.appendChild(buildGroup("Rooms", ROOM_LIST.filter((d) => !d.cluster), cb));
   scroll.appendChild(
     buildGroup("Circulation & Outdoor", ROOM_LIST.filter((d) => !!d.cluster), cb)
@@ -80,6 +85,15 @@ function sectionHeading(text: string): HTMLElement {
   h.className = "section-title";
   h.textContent = text;
   return h;
+}
+
+/** A quiet line of prose under a heading, in the same style the orientation and
+ *  grid panels already use for their notes. */
+function caption(text: string): HTMLElement {
+  const p = document.createElement("p");
+  p.className = "hint-text";
+  p.textContent = text;
+  return p;
 }
 
 /** STRUCTURE & ACCESS: the stair and the two placement tools. They sit together
