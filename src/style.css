@@ -79,6 +79,41 @@ body {
   width: 100vw;
 }
 
+/* ---- Scrollbars ----
+   Every scroller in the app: the palette, the layout-check rail and its cards,
+   the shortcuts panel. The browser default is a light-grey chrome bar that
+   reads as a piece of the operating system sitting on top of the paper, so it
+   is restated in the same three values the rest of the shell uses — paper
+   track, hairline thumb, quiet grey on hover. Squared off, like everything
+   else here. `scrollbar-*` covers Firefox; the `::-webkit-` block covers
+   Chromium and gives the thinner 10px bar. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-paper) var(--bg);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-paper);
+  border: 2px solid var(--bg); /* insets the thumb without rounding it */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--meta);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg);
+}
+
 /* ---- Sidebar ---- */
 #sidebar {
   /* Design default 296px, resizable 248-480 (see #palette-resize). */
