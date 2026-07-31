@@ -13,8 +13,25 @@
   --paper-2: #d9d3c5;
   --text: #f4f1ea;
   --text-dim: #a8a399;
-  --accent: #d32f2f; /* Bauhaus red, used sparingly for interaction */
+  --accent: #d2232e; /* Re_Configure --accent: active and failing only */
   --canvas-bg: #e4e0d6;
+
+  /* ------------------------------------------------------------------
+     Re_Configure design-system tokens, introduced for the drag gesture
+     (run 0015). ADDITIVE ONLY: existing chrome still reads the Bauhaus
+     names above, and the full swap is Part 2 of the handoff. --accent
+     is the one name that already existed; its value moved from #d32f2f
+     to the system's #d2232e, which is the same red a hair cooler.
+     ------------------------------------------------------------------ */
+  --ink: #141317; /* text, rules, filled controls */
+  --bg: #ece8e0; /* ground / paper */
+  --meta: #6d6a62; /* captions, counts */
+
+  --dur-tap: 150ms; /* press, hover, ghost snap, validity flips */
+  --dur-panel: 260ms; /* sheets, grid emphasis, the drop settle */
+  --dur-hero: 420ms; /* view changes only */
+  --ease-out: cubic-bezier(0.22, 0.9, 0.24, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* hero motion and toasts only */
 }
 
 * {
@@ -186,17 +203,35 @@ button.secondary:disabled {
   border-radius: 0;
   cursor: grab;
   user-select: none;
-  transition: background 0.1s, border-color 0.1s;
 }
 
 .palette-item:hover {
   border-color: var(--accent);
   background: #262626;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 0 var(--ink);
 }
 
+/* Press: the tile settles back down and tips, shadowless — it reads as the
+   thing being picked up rather than a button being clicked. */
 .palette-item:active {
   cursor: grabbing;
   background: #2e2e2e;
+  transform: translateY(0) rotate(-0.6deg);
+  box-shadow: none;
+}
+
+/* The source tile stays dimmed for the WHOLE gesture: "you took this from
+   here". The class is applied by ui/dragChrome.ts on every emitted state, so a
+   sidebar re-render mid-drag repairs itself on the next pointer move rather
+   than losing the dim. CSS cannot match one attribute against another, which is
+   why this is a class and not a `body[data-dragging]` descendant selector. */
+.palette-item {
+  transition: background 0.1s, border-color 0.1s, opacity var(--dur-tap) var(--ease-out),
+    transform var(--dur-tap) var(--ease-out), box-shadow var(--dur-tap) var(--ease-out);
+}
+.palette-item.is-drag-source {
+  opacity: 0.35;
 }
 
 .palette-swatch {
@@ -1179,4 +1214,82 @@ button.primary:hover {
   gap: 8px;
   justify-content: flex-end;
   margin-top: 4px;
+}
+
+/* ============================================================
+   Drag-to-place gesture (run 0015, handoff Part 1)
+   The cursor chip and the validity label. Both are created once
+   by ui/dragChrome.ts and reused; between gestures they sit at
+   opacity 0 with pointer-events none and cost nothing.
+   ============================================================ */
+
+#drag-chip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60; /* above the canvas and the viewport overlays */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  background: var(--bg);
+  border: 1px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-tap) var(--ease-out);
+}
+
+/* The chip stays visible for the ENTIRE gesture, including over the canvas. An
+   earlier revision of the design faded it out there; that was withdrawn. */
+#drag-chip.on {
+  opacity: 1;
+}
+
+#drag-chip .dc-swatch {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border: 1px solid var(--ink);
+}
+
+#drag-chip .dc-name {
+  font-weight: 600;
+}
+
+#drag-chip .dc-size {
+  color: var(--meta);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+#drag-label {
+  position: fixed;
+  left: 16px;
+  top: 16px;
+  z-index: 60;
+  padding: 5px 9px;
+  background: var(--ink);
+  color: #ece8e0;
+  font: 600 9px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-tap) var(--ease-out),
+    background var(--dur-tap) var(--ease-out);
+}
+
+#drag-label.on {
+  opacity: 1;
+}
+
+/* Background follows the ghost's edge colour, so the label and the thing it
+   describes are the same colour in both states. */
+#drag-label.invalid {
+  background: var(--accent);
 }

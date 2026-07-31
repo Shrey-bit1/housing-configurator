@@ -658,10 +658,51 @@ function buildConnectorTile(
   group.add(tileMesh);
 }
 
-/** Tint a ghost group to signal a valid (green) or invalid (red) drop. */
+/** Design-system ink and accent (see src/style.css `--ink` / `--accent`). The
+ *  ghost is scene geometry rather than DOM, so it cannot read the CSS variables
+ *  and carries the two values it needs as numbers. Keep them in step by hand. */
+const GHOST_INK = 0x141317;
+const GHOST_ACCENT = 0xd2232e;
+/** Ghost opacity per state. Valid stays translucent enough to read the plate
+ *  under it; invalid is stronger than the design's 0.20 because that alpha was
+ *  specified over paper and disappears against a lit 3D scene at room height. */
+const GHOST_ALPHA_VALID = 0.55;
+const GHOST_ALPHA_INVALID = 0.45;
+/** How far the valid ghost's own room colour is pulled toward ink — the
+ *  `rgba(20,19,23,.10)` overlay the design puts over the room colour. */
+const GHOST_INK_MIX = 0.1;
+
+const ghostInk = new THREE.Color(GHOST_INK);
+
+/**
+ * Tint a ghost group to signal a valid or invalid drop.
+ *
+ * VALID keeps the module's own colour, pulled a tenth toward ink, so a room
+ * still reads as itself while it is being placed. INVALID goes to the accent
+ * red. Green was retired because it competed with the balcony green (`--out`
+ * #2E6B4F) and with the room palette generally; the system's rule is that red
+ * marks the active and the failing, and neutral ink means fine.
+ *
+ * Edge colour follows the fill. The design asks for 2px edges, which WebGL
+ * cannot give: `LineBasicMaterial.linewidth` is ignored by every browser's
+ * WebGL renderer and always draws 1px. Widening them would need a line library,
+ * which is a new dependency and out of scope, so the weight is 1px and only the
+ * colour carries the state.
+ */
 export function setGhostValidity(group: THREE.Group, valid: boolean): void {
   const mat = group.userData.material as THREE.MeshStandardMaterial;
-  mat.color.setHex(valid ? 0x4fd08a : 0xff5d5d);
+  const base = (group.userData.ghostBaseColor as number | undefined) ?? mat.color.getHex();
+  group.userData.ghostBaseColor = base; // first call captures the room's own colour
+  if (valid) mat.color.setHex(base).lerp(ghostInk, GHOST_INK_MIX);
+  else mat.color.setHex(GHOST_ACCENT);
+  mat.opacity = valid ? GHOST_ALPHA_VALID : GHOST_ALPHA_INVALID;
+
+  // The outline is a child LineSegments built beside the fill; recolour it so
+  // the state reads at the silhouette as well as through the body.
+  group.traverse((o) => {
+    const lm = (o as THREE.LineSegments).material as THREE.LineBasicMaterial | undefined;
+    if (lm && lm.isLineBasicMaterial) lm.color.setHex(valid ? GHOST_INK : GHOST_ACCENT);
+  });
 }
 
 /** Toggle the selected look (emissive glow) on a placed module group. */

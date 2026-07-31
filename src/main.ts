@@ -5,7 +5,7 @@ import { rotatedCells } from "./core/modules";
 import { FloorManager } from "./core/floorManager";
 import { worldNorthDir } from "./core/orientation";
 import { createScene } from "./scene/sceneSetup";
-import { GhostPreview } from "./scene/ghostPreview";
+import { GhostPreview, tickGhostAnimations } from "./scene/ghostPreview";
 import { GroupGhostPreview } from "./scene/groupGhostPreview";
 import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
@@ -25,6 +25,7 @@ import {
 import { EntranceController } from "./interaction/entranceController";
 import { DoorController } from "./interaction/doorController";
 import { buildPalette } from "./ui/palette";
+import { renderDragChrome } from "./ui/dragChrome";
 import { showToast } from "./ui/toast";
 import { History } from "./core/history";
 import {
@@ -154,6 +155,18 @@ const selection = new SelectionController(
 );
 
 floors.attach({ picker, ghost, groupGhost, dragDrop, selection, groundPlane, sizeGroundPlane });
+
+// The drag gesture reports itself; main decides what that looks like. The
+// controller owns no DOM and no scene state beyond its ghost, so the cursor
+// chip, the validity label and the grid emphasis are all wired here.
+dragDrop.onGesture = (state) => {
+  renderDragChrome(state);
+  // Only the ACTIVE floor's grid gains emphasis: it is the one being placed on,
+  // and lighting the others would say a drop could land there.
+  floors.floors.forEach((f, i) =>
+    f.gridView.setEmphasis(state !== null && i === floors.activeIndexValue)
+  );
+};
 
 // A stair placed on the top floor auto-creates a floor above it — refresh the
 // sidebar floor tabs when that happens. The floor stack shape changing while
@@ -979,13 +992,27 @@ resizeObserver.observe(canvas);
 window.addEventListener("resize", () => ctx.handleResize());
 
 // ---- Render loop ----
+/** Timestamp of the previous frame, for a real delta rather than an assumed
+ *  60 fps. The gesture tweens are time-based, so a slow frame must not make the
+ *  ghost lag behind the pointer. */
+let lastFrameMs = performance.now();
+
 function animate(): void {
   requestAnimationFrame(animate);
+  const now = performance.now();
+  // Clamp the delta: a backgrounded tab resumes with a delta of seconds, and an
+  // unclamped one would teleport every tween to its destination in one frame.
+  const dt = Math.min(0.1, (now - lastFrameMs) / 1000);
+  lastFrameMs = now;
   if (graphView.visible) {
     // In diagram mode: skip the 3D render, drive the bubble diagram instead.
     graphView.frame();
     return;
   }
+  // Gesture motion first, so a tween and the frame that shows it agree.
+  ghost.tick(dt);
+  tickGhostAnimations(dt);
+  for (const f of floors.floors) f.gridView.tick(dt);
   controls.update();
   updateCutaway(scene, camera.position, controls.target);
   updateNorthBadge();

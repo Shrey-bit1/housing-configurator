@@ -1648,6 +1648,88 @@ overnight edit. It is recorded as an `it.fails` case in
 `src/core/unitExport.slow.test.ts`, which keeps the suite green and turns red the
 moment someone repairs the export; the fix is then to delete the `.fails`.
 
+### 2r. The drag-to-place gesture (run 0015, handoff Part 1)
+
+Part 1 of the Claude Design handoff, implemented in the app's own environment:
+plain TypeScript, the existing `GhostPreview` mesh, `src/style.css`. The
+prototype's CSS-3D technique was deliberately not ported; what was taken is the
+choreography and the values. Part 2, the chrome reorganisation, is untouched.
+
+**THE COMMIT GATE, a bug fix that shipped first.** `dragDrop.onUp` used to call
+`store.place` for whatever cell was under the pointer without re-asking whether
+the module fitted, so a ghost showing red still placed. Nothing corrupt was ever
+written, because `store.place` refuses an overlap on its own and returned null,
+but the gesture lied about what a release would do. `onUp` now runs
+`store.canPlaceInstance` for the release cell and bails when it is false
+(`dragDrop.ts`). It re-asks rather than trusting the last move's answer, because
+a release can land on a cell no move event reported: a click without motion
+never fires `pointermove`, and the pointer can leave and re-enter the canvas
+between the last move and the release. Measured on flat-1: a release over an
+occupied cell leaves the store at 24 instances, and a release over a free one
+takes it to 25.
+
+**THE GHOST TWEENS BETWEEN CELLS.** It still snaps to whole cells; what changed
+is that `update` now sets a target and `GhostPreview.tick(dt)` eases the group
+toward it over `--dur-tap` (150 ms), called once per frame from `main.animate`.
+Before this the position was assigned outright and a drag across the plate read
+as a jitter of discrete jumps. The first cell of a gesture lands outright rather
+than sliding in from wherever the last gesture ended.
+
+**VALIDITY COLOURS.** Green was retired because it competed with the balcony
+green. Valid is now the module's own colour pulled a tenth toward `--ink` at
+0.55 opacity; invalid is `--accent` #d2232e at 0.45. The design specified 0.20
+for the invalid fill, which is an alpha chosen over paper and disappears against
+a lit 3D scene, so it is 0.45 here. The design also specified 2px edges, which
+WebGL cannot draw: `LineBasicMaterial.linewidth` is ignored by every browser and
+always renders 1px, so only the edge COLOUR carries the state.
+
+KNOWN COLLISION, unresolved: the Living Room's own colour is #d32f2f, so its
+valid ghost renders #c92d2d against an invalid #d2232e. Those are the same red.
+Every other room type reads clearly; the living room, which is the most-placed
+one, does not. See the run 0015 report's open questions.
+
+**THE DROP SETTLE.** A committed module enters 0.55 world units above its
+resting Y at opacity 0.2 and lands over `--dur-panel` (260 ms), driven by
+`settleDrop` plus `tickGhostAnimations(dt)` in `scene/ghostPreview.ts`. The
+settle list is module-level rather than a field on the ghost, because a settle
+outlives the ghost that caused it: the ghost clears the instant the placement
+commits and the module keeps falling for 260 ms. On arrival the materials are
+restored to opaque and non-transparent exactly, so a settled module sorts
+against the cutaway like its neighbours.
+
+**GRID EMPHASIS.** The active floor's dots move from their resting #b0a99c
+toward #141317 over `--dur-panel` while a placement is live and back on release
+(`GridView.setEmphasis` / `tick`). It is a colour ramp rather than an opacity
+ramp because the dots are opaque on purpose, and fading them in would
+reintroduce the depth-sort artifacts `setDimmed` already avoids. Only the active
+floor lights: emphasising the others would say a drop could land there.
+
+**THE CHROME.** `ui/dragChrome.ts` owns the cursor chip and the validity label.
+The chip is a miniature of the palette tile (20px swatch, name, `w×d`), tilted
+-1.5deg with a 3px hard shadow, following the pointer for the WHOLE gesture
+including over the canvas. The label sits at the viewport's top left and reads
+`Living Room · 7×5 · CELL 0,0` when valid and `BLOCKED — OVERLAPS A PLACED ROOM`
+when not, its background following the ghost's edge colour. It has a THIRD state
+the design does not name: it is hidden while there is no cell at all, between
+pressing a tile and reaching the canvas, because claiming an overlap there would
+be false.
+
+`dragDrop.ts` owns no DOM. It emits a `DragGestureState` on start, on every
+move, on rotate and mirror, and once with null at the end; `main.ts` decides
+what that looks like. The source tile is dimmed to 0.35 through an
+`is-drag-source` class re-applied on every emitted state, so a sidebar re-render
+mid-gesture repairs itself on the next pointer move.
+
+**TOKENS.** `src/style.css` gained `--ink`, `--bg`, `--meta`, `--dur-tap`,
+`--dur-panel`, `--dur-hero`, `--ease-out` and `--ease-spring`, additively.
+`--accent` already existed and moved from #d32f2f to the system's #d2232e, which
+is the one value in existing chrome this run changed. The full token swap is
+Part 2.
+
+Unchanged, and verified unchanged: `R` rotate, `M` mirror, Escape arbitration in
+`main.ts`, `controls.enabled = false` while placing, the export, the rules, and
+both canonical panels.
+
 ## 3. Key data structures / formats (written out)
 
 ### Cell (`grid.ts`)
