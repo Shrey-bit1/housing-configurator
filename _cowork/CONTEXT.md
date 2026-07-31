@@ -26,15 +26,18 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** the working tree is CHECKED OUT ON `reskin-1a` (tip `b6e3bd4`,
-eleven commits ahead of `main`), which run 0017 left deliberately so a reload
-shows the finished reskin. That branch carries the whole of the "Paper studio"
-chrome reskin: the tokens, top bar, palette and overlays from run 0016, then the
-layout-check bottom sheet, the Must fix / Worth a look / Note copy, themed
-scrollbars and the removal of the viewport hint line from run 0017. `main` (tip
-after this record) is demo-ready and contains none of it. Whether it merges is
-Shrey's call after the 4 August review; if it is dropped, PROJECT_STATE's §2s
-goes with it. A run that needs the pre-reskin app must check out `main` first.
+**Branch:** the working tree is CHECKED OUT ON `reskin-1a`, which run 0017 left
+deliberately so a reload shows the finished reskin. Its last code commit is
+`b6e3bd4`; the commits above that are merges bringing `main`'s bridge records
+forward, because this file is tracked and would otherwise read as `main`'s copy
+while the tree sits on the branch. The branch carries the whole of the "Paper
+studio" chrome reskin: the tokens, top bar, palette and overlays from run 0016,
+then the layout-check bottom sheet, the Must fix / Worth a look / Note copy,
+themed scrollbars and the removal of the viewport hint line from run 0017. It is
+a strict superset of `main`, which is demo-ready and contains none of the
+reskin. Whether it merges is Shrey's call after the 4 August review; if it is
+dropped, PROJECT_STATE's §2s goes with it. A run that needs the pre-reskin app
+must check out `main` first.
 **Last updated:** 2026-07-31
 
 ## What this project is
