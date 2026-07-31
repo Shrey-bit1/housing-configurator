@@ -1,37 +1,53 @@
 /* ============================================================
-   Bauhaus visual system
-   - geometric sans, flat solid fills, sharp rectangular edges
-   - black / off-white as structural chrome; room colours as accents
-   - no gradients, shadows, skeuomorphism, or border-radius
+   Re_Configure "Paper studio" (handoff Part 2, direction 1a)
+   - paper ground, ink rules, hairlines; the app was dark chrome
+     on off-white and is now ink on paper throughout
+   - the red marks the active and the failing, never decoration
+   - flat solid fills, sharp edges, no gradients or border-radius
    ============================================================ */
 :root {
-  --black: #141414;
-  --black-2: #1e1e1e;
-  --line: #000000;
-  --line-soft: #34322d;
-  --paper: #ede7da; /* off-white */
-  --paper-2: #d9d3c5;
-  --text: #f4f1ea;
-  --text-dim: #a8a399;
-  --accent: #d2232e; /* Re_Configure --accent: active and failing only */
-  --canvas-bg: #e4e0d6;
-
-  /* ------------------------------------------------------------------
-     Re_Configure design-system tokens, introduced for the drag gesture
-     (run 0015). ADDITIVE ONLY: existing chrome still reads the Bauhaus
-     names above, and the full swap is Part 2 of the handoff. --accent
-     is the one name that already existed; its value moved from #d32f2f
-     to the system's #d2232e, which is the same red a hair cooler.
-     ------------------------------------------------------------------ */
-  --ink: #141317; /* text, rules, filled controls */
+  /* --- The design system, by its own names ------------------------- */
   --bg: #ece8e0; /* ground / paper */
+  --ink: #141317; /* text, rules, filled controls */
+  --panel: #141317; /* dark panel fill */
+  --panel-ink: #edece8; /* text on dark */
+  --line-paper: #c9c5bb; /* hairlines on paper */
+  --line-dark: #2a2830; /* hairlines on dark */
   --meta: #6d6a62; /* captions, counts */
+  --plate: #d8d4cb; /* module plate / chips */
+  --plate2: #c9c5bb;
+  --tint: #a9bcd0;
+
+  --accent: #d2232e; /* active and failing only — never decorative */
+  --entry: #e91e63; /* entrance */
+  --violet: #7c5ce6; /* door arcs and EVERY focus ring */
+  --soft: #b98a2f; /* worth a look */
+  --note: #4e7a5a; /* note / passing */
 
   --dur-tap: 150ms; /* press, hover, ghost snap, validity flips */
   --dur-panel: 260ms; /* sheets, grid emphasis, the drop settle */
-  --dur-hero: 420ms; /* view changes only */
+  --dur-hero: 420ms; /* view changes only — one on screen at a time */
   --ease-out: cubic-bezier(0.22, 0.9, 0.24, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* hero motion and toasts only */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* hero + toasts only */
+
+  /* --- The Bauhaus names, REPOINTED at the design values -----------
+     Roughly 140 declarations across this file read these, and rewriting
+     every one of them would be a diff nobody could review against the
+     screenshots. Repointing the names is the whole reskin for existing
+     chrome: `--black` was the dark panel fill and is now the paper
+     ground, `--text` was near-white on dark and is now ink on paper.
+     New rules should use the design names above; these stay until the
+     last old rule is gone.
+     ------------------------------------------------------------------ */
+  --black: #ece8e0; /* was #141414 — panel fill, now paper */
+  --black-2: #e4e0d6; /* was #1e1e1e — raised panel fill */
+  --line: #c9c5bb; /* was #000000 — hairline */
+  --line-soft: #c9c5bb; /* was #34322d — hairline */
+  --paper: #141317; /* was #ede7da — INVERTED: this was the light on dark */
+  --paper-2: #d8d4cb;
+  --text: #141317; /* was #f4f1ea — body text, now ink */
+  --text-dim: #6d6a62; /* was #a8a399 — captions */
+  --canvas-bg: #e9e5dc; /* the viewport, a touch under the panel paper */
 }
 
 * {

@@ -16,7 +16,7 @@ import { connectedComponents } from "../core/cluster";
  */
 const VOID_COLOR = 0x2a2a2a;
 const OUTLINE_COLOR = 0x1a1a1a;
-const DIM_BG = new THREE.Color(0xe4e0d6);
+const DIM_BG = new THREE.Color(0xe9e5dc);
 
 export class HoleView {
   private group = new THREE.Group();

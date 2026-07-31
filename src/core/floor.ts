@@ -13,7 +13,7 @@ import type { SemiExteriorPlan } from "./semiExterior";
 
 /** Canvas background colour; dimmed floors fade toward it. Keep in sync with
  *  the scene background in sceneSetup.ts. */
-const DIM_BG = new THREE.Color(0xe4e0d6);
+const DIM_BG = new THREE.Color(0xe9e5dc);
 /** How far an inactive floor's colours are pulled toward the background. */
 const DIM_AMOUNT = 0.74;
 /** Edge-outline colour at full strength (matches moduleMesh). */

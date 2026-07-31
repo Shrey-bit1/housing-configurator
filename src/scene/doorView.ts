@@ -16,7 +16,7 @@ import { doorEdges, DEFAULT_SWING, type Door } from "../core/door";
  */
 const ACCENT = 0x7c4dff; // violet — distinct from entrance magenta and every room colour
 const EDGE = 0x1a1a1a;
-const DIM_BG = new THREE.Color(0xe4e0d6);
+const DIM_BG = new THREE.Color(0xe9e5dc);
 
 /** Matches moduleMesh's FLOOR_H so the threshold sits on top of the floor slab. */
 const SLAB_TOP = 0.15;

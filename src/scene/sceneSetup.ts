@@ -40,7 +40,7 @@ const FRAME_DIST = 100;
  */
 export function createScene(canvas: HTMLCanvasElement): SceneContext {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xe4e0d6); // Bauhaus off-white canvas
+  scene.background = new THREE.Color(0xe9e5dc); // --canvas-bg: paper, a touch under the panels
 
   const renderer = new THREE.WebGLRenderer({
     canvas,

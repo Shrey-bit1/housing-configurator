@@ -27,7 +27,7 @@ import type { Entrance } from "../core/entrance";
 const ACCENT = 0xe91e63; // vivid magenta — a colour no room type uses, so the
 // door marker stays legible against any wall (incl. the red living room).
 const EDGE = 0x1a1a1a;
-const DIM_BG = new THREE.Color(0xe4e0d6);
+const DIM_BG = new THREE.Color(0xe9e5dc);
 
 /** Leaf thickness across the wall. A touch wider than WALL_T so it reads from
  *  both sides, matching doorView's STRIP_THICK reasoning. */

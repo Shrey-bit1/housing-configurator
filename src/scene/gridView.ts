@@ -40,7 +40,7 @@ export class GridView {
   setDimmed(dimmed: boolean): void {
     this.dimmed = dimmed;
     this.applyDotColor();
-    const bg = new THREE.Color(0xe4e0d6);
+    const bg = new THREE.Color(0xe9e5dc);
     const border = this.border?.material as THREE.LineBasicMaterial | undefined;
     if (border) {
       border.color.set(0x1a1a1a);
@@ -71,7 +71,7 @@ export class GridView {
     const dots = this.points?.material as THREE.PointsMaterial | undefined;
     if (!dots) return;
     dots.color.set(DOT_REST).lerp(new THREE.Color(DOT_EMPHASIS), this.emphasis);
-    if (this.dimmed) dots.color.lerp(new THREE.Color(0xe4e0d6), 0.6);
+    if (this.dimmed) dots.color.lerp(new THREE.Color(0xe9e5dc), 0.6);
   }
 
   rebuild(): void {

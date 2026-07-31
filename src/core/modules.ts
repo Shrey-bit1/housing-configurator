@@ -200,7 +200,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Rectangle · 7×5",
     category: "room",
     group: "Living Room",
-    color: 0xd32f2f,
+    color: 0xc13a2e,
     cells: rect(7, 5),
     height: ROOM_HEIGHT,  },
   kitchen: {
@@ -209,7 +209,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Rectangle · 4×4",
     category: "room",
     group: "Kitchen",
-    color: 0xf5c400,
+    color: 0xe8b117,
     cells: rect(4, 4),
     height: ROOM_HEIGHT,  },
   bedroom_small: {
@@ -218,7 +218,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Rectangle · 5×4",
     category: "room",
     group: "Bedroom",
-    color: 0x1565c0,
+    color: 0x16336e,
     cells: rect(5, 4),
     height: ROOM_HEIGHT,  },
   bedroom_large: {
@@ -227,7 +227,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Rectangle · 6×5",
     category: "room",
     group: "Bedroom",
-    color: 0x0d2c54,
+    color: 0x274a9e,
     cells: rect(6, 5),
     height: ROOM_HEIGHT,  },
   bathroom_small: {
@@ -236,7 +236,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Rectangle · 3×3",
     category: "room",
     group: "Bathroom",
-    color: 0xede7da,
+    color: 0xd8d4cb,
     cells: rect(3, 3),
     height: ROOM_HEIGHT,  },
   bathroom_large: {
@@ -245,7 +245,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Rectangle · 4×4",
     category: "room",
     group: "Bathroom",
-    color: 0x9b9690,
+    color: 0xd8d4cb,
     cells: rect(4, 4),
     height: ROOM_HEIGHT,  },
   recreation: {
@@ -254,7 +254,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Rectangle · 5×5",
     category: "room",
     group: "Recreation Room",
-    color: 0xc68a1e,
+    color: 0xb98a2f,
     cells: rect(5, 5),
     height: ROOM_HEIGHT,  },
   circulation_single: {
@@ -263,7 +263,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Connector · 1×1",
     category: "room",
     group: "Circulation",
-    color: 0x1a1a1a,
+    color: 0x141414,
     cells: rect(1, 1),
     height: ROOM_HEIGHT,    cluster: "circulation",
   },
@@ -273,7 +273,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Connector · 1×2",
     category: "room",
     group: "Circulation",
-    color: 0x1a1a1a,
+    color: 0x141414,
     cells: [
       { cx: 0, cz: 0 },
       { cx: 1, cz: 0 },
@@ -286,7 +286,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Balcony · 1×1",
     category: "room",
     group: "Outdoor",
-    color: 0x4a7c59,
+    color: 0x2e6b4f,
     cells: rect(1, 1),
     height: ROOM_HEIGHT,    cluster: "outdoor",
   },
@@ -296,7 +296,7 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     description: "Balcony · 1×2",
     category: "room",
     group: "Outdoor",
-    color: 0x4a7c59,
+    color: 0x2e6b4f,
     cells: [
       { cx: 0, cz: 0 },
       { cx: 1, cz: 0 },
