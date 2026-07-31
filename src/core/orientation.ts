@@ -112,3 +112,37 @@ export function worldNorthDir(northAngle: number): { x: number; z: number } {
   const r = northAngle / DEG;
   return { x: Math.sin(r), z: -Math.cos(r) };
 }
+
+/**
+ * A PROJECT-LEVEL orientation preference: which way this design would like its
+ * habitable rooms to look, and which way it would rather they did not.
+ *
+ * Both halves are optional and independent, because a brief usually states one
+ * or the other rather than both, and an absent half has to mean "no opinion"
+ * instead of a default that quietly becomes a rule. Sectors are the same 8-wind
+ * {@link CompassSector} the derived glazing already reports in, so a preference
+ * and a room's actual glazing are compared in one vocabulary rather than through
+ * a conversion that could drift.
+ *
+ * This is DESIGN state, so it is serialized in the project file beside
+ * `northAngle` (core/projectIO.ts). It is deliberately NOT in the
+ * `dwelling-unit` export: the building packer receives what a flat IS, and a
+ * preference is a statement about what its author wanted, which is a different
+ * kind of claim and belongs to the authoring tool.
+ *
+ * Only `avoid` currently drives a rule (OR2, core/rules.ts). `prefer` is stored
+ * and shown but has no check yet, on purpose: "faces the wrong way" is a defect
+ * a reviewer wants named, while "does not face the preferred way" is true of
+ * most rooms in most layouts and would flood the report.
+ */
+export interface OrientationPreference {
+  prefer?: CompassSector;
+  avoid?: CompassSector;
+}
+
+/** Whether `value` is one of the eight compass sectors. Used to keep a
+ *  hand-edited or newer project file from putting a nonsense sector into the
+ *  preference (core/projectIO.ts drops anything this rejects). */
+export function isCompassSector(value: unknown): value is CompassSector {
+  return typeof value === "string" && (COMPASS_SECTORS as readonly string[]).includes(value);
+}

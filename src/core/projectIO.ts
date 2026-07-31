@@ -1,6 +1,7 @@
 import type { Floor } from "./floor";
 import { SIDES, type Side } from "./exteriorEdges";
 import type { DoorSwing } from "./door";
+import { isCompassSector, type OrientationPreference } from "./orientation";
 
 /**
  * Project save/load — serialize the whole design to a JSON file and back.
@@ -71,6 +72,11 @@ export interface ProjectFile {
    *  in pre-north files → 0, defaulted by {@link normalize}, so no version bump /
    *  migration. */
   northAngle?: number;
+  /** Project orientation preference (see core/orientation.ts). ADDITIVE like
+   *  `northAngle`: absent in every file written before run 0014, normalized to
+   *  an empty object, so no version bump and no migration. Never appears in the
+   *  `dwelling-unit` export, which stays frozen. */
+  orientationPreference?: OrientationPreference;
 }
 
 /** How the file's version relates to the version this app understands. */
@@ -90,11 +96,16 @@ export class ProjectParseError extends Error {}
 
 /** Capture the whole project (all floors + project north) as a plain JSON
  *  object. `northAngle` is project-level (not per-floor); default 0. */
-export function serializeProject(floors: Floor[], northAngle = 0): ProjectFile {
+export function serializeProject(
+  floors: Floor[],
+  northAngle = 0,
+  orientationPreference: OrientationPreference = {}
+): ProjectFile {
   return {
     format: PROJECT_FORMAT,
     version: APP_PROJECT_VERSION,
     northAngle,
+    orientationPreference,
     floors: floors.map((f) => ({
       cols: f.grid.cols,
       rows: f.grid.rows,
@@ -187,8 +198,22 @@ function normalize(obj: Record<string, unknown>): ProjectFile {
     format: PROJECT_FORMAT,
     version: APP_PROJECT_VERSION,
     northAngle: north,
+    orientationPreference: normalizePreference(obj.orientationPreference),
     floors: floorsRaw.map(normalizeFloor),
   };
+}
+
+/** Tolerant read of the orientation preference: anything that is not one of the
+ *  eight compass sectors is DROPPED rather than defaulted, because a preference
+ *  with no opinion has to stay a preference with no opinion. A file written by a
+ *  newer app with a ninth sector therefore loads with that half absent instead
+ *  of loading a value the rules cannot interpret. */
+function normalizePreference(raw: unknown): OrientationPreference {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const out: OrientationPreference = {};
+  if (isCompassSector(o.prefer)) out.prefer = o.prefer;
+  if (isCompassSector(o.avoid)) out.avoid = o.avoid;
+  return out;
 }
 
 function normalizeFloor(raw: unknown): FloorData {

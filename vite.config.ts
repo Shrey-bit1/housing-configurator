@@ -54,6 +54,13 @@ function captureSink(root: string): Plugin {
 // otherwise use Vite's default 5173.
 export default defineConfig(({ command }) => ({
   plugins: command === "serve" ? [captureSink(process.cwd())] : [],
+  // `npm test` is the suite people run on every change, so it stays under two
+  // seconds. Anything named `*.slow.test.ts` imports the three.js render layer
+  // and belongs to `npm run test:slow` (vitest.slow.config.ts), which is the
+  // only other place this split is written down.
+  test: {
+    exclude: ["**/node_modules/**", "**/dist/**", "**/*.slow.test.ts"],
+  },
   server: {
     port: process.env.PORT ? Number(process.env.PORT) : 5173,
     strictPort: false,

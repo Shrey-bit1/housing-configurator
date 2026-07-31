@@ -1,6 +1,7 @@
 import type { DwellingGraph, GraphNode } from "./adjacencyGraph";
 import { BATHROOM_TYPES, WET_TYPES } from "./modules";
 import { connectedComponents } from "./cluster";
+import type { OrientationPreference } from "./orientation";
 
 /**
  * Layout-rules validation — ADVISORY ONLY.
@@ -133,6 +134,11 @@ interface RuleContext {
    *  stair" consult this and stay quiet, the same way the reachability family
    *  consults {@link hasEntrance} and lets E1 speak. */
   disconnectedFloors: Set<number>;
+  /** The project's stated orientation preference (core/orientation.ts). Passed
+   *  IN rather than derived, because unlike every other context member it is not
+   *  a fact about the layout: it is what the author asked for, and only OR2
+   *  reads it. An empty object means no opinion, which is the default. */
+  orientationPreference: OrientationPreference;
   /**
    * Ids reachable from `seeds` over edges, never entering nodes for which
    * `blocked` is true (the "remove all X, still reachable?" checks H2/H3/H6).
@@ -179,7 +185,7 @@ function computeDisconnectedFloors(graph: DwellingGraph): Set<number> {
   return new Set([...occupied].filter((f) => !seen.has(f)));
 }
 
-function buildContext(graph: DwellingGraph): RuleContext {
+function buildContext(graph: DwellingGraph, orientationPreference: OrientationPreference): RuleContext {
   const nodesById = new Map(graph.nodes.map((n) => [n.id, n] as const));
 
   const adj = new Map<string, Set<string>>();
@@ -283,6 +289,7 @@ function buildContext(graph: DwellingGraph): RuleContext {
     entryIds: graph.entryIds,
     hasEntrance: graph.entryIds.length > 0,
     disconnectedFloors: computeDisconnectedFloors(graph),
+    orientationPreference,
     reachableFrom,
   };
 }
@@ -933,6 +940,46 @@ export const RULES: Rule[] = [
         .map((n) => violation("OR1", "soft", n));
     },
   },
+  {
+    // PROJECT PREFERENCE, not practice and not law, which is why this rule
+    // carries no citation where FAC1 carries one. The author states an
+    // orientation the design should avoid (core/orientation.ts,
+    // `OrientationPreference.avoid`, edited in the sidebar and saved in the
+    // project file), and this reports every habitable room or kitchen whose
+    // glazing faces ONLY that way.
+    //
+    // ONLY, not partly. A room glazed S + N still gets its southern sun, so
+    // flagging it would report a preference miss where none is felt; a room
+    // glazed N alone has nothing else, which is the case a brief means. That
+    // also makes the rule silent by construction on any room with no glazing at
+    // all, whose problem is daylight and belongs to D1 and W1.
+    //
+    // It overlaps OR1 exactly when `avoid` is "N", and both lines then appear.
+    // That is intended rather than tolerated: OR1 says the room gets no direct
+    // sun at this latitude, which is true whoever designed it, and OR2 says the
+    // room breaks a rule this project set itself. They agree here and diverge
+    // for every other sector.
+    id: "OR2",
+    severity: "soft",
+    description: "Room's glazing faces only the orientation this project asks to avoid.",
+    check(graph, ctx) {
+      const avoid = ctx.orientationPreference.avoid;
+      if (!avoid) return []; // no preference stated — nothing to measure against
+      const out: Violation[] = [];
+      for (const n of graph.nodes) {
+        if (!ctx.is.habitable(n) && !ctx.is.kitchen(n)) continue;
+        const sectors = n.glazing?.sectors ?? [];
+        if (sectors.length === 0 || !sectors.every((s) => s === avoid)) continue;
+        out.push({
+          ruleId: "OR2",
+          severity: "soft" as const,
+          description: `Room's glazing faces ${sectors.join(" + ")}, which this project asks to avoid.`,
+          nodeIds: [n.id],
+        });
+      }
+      return out;
+    },
+  },
 
   // ===== Privacy / access refinements =====
   {
@@ -1278,8 +1325,11 @@ export const RULES_BY_ID: Record<string, Rule> = Object.fromEntries(
 // ---- Engine ----------------------------------------------------------------
 
 /** Run every rule over the dwelling `graph` and collect all violations. */
-export function validate(graph: DwellingGraph): Violation[] {
-  const ctx = buildContext(graph);
+export function validate(
+  graph: DwellingGraph,
+  orientationPreference: OrientationPreference = {}
+): Violation[] {
+  const ctx = buildContext(graph, orientationPreference);
   const out: Violation[] = [];
   for (const rule of RULES) out.push(...rule.check(graph, ctx));
   return out;

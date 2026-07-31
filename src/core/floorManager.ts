@@ -20,6 +20,7 @@ import { computeEntranceDepths } from "./rules";
 import { computeExpansion } from "./expansion";
 import { computeSemiExterior } from "./semiExterior";
 import { isElastic, isWet, isBedroom } from "./modules";
+import type { OrientationPreference } from "./orientation";
 import type { Picker } from "../interaction/picker";
 import type { GhostPreview } from "../scene/ghostPreview";
 import type { GroupGhostPreview } from "../scene/groupGhostPreview";
@@ -93,6 +94,12 @@ export class FloorManager {
    *  toward south and drives OR1 + the orientation report. Mutate via
    *  {@link setNorthAngle} so windows re-derive. */
   northAngle = 0;
+  /** Project-level orientation preference (see core/orientation.ts). Serialized
+   *  design state like {@link northAngle}, but unlike north it derives NOTHING:
+   *  no geometry moves when it changes, only the OR2 rule's reading of the
+   *  glazing that is already there. So it is a plain field with no setter and no
+   *  rebuild, and the caller commits history when it edits it. */
+  orientationPreference: OrientationPreference = {};
   /** Fired when the floor STACK changes structurally (a stair auto-created a
    *  floor above). Lets main rebuild the sidebar floor tabs. */
   onStructureChange?: () => void;
@@ -852,6 +859,10 @@ export class FloorManager {
     const rawNorth =
       typeof data.northAngle === "number" && Number.isFinite(data.northAngle) ? data.northAngle : 0;
     this.northAngle = ((rawNorth % 360) + 360) % 360;
+    // The preference derives no geometry, so it only has to be in place before
+    // the next Check Layout; restoring it here keeps it beside north, which is
+    // where a reader looks for project-level design state.
+    this.orientationPreference = { ...(data.orientationPreference ?? {}) };
 
     for (const f of [...this.floors]) this.disposeFloor(f);
     this.floors.length = 0;

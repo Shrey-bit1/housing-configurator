@@ -304,6 +304,15 @@ function renderSidebar(): void {
       onExportUnit() {
         openUnitExportDialog();
       },
+      onSetOrientationPreference(pref) {
+        // Design state, so it is undoable and it lands in the project file. No
+        // geometry re-derives: the preference only changes how OR2 reads the
+        // glazing that is already there, so the stale report is dropped and
+        // nothing is rebuilt.
+        floors.orientationPreference = pref;
+        clearValidation();
+        commitHistory();
+      },
     },
     {
       floors: floors.floors.map((_, i) => ({
@@ -313,6 +322,7 @@ function renderSidebar(): void {
       activeIndex: floors.activeIndexValue,
       cols: floors.active.grid.cols,
       rows: floors.active.grid.rows,
+      orientationPreference: floors.orientationPreference,
     }
   );
 }
@@ -581,7 +591,7 @@ function onHoverViolation(v: Violation | null): void {
 
 function runCheck(): void {
   const graph = computeDwellingGraph(floors.floors);
-  const violations = validate(graph);
+  const violations = validate(graph, floors.orientationPreference);
   const depths = computeEntranceDepths(graph);
   graphView.setHover(null); // a stale hover from the previous report shouldn't survive a re-check
   clearHoverEmphasis();
@@ -605,7 +615,7 @@ floors.onLayoutChange = () => clearValidation();
 // path, so a loaded design is identical to a hand-built one.
 
 function exportProject(): void {
-  const data = serializeProject(floors.floors, floors.northAngle);
+  const data = serializeProject(floors.floors, floors.northAngle, floors.orientationPreference);
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -660,7 +670,10 @@ function exportUnit(name: string, color: string): void {
     return;
   }
   // …then the ADVISORY hard-rule confirm: violations never block, only inform.
-  const hard = validate(computeDwellingGraph(floors.floors)).filter((v) => v.severity === "hard");
+  const hard = validate(
+    computeDwellingGraph(floors.floors),
+    floors.orientationPreference
+  ).filter((v) => v.severity === "hard");
   if (hard.length > 0) {
     const ok = window.confirm(
       `Check Layout reports ${hard.length} HARD violation(s) in this dwelling.\n` +
@@ -902,7 +915,7 @@ function updateHistoryButtons(): void {
 }
 
 history = new History(
-  () => JSON.stringify(serializeProject(floors.floors, floors.northAngle)),
+  () => JSON.stringify(serializeProject(floors.floors, floors.northAngle, floors.orientationPreference)),
   restoreState,
   updateHistoryButtons,
   20

@@ -1,3 +1,4 @@
+import { COMPASS_SECTORS, type CompassSector, type OrientationPreference } from "../core/orientation";
 import {
   MODULE_LIST,
   ROOM_LIST,
@@ -12,6 +13,9 @@ export interface FloorState {
   /** Active floor's grid dimensions (the grid-size control reflects these). */
   cols: number;
   rows: number;
+  /** The project's stated orientation preference, so the two selects show what
+   *  is actually saved rather than whatever was last typed into them. */
+  orientationPreference: OrientationPreference;
 }
 
 export interface PaletteCallbacks {
@@ -34,6 +38,10 @@ export interface PaletteCallbacks {
   onImport: () => void;
   /** Export the dwelling as a `dwelling-unit` bridge file (docs/bridge-format.md). */
   onExportUnit: () => void;
+  /** Replace the project's orientation preference. Either half may be
+   *  undefined, which means no opinion; the caller stores it and commits
+   *  history, because it is design state that belongs in the project file. */
+  onSetOrientationPreference: (pref: OrientationPreference) => void;
 }
 
 /**
@@ -53,6 +61,7 @@ export function buildPalette(
   root.appendChild(buildSection("Stairs", STAIR_LIST, cb));
   root.appendChild(buildAccessPanel(cb));
   root.appendChild(buildSection("Modules", MODULE_LIST, cb));
+  root.appendChild(buildOrientationPanel(state, cb));
   root.appendChild(buildGridControls(state, cb));
 }
 
@@ -251,6 +260,74 @@ function shapeIcon(def: ModuleDef): string {
     })
     .join("");
   return `<svg width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">${rects}</svg>`;
+}
+
+/**
+ * The project's orientation preference: one sector it would like habitable
+ * rooms to face and one it would rather they did not, both optional.
+ *
+ * It sits here rather than beside the compass dial, which is a viewport overlay
+ * for a value that MOVES GEOMETRY and therefore wants to be next to the model it
+ * turns. A preference moves nothing; it is a statement about the brief, in the
+ * same family as the project's name and grid, so it lives in the left panel with
+ * the rest of the project's settings. Only `avoid` drives a rule today (OR2).
+ */
+function buildOrientationPanel(state: FloorState, cb: PaletteCallbacks): HTMLElement {
+  const section = document.createElement("div");
+  section.appendChild(heading("Orientation preference"));
+
+  const row = document.createElement("div");
+  row.className = "field-row";
+  const prefer = sectorField("Prefer", state.orientationPreference.prefer);
+  const avoid = sectorField("Avoid", state.orientationPreference.avoid);
+  row.appendChild(prefer.field);
+  row.appendChild(avoid.field);
+  section.appendChild(row);
+
+  const push = () =>
+    cb.onSetOrientationPreference({
+      prefer: readSector(prefer.select),
+      avoid: readSector(avoid.select),
+    });
+  prefer.select.addEventListener("change", push);
+  avoid.select.addEventListener("change", push);
+
+  const note = document.createElement("p");
+  note.className = "hint-text";
+  note.textContent =
+    "Saved with the project, never in the unit export. \"Avoid\" drives rule OR2, " +
+    "which reports any habitable room or kitchen glazed ONLY that way. \"Prefer\" is " +
+    "recorded for the brief and drives no rule.";
+  section.appendChild(note);
+  return section;
+}
+
+/** A labelled 8-wind select with a leading "no opinion" option. */
+function sectorField(labelText: string, value: CompassSector | undefined) {
+  const field = document.createElement("div");
+  field.className = "field";
+  const label = document.createElement("label");
+  label.textContent = labelText;
+  const select = document.createElement("select");
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "—";
+  select.appendChild(none);
+  for (const sector of COMPASS_SECTORS) {
+    const opt = document.createElement("option");
+    opt.value = sector;
+    opt.textContent = sector;
+    select.appendChild(opt);
+  }
+  select.value = value ?? "";
+  field.appendChild(label);
+  field.appendChild(select);
+  return { field, select };
+}
+
+/** The select's value as a sector, or undefined for the "—" option. */
+function readSector(select: HTMLSelectElement): CompassSector | undefined {
+  return select.value === "" ? undefined : (select.value as CompassSector);
 }
 
 function buildGridControls(state: FloorState, cb: PaletteCallbacks): HTMLElement {

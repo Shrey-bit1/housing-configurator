@@ -48,6 +48,7 @@ All rules are advisory (never block placement) and run on demand via **Check Lay
 | D2 | 🟡 soft | Kitchen has no exterior wall — no natural ventilation. |
 | W1 | 🟡 soft | Room's glazing is below its daylight target. |
 | OR1 | 🟡 soft | Room is lit only from the north (no direct sun). |
+| OR2 | 🟡 soft | Room's glazing faces only the orientation this project asks to avoid (see **Orientation preference** in the sidebar). |
 | G1 | 🟡 soft | No bathroom is reachable without passing through a bedroom (guest access). |
 | G2 | 🟡 soft | Entrance opens directly into a private room. |
 | S1 | 🟡 soft | Outdoor / balcony over-connected (more than two doors) — usually a leaf space. |

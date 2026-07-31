@@ -224,7 +224,7 @@ export function buildUnitExport(
       northAngle: fm.northAngle,
       storeys,
       roomTypes,
-      sourceProject: serializeProject(floors, fm.northAngle),
+      sourceProject: serializeProject(floors, fm.northAngle, fm.orientationPreference),
     },
   };
 }

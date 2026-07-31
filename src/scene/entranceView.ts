@@ -80,13 +80,24 @@ export function entranceSpan(
   return { start: cell, cells: 1 };
 }
 
-/** The `Entry` glyph plate, built once and shared by every marker. A canvas
- *  texture because three.js has no text primitive, and a flat plane in the wall
- *  rather than a camera-facing sprite because the label belongs to the facade
- *  and should foreshorten with it. */
+/**
+ * The `Entry` glyph plate, built once and shared by every marker. A canvas
+ * texture because three.js has no text primitive, and a flat plane in the wall
+ * rather than a camera-facing sprite because the label belongs to the facade and
+ * should foreshorten with it.
+ *
+ * Returns null where there is no DOM, which is every non-browser host: vitest
+ * runs `core/floor.ts` in plain Node, and `Floor.addEntrance` reaches this
+ * through `EntranceView.rebuild`. Nothing else in the marker needs a document,
+ * so the leaf, its threshold and its outline still build and the label is simply
+ * absent. The alternative, letting `document.createElement` throw, made placing
+ * an entrance impossible outside a browser, which is a testability cost this
+ * label was never worth.
+ */
 let labelTexture: THREE.CanvasTexture | null = null;
-function entryLabel(): THREE.CanvasTexture {
+function entryLabel(): THREE.CanvasTexture | null {
   if (labelTexture) return labelTexture;
+  if (typeof document === "undefined") return null;
   const w = 512;
   const h = 128;
   const c = document.createElement("canvas");
@@ -109,9 +120,11 @@ function entryLabel(): THREE.CanvasTexture {
 /** One label plate, facing `outward` along the wall normal. Two are built per
  *  marker (one each way) so the word reads the right way round from the street
  *  and from inside, instead of appearing mirrored on one of them. */
-function labelPlate(width: number, runX: boolean, outward: 1 | -1): THREE.Mesh {
+function labelPlate(width: number, runX: boolean, outward: 1 | -1): THREE.Mesh | null {
+  const map = entryLabel();
+  if (!map) return null; // no DOM: the marker builds without its label
   const mat = new THREE.MeshBasicMaterial({
-    map: entryLabel(),
+    map,
     transparent: true,
     depthWrite: false,
   });
@@ -202,6 +215,7 @@ export function makeEntranceMesh(
   const off = LEAF_THICK / 2 + 0.012; // clear of the leaf face, no z-fighting
   for (const outward of [1, -1] as const) {
     const plate = labelPlate(labelW, runX, outward);
+    if (!plate) continue;
     plate.position.set(
       runX ? 0 : outward * off,
       LABEL_Y - DOOR_OPENING_H / 2,

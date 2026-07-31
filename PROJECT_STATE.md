@@ -1586,6 +1586,68 @@ runs deferred visual work for want of a way to check it: `?project=` made
 fixtures scriptable, and this makes their RESULT scriptable, so a span width or
 a toggle state is a number rather than a picture someone has to squint at.
 
+### 2q. Orientation preference and the export glazing gap (run 0014)
+
+**THE PREFERENCE.** A project may state one orientation it would like habitable
+rooms to face and one it would rather they did not, both optional and
+independent, because a brief usually gives one or the other and an absent half
+has to mean "no opinion" rather than a default that quietly becomes a rule. The
+type is `OrientationPreference` in `src/core/orientation.ts`, using the same
+8-wind `CompassSector` the derived glazing already reports in, so a preference
+and a room's actual glazing are compared in one vocabulary.
+
+It is DESIGN state: serialized in the project file beside `northAngle`
+(`projectIO.ts`, `normalizePreference` drops anything that is not one of the
+eight sectors rather than defaulting it), restored in
+`FloorManager.loadProject`, and carried through undo because history snapshots
+are serialized projects. Unlike north it DERIVES NOTHING, so it is a plain field
+with no setter and no rebuild; the sidebar callback stores it, drops the stale
+report and commits history.
+
+`OR2` (soft) is the only consumer. It reports a habitable room or kitchen whose
+glazing faces ONLY the avoided sector. Only, not partly: a room glazed S + N
+still gets its southern sun, so flagging it would report a miss nobody feels,
+and a room with no glazing at all belongs to D1 and W1. `prefer` is stored and
+shown but drives no rule, because "does not face the preferred way" is true of
+most rooms in most layouts and would flood the report. OR2 overlaps OR1 exactly
+when `avoid` is "N" and both lines then appear, which is intended: OR1 says the
+room gets no direct sun at this latitude whoever designed it, OR2 says it breaks
+a rule this project set itself.
+
+The UI is a two-select panel in the LEFT SIDEBAR (`ui/palette.ts`,
+`buildOrientationPanel`), not beside the compass dial. The dial is a viewport
+overlay for a value that moves geometry and wants to sit next to the model it
+turns; a preference moves nothing and belongs with the project's other settings.
+
+Measured on `testflats/flat-1-two-storey.json`: with no preference the panel
+reads `12 issues (1 hard, 11 soft)`, unchanged. With avoid set to N it reads
+`14 issues (1 hard, 13 soft)`, the two added lines being OR2 on Living Room (F0)
+and Bedroom — Small (F1), which are exactly the two rooms OR1 already names as
+north-lit.
+
+**THE EXPORT GLAZING GAP — A KNOWN DEFECT, NOT YET FIXED.** French-window edges
+are BUILT but never EXPORTED. `unitExport.ts:311` enumerates the envelope with
+`exteriorEdges(cells, occupied, floor.isOutside)`, the strict open-sky test,
+which skips any edge whose neighbour cell is occupied (`exteriorEdges.ts:131`).
+A balcony cell is occupied, so a room-to-balcony or corridor-to-balcony edge
+never enters the edge list, and the `glazed` class that `glazedKeys` correctly
+holds for it at `unitExport.ts:297` has nowhere to land. Run 0011 fixed the KEY
+SET and left the ENUMERATION on the strict test, so f2af130's bug survived in its
+other half.
+
+Measured on `flat-1-two-storey.json`: storey 0 builds 0 french edges and exports
+10 glazed of 64, which is consistent because floor 0 has no balcony; storey 1
+builds 9 french edges and exports 2 glazed of 68, so the building packer is told
+about 2 of the 11 glazed edges that exist. Measured on a minimal layout of one
+living room directly against a balcony: 3 french edges built, 0 glazed exported
+of 26 edges total.
+
+It is left unfixed on purpose. The repair changes what the bridge file CONTAINS,
+which the other repo consumes, so it is a deliberate decision rather than an
+overnight edit. It is recorded as an `it.fails` case in
+`src/core/unitExport.slow.test.ts`, which keeps the suite green and turns red the
+moment someone repairs the export; the fix is then to delete the `.fails`.
+
 ## 3. Key data structures / formats (written out)
 
 ### Cell (`grid.ts`)
@@ -1824,9 +1886,32 @@ footprint's anchor cell ONLY when that still collides: `Bathroom — Small (F0, 
 Two rooms of the same type on one floor previously rendered identically, so a report
 could name two different rooms with the same string.
 
-**Testing.** `vitest` is a devDependency and `npm test` runs `vitest run`. No config
-file: vitest reads `vite.config.ts` and needed nothing added. Two files, eight cases,
-3.29 s.
+**Testing.** `vitest` is a devDependency. THREE files and TWO suites as of run 0014.
+
+`npm test` runs `vitest run` over everything except `*.slow.test.ts`, which
+`vite.config.ts`'s `test.exclude` hides from it: 33 cases in about 2 s. It holds
+`src/core/exteriorEdges.test.ts` (five cases over `isFacadeEdge`),
+`src/core/unitExport.test.ts` (three pure cases over the export glazing
+invariant) and `src/core/rules.test.ts` (25 cases, a firing and a silent fixture
+for each of E1, E2, H1, C1, OD1, A1, N1, DP1, WET1, FAC1 and ST3). The rules pack
+builds `DwellingGraph` objects BY HAND, which is what makes it fast: `validate`
+consumes plain data, so rule logic is testable without three.js. Read its header
+for what that does not prove, which is that the app ever builds such a graph.
+
+`npm run test:slow` runs `vitest run --config vitest.slow.config.ts` over
+`*.slow.test.ts` only: 4 passing and 1 expected-fail in about 5.5 s. It holds
+`src/core/unitExport.slow.test.ts`, which drives a real `FloorManager` through a
+stubbed `FloorDeps` and calls the real `buildUnitExport`. The split exists
+because that import graph pulls in the whole render layer, measured at 11.94 s
+against 1.65 s for the pure tests, and the fast suite is the one people run on
+every change. The split is written in exactly two places: the `exclude` line in
+`vite.config.ts` and the `include` line in `vitest.slow.config.ts`.
+
+NOTE, from run 0014: `scene/entranceView.ts`'s `entryLabel()` returns null where
+there is no DOM, so `Floor.addEntrance` works headlessly and the marker simply
+builds without its label. Before that guard, run 0013's canvas-texture label made
+placing an entrance throw `ReferenceError: document is not defined` outside a
+browser, which blocked the slow test entirely.
 
 `src/core/unitExport.test.ts` (run 0013, three cases) is about the export glazing
 invariant, which is that the glazed edge set a unit EXPORTS equals the set the wall
@@ -2627,6 +2712,7 @@ typology — open-plan, en-suite, efficient services).
 | H3 | 🔴 hard | A room or stair reachable from an entrance only by passing through a bedroom (host bedroom exempt). BATHROOM targets are ALSO exempt — that's the en-suite typology → S7, not a failure; H3 still fires for other rooms + stairs. |
 | H6 | 🔴 hard | A room or stair reachable from an entrance only by passing through an outdoor space (host exempt). |
 | ST2 | 🔴 hard | Stair not reachable from any entrance (via doors). |
+| ST3 | 🔴 hard | A floor is not reachable by stairs from the entrance floor. Fires ONCE for the whole dwelling; H1, C1 and OD1 stay quiet about spaces on that floor (`ctx.disconnectedFloors`), since they would all restate the same cause. A1 keeps firing, because a corridor's width is true whether or not anyone can reach it. |
 
 *(H5 does not exist — ids are not contiguous; do not add one without a reason.)*
 
@@ -2647,6 +2733,7 @@ typology — open-plan, en-suite, efficient services).
 |---|---|---|
 | C1 | 🟡 soft | Orphaned corridor — connects to nothing via doors (dead space). SOFT (was hard) — matches O1, the identical degree-0-cluster condition; dead space is a design flaw, not uninhabitability. |
 | C2 | 🟡 soft | Under-used corridor — reached by only one door, so it doesn't circulate. |
+| OD1 | 🔴 hard | Outdoor space is not reachable from the dwelling. |
 | A1 | 🟡 soft | Circulation narrower than 1.2 m (below accessible width, SIA 500). Per circulation cluster: a cell is accessible-width iff it lies in ≥1 **2×2 block of cells fully inside the same cluster** (`narrowWidthCells`); a cluster with ≥1 narrow cell flags (message includes the narrow-cell count). A 1-wide corridor flags every cell (L-corners included — neighboured on two axes but never in a full 2×2 square); a 2-wide corridor passes; a wide hall with a 1-wide spur flags only the spur. Resolves the doors-are-1200mm-but-corridors-could-be-600mm contradiction. Circulation clusters only. |
 
 **Stairs**
@@ -2662,6 +2749,7 @@ typology — open-plan, en-suite, efficient services).
 | D2 | 🟡 soft | Kitchen has no exterior wall. |
 | W1 | 🟡 soft | Room's glazing is below its daylight target (too little glazing on the exterior walls it HAS). GATED on `hasExteriorEdge` — a room with no exterior wall is D1/D2's (avoids a double-flag on the same void-facing room). |
 | OR1 | 🟡 soft | Habitable room or kitchen is lit ONLY from the north (every windowed edge within `NORTH_SECTOR_HALF_WIDTH` = 45° of due north under the project north). Reads `glazing.northLit`, TRUE only when glazing EXISTS and is all-north — so a NO-glazing room can't fire it (D1/W1 own that; no double-fire). Heuristic (solar-access practice at this latitude), not code. §2k. |
+| OR2 | 🟡 soft | Room's glazing faces ONLY the orientation the project asks to avoid (`OrientationPreference.avoid`, core/orientation.ts). Preference rather than law, so no citation. Silent when no preference is set, and silent on a room with mixed glazing, which still gets its other sun. |
 
 **Room-count / connectivity balance** (S1/S2 count ACCESS/door degree — a *connected* hub; House-GAN anchors were proximity-based, so approximate under door semantics)
 | ID | Severity | Description |
