@@ -22,3 +22,5 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0012 | 2026-07-30 | Marker first, Structure view, stair rule, export test | partial | 0012-marker-first-structure-view-stair-rule-export-test.report.md |
 | 0013 | 2026-07-30 | Marker, Structure view, plans, and the backlog | partial | 0013-marker-structure-view-plans-and-backlog.report.md |
 | 0014 | 2026-07-30 | Night shift, orientation, tests, audit | partial | 0014-night-shift-orientation-tests-audit.report.md |
+| A0001 | 2026-07-31 | Design system synced to claude.ai/design as Re_Configure | complete | A0001-design-system-synced-to-claude-design.report.md |
+| 0015 | 2026-07-31 | Drag gesture trial from the Claude Design handoff | complete | 0015-drag-gesture-trial-from-the-handoff.report.md |

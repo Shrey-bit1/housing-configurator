@@ -27,7 +27,7 @@ Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
 **Branch:** `main`
-**Last updated:** 2026-07-30
+**Last updated:** 2026-07-31
 
 ## What this project is
 
@@ -68,6 +68,12 @@ rules engine and the export format are the mature parts, the UI is not.
 - `captures/` — rendered PNGs of views, written by the app itself through the dev
   server (see How to work with it). New in run 0013 and untracked, so it never shows
   up in a clone; the first capture creates it.
+- `design/` — the Re_Configure design system as standalone HTML pages (tokens,
+  motion, buttons, toggles, palette, toast, validation, and the interface-dissolve
+  moment). `.design-sync/` beside it holds the config and conventions the sync runs
+  against. Both are SOURCE and both are committed; `ds-bundle/` is generated from
+  them and is gitignored. Added by A0001, committed in run 0015. This is where the
+  values in `src/style.css`'s new `--ink` / `--dur-*` / `--ease-*` tokens come from.
 - `_cowork/` — the bridge traffic. Tracked in git on purpose.
 
 ## Entry points
@@ -115,6 +121,13 @@ rules engine and the export format are the mature parts, the UI is not.
   under `captures/`. So a check can read a mesh's real dimensions rather than describe a
   screenshot, and can leave a rendered plan behind as a file. Both are behind
   `import.meta.env.DEV` and `apply: "serve"`, so neither ships.
+- **Check that a capture is not 0 bytes before trusting it.**
+  `window.__app.capture(name)` returns `{ok: true}` and creates the file even when
+  the Browser pane is HIDDEN, but the PNG is empty, because `canvas.toDataURL()`
+  gives nothing back when the page is not compositing. With the pane visible the
+  same call wrote 33445 bytes. Note also that a capture records the WebGL canvas
+  ONLY: DOM overlays such as the drag chip and the validity label never appear in
+  one, and need the pane's own screenshot instead.
 - **Restart the dev server at the start of a session.** Run 0013 found one that had
   been running for four hours and was serving a transform of `src/scene/clusterShells.ts`
   from before run 0011 edited it, which threw on every page load while the source in the
