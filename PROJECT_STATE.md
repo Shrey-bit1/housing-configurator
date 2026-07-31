@@ -59,7 +59,7 @@ work-in-progress research artifact, not a production app.
 | **Layout rules engine** (advisory, on-demand) | `src/core/rules.ts` | `RULES: Rule[]`, `validate(graph)`, `computeEntranceDepths(graph)`. See §8 for the full current rule table. |
 | Rules-violation **3D highlighting** | `src/scene/highlight.ts` | `applyRoomHighlights(floors, violations)` / `clearRoomHighlights(floors)`: emissive tint on implicated room/cluster/stair shells + entrance markers, across ALL floors, resolved via `parseDwellingNodeId`. Plus `setHoverEmphasis`/`clearHoverEmphasis`: an intensity-only boost on top of an active tint, for report-card hover — see §2j. |
 | Bubble-diagram **view** | `src/ui/graphView.ts` | Toggleable full-screen 2D force-directed diagram of the WHOLE dwelling at once — one column per floor, stairs straddling their floor-pair boundary, draggable/pinnable nodes. See §2j. |
-| Validation report panel | `src/ui/validationPanel.ts` | `renderValidationPanel()`: grouped hard/soft/note issue list + the entrance-depth metric summary. Cards with a resolvable target fire `onHoverViolation` on mouseenter/leave (orchestrated in main.ts — see §2j); dwelling-level cards don't. |
+| Validation report panel | `src/ui/validationPanel.ts` | `renderValidationPanel()`: on `reskin-1a` this is the 256px horizontal bottom sheet of §2s — a header of counts and metrics over a rail of one card per violation. On `main` it is still the vertical top-left column with grouped hard/soft/note sections. Either way, cards with a resolvable target fire `onHoverViolation` on mouseenter/leave (orchestrated in main.ts — see §2j); dwelling-level cards don't. |
 | **Project save / load** | `src/core/projectIO.ts` | `serializeProject(floors) → ProjectFile`, `parseProject(text) → ParsedProject` (tolerant/versioned). Per-floor `entrances` AND `doors` are additive edge-bound lists (`normalizeEdgeBound` serves both). See §3. Camera state and floor visibility are deliberately excluded (view state, not design state). |
 | **Elastic-room expansion** (derived effective footprints) | `src/core/expansion.ts` | `computeExpansion(floor) → Map<instanceId, Cell[]>` — pure, per-floor, recomputed on every layout change. See §2m for the class split, algorithm, and the two-tier occupancy contract. `isElastic(def)` lives in modules.ts. |
 | **Unit export — flat → building bridge** | `src/core/unitExport.ts` (+ `docs/bridge-format.md`) | `buildUnitExport(fm, name, color) → {ok, file \| reason}`: the `dwelling-unit` v1 exporter for the bottom-up-design building packer. READ-ONLY (no store mutation, no history commit). Envelope per storey = `buildSpaceTargets` key set; edges classified entrance/glazed/open/blank by reusing graph entrance re-validation, `computeWindows`, and Outdoor-cluster membership. See §9. |
@@ -705,7 +705,7 @@ same `window` node all fire in registration order in the SAME dispatch — by
 the time a later listener inspects state, an earlier one may have already
 mutated it. One arbitrator, checked top-to-bottom, has no such race.
 
-**Selection readout** (`#selection-readout`, bottom-centre above `#hint`):
+**Selection readout** (`#selection-readout`, bottom-centre; on `reskin-1a` it lifts to `bottom: 312px` while the layout-check sheet is open, §2s):
 `updateSelectionReadout()` in main.ts, driven by `SelectionController`'s
 `onSelectionChange` callback. Empty when nothing is selected (hidden via a
 `.visible` CSS class toggle — NOT `style.display = ""`, which would fall back
@@ -1102,7 +1102,7 @@ in testing, §6).
 `computeWindows` (it now has `northAngle`), stashed on `floor.windowStats`,
 carried onto `node.glazing`. So **no new graph-node fields** — OR1 reads
 `node.glazing.northLit`, the report's "Glazing orientation" line reads
-`node.glazing.sectors` (`validationPanel.appendOrientation`), both already
+`node.glazing.sectors` (`validationPanel.glazingCard` on `reskin-1a`, `appendOrientation` on `main`), both already
 flowing through the existing `node.glazing` pipe.
 
 **OR1** (soft, §8): habitable-or-kitchen room whose glazing is all north-facing.
@@ -1730,10 +1730,11 @@ Unchanged, and verified unchanged: `R` rotate, `M` mirror, Escape arbitration in
 `main.ts`, `controls.enabled = false` while placing, the export, the rules, and
 both canonical panels.
 
-### 2s. Paper studio reskin (run 0016, branch `reskin-1a`)
+### 2s. Paper studio reskin (runs 0016 and 0017, branch `reskin-1a`)
 
-Part 2 of the Claude Design handoff, direction 1a. THIS SECTION DESCRIBES THE
-BRANCH, not `main`. If the branch is dropped, delete this section with it.
+Part 2 of the Claude Design handoff, direction 1a, complete as of run 0017. THIS
+SECTION DESCRIBES THE BRANCH, not `main`. If the branch is dropped, delete this
+section with it.
 
 **TOKENS AND THE PALETTE.** `src/style.css` gains the design system by its own
 names (`--bg --ink --panel --panel-ink --line-paper --line-dark --meta --plate
@@ -1782,18 +1783,83 @@ merge, the outline is stroked once around the shape, and interior divisions
 appear only above 3.5px per cell. The per-cell gapped rects that preceded this
 were legible at 36px and turned to mesh at 20px.
 
-**OVERLAYS.** Three clusters. Selection top-left, undo/redo plus the hint
-bottom-left, and one 224px Display card bottom-right, collapsed by default with a
-summary of what is on in its header (`syncDisplaySummary()`). The compass row is
-always visible, collapsed or not, because north moves glazing and is design state
-rather than a view toggle. Both circles live there: the dial is the north that is
-SET, the badge is where north points ON SCREEN under the current camera.
+**OVERLAYS.** Three clusters. Selection top-left, undo/redo bottom-left, and one
+224px Display card bottom-right, collapsed by default with a summary of what is
+on in its header (`syncDisplaySummary()`). The compass row is always visible,
+collapsed or not, because north moves glazing and is design state rather than a
+view toggle. Both circles live there: the dial is the north that is SET, the
+badge is where north points ON SCREEN under the current camera.
 
-**NOT DONE ON THIS BRANCH:** the layout-check bottom sheet (stage 2e) and the
-copy rewrite (stage 2f). The validation panel is still the pre-reskin vertical
-overlay, and severity words are still hard/soft/note everywhere. The one piece of
-2f that did land is the Structure toggle's tooltip, which had described the view
-as an elastic-room x-ray since run 0013 changed what it does.
+The hint line that ran beside undo/redo was removed in run 0017. It was clipped
+to an ellipsis at any usable window width, and everything it listed already sat
+in the shortcuts panel behind the `?` button. Its one unique sentence became a
+caption under the palette's PLACE heading (`palette.ts:63-69`), and the two
+bindings the shortcuts panel had been missing, Click to select and Drag to move,
+were added there (`index.html:74-75`). `#hint` no longer exists in the DOM or in
+`style.css`, and `setDiagramVisible` no longer reaches for it.
+
+**SCROLLBARS.** Themed globally in `style.css` (the `*` rule plus the
+`::-webkit-scrollbar` block): paper track, hairline thumb, quiet grey on hover,
+squared off, 10px. Every scroller inherits it — the palette, the layout-check
+rail and its cards, the shortcuts panel.
+
+**LAYOUT CHECK — THE BOTTOM SHEET (run 0017, stage 2e).** `#validation-panel`
+keeps its id and stops being a 300px column pinned top-left. It is now a 256px
+sheet spanning the viewport bottom, rendered by `ui/validationPanel.ts`:
+
+- The header (`buildHeader`) holds the title, a 340px block with a proportional
+  8px severity bar over the tier counts, one metrics line, and the close control.
+  The metrics line carries what used to be three sections at the bottom of a long
+  vertical scroll: circulation share with its per-floor rider, depth max/mean, and
+  the privacy gradient.
+- The bar's fourth segment counts ROOMS THAT APPEAR IN NO VIOLATION
+  (`clearRooms`), not the violation total subtracted from the room count. flat-1
+  carries 17 violations across 13 rooms, so the subtraction would floor at zero
+  exactly where the reference length matters.
+- The rail (`buildRail`) is one 300px card per violation, hard then soft then
+  note, each with a 3px top border in its severity colour, followed by the two
+  informational cards (glazing orientation, depth from entrance) the old panel
+  ended with. Repeated rules keep one card each and carry an ordinal on the chip
+  (`OR1 (1/2)`), because hover emphasis targets ONE violation's rooms and a merged
+  card would have nothing single to point at.
+- `ACTION_BY_RULE` (`validationPanel.ts:46`) is a display-only suggested move per
+  rule id, covering 34 of the 41 rules; the seven notes have no entry and render
+  no action line. It is deliberately NOT in `RULES` — `validate()`'s returned data
+  is unchanged and `rules.test.ts` never sees this file.
+- `bindWheelToScroll` calls `preventDefault` only while the rail can still move
+  in the direction the wheel asks for, so a trackpad falls through to the page at
+  either end instead of being trapped.
+- Opening runs one `vs-rise` keyframe over `--dur-panel`. Re-running Check Layout
+  replaces the sheet's children, never the container, so it does not run again.
+- `main.ts` toggles `sheet-open` on `#viewport`; while open `#bottom-left`,
+  `#view-controls` and `#graph-legend` move to `bottom: 272px` and
+  `#selection-readout` to `312px`. Check Layout both opens and closes the sheet.
+  ESCAPE WAS NOT GIVEN A FOURTH MEANING — it already arbitrates drag-abort,
+  selection-clear and plan-view exit.
+
+**COPY (run 0017, stage 2f).** The tier words the user reads are `Must fix`,
+`Worth a look` and `Note`. The `Severity` union is still `hard | soft | note` and
+nothing downstream of `validate()` changed; `SEVERITY_LABEL`
+(`validationPanel.ts:35`) is the only place the internal names become English,
+which is why `rules.test.ts` stayed green untouched. The same three words were
+applied to the diagram legend (`index.html:57-58`), the unit-export confirm
+(`main.ts:780`), the README rule table and legend, and the tier chips, index
+headings and tier-defining passages of `docs/rules-list.html`,
+`docs/rules-list.md` and `docs/rules-reference.html`.
+
+`Circulation` reads as `Hall` IN THE PALETTE ONLY, via `paletteName()`
+(`palette.ts:256`). `def.name` is not just a caption: `adjacencyGraph.ts:170` and
+`:202` copy it into every graph node's `label` and `unitExport.ts:213` copies it
+into the exported unit's `roomTypes`, which is a bridge-format payload another
+repository reads. Renaming the preset would change a file format. The report and
+the diagram therefore still say Circulation while the palette says Hall.
+
+**DOCS DRIFT, MEASURED.** `docs/rules-list.html` and `docs/rules-list.md`
+document 37 of the 41 rules; FAC1, OR2, ST3 and WET1 have no entry, and E1 is
+filed as a note where `rules.ts` has it hard. Run 0017 corrected the totals it was
+already rewriting (35/36 → 41, and the tier index 11/19/7 → 14/21/6) but left the
+per-rule entries alone, because filling them is a docs regeneration rather than a
+copy pass.
 
 ## 3. Key data structures / formats (written out)
 
@@ -2413,7 +2479,8 @@ screenshots):**
     correctly too (`hoverIds`/`hoverEdge` matched exactly). Hovering the
     dwelling-level G1 card ("Whole dwelling", no nodeIds/edge) produced no
     diagram change and its DOM row correctly lacked the `.hoverable` class —
-    confirmed by querying every `.vp-item`'s class list against its rule id.
+    confirmed by querying every report card's class list against its rule id
+    (`.vp-item` on `main`, `.vs-card` on `reskin-1a`).
     In the 3D view (report panel open over the 3D scene, not the diagram):
     hovering S6 read the actual THREE.js materials directly — both Kitchen's
     and Bathroom's `emissiveIntensity` were exactly `1.0`
