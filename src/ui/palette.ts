@@ -55,14 +55,82 @@ export function buildPalette(
   state: FloorState
 ): void {
   root.innerHTML = "";
-  root.appendChild(buildProjectPanel(cb));
-  root.appendChild(buildFloorsPanel(cb, state));
-  root.appendChild(buildSection("Rooms", ROOM_LIST, cb));
-  root.appendChild(buildSection("Stairs", STAIR_LIST, cb));
-  root.appendChild(buildAccessPanel(cb));
-  root.appendChild(buildSection("Modules", MODULE_LIST, cb));
-  root.appendChild(buildOrientationPanel(state, cb));
-  root.appendChild(buildGridControls(state, cb));
+  // PLACE / FLOORS / BRIEF (handoff Part 2, 1a). The Project panel is gone: its
+  // three actions live in the top bar's Save / Open menu now. Every entry that
+  // existed still exists; PLACE regroups them so a reader sees three kinds of
+  // thing rather than five lists.
+  const scroll = document.createElement("div");
+  scroll.id = "palette-scroll";
+  scroll.appendChild(sectionHeading("Place"));
+  scroll.appendChild(buildGroup("Rooms", ROOM_LIST.filter((d) => !d.cluster), cb));
+  scroll.appendChild(
+    buildGroup("Circulation & Outdoor", ROOM_LIST.filter((d) => !!d.cluster), cb)
+  );
+  scroll.appendChild(buildStructureGroup(cb));
+  scroll.appendChild(buildFloorsPanel(cb, state));
+  scroll.appendChild(sectionHeading("Brief"));
+  scroll.appendChild(buildOrientationPanel(state, cb));
+  scroll.appendChild(buildGridControls(state, cb));
+  root.appendChild(scroll);
+  root.appendChild(buildResizeHandle(root));
+}
+
+/** A top-level section heading with the 2px ink rule under it. */
+function sectionHeading(text: string): HTMLElement {
+  const h = document.createElement("p");
+  h.className = "section-title";
+  h.textContent = text;
+  return h;
+}
+
+/** STRUCTURE & ACCESS: the stair, the furniture modules, and the two placement
+ *  tools. They sit together because none of them is a room, and all four are
+ *  things a plan needs before it is finished. */
+function buildStructureGroup(cb: PaletteCallbacks): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "palette-group";
+  const h = document.createElement("p");
+  h.className = "group-title";
+  h.textContent = "Structure & Access";
+  wrap.appendChild(h);
+
+  const grid = document.createElement("div");
+  grid.className = "palette-grid";
+  for (const def of [...STAIR_LIST, ...MODULE_LIST]) grid.appendChild(createPaletteItem(def, cb));
+
+  // Entrance and Doorway are TOOLS rather than draggable presets, so they are
+  // buttons that arm a placement mode. They are outlined in their own accent
+  // (--entry / --violet) so the palette says which mark each one will leave.
+  const entrance = document.createElement("button");
+  entrance.type = "button";
+  entrance.className = "palette-tool tool-entrance";
+  entrance.innerHTML = '<span class="pt-name">Entrance</span><span class="pt-size">exterior edge</span>';
+  entrance.addEventListener("click", () => cb.onPlaceEntrance());
+  const doorway = document.createElement("button");
+  doorway.type = "button";
+  doorway.className = "palette-tool tool-doorway";
+  doorway.innerHTML = '<span class="pt-name">Doorway</span><span class="pt-size">interior wall</span>';
+  doorway.addEventListener("click", () => cb.onPlaceDoor());
+  grid.appendChild(entrance);
+  grid.appendChild(doorway);
+
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+/** One PLACE group: a heading and a two-column grid of entries. */
+function buildGroup(title: string, defs: ModuleDef[], cb: PaletteCallbacks): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "palette-group";
+  const h = document.createElement("p");
+  h.className = "group-title";
+  h.textContent = title;
+  wrap.appendChild(h);
+  const grid = document.createElement("div");
+  grid.className = "palette-grid";
+  for (const def of defs) grid.appendChild(createPaletteItem(def, cb));
+  wrap.appendChild(grid);
+  return wrap;
 }
 
 /** Minimal geometric eye glyphs for the per-floor visibility toggle (no emoji,
@@ -72,81 +140,37 @@ const EYE_OPEN_ICON =
 const EYE_CLOSED_ICON =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8C1 8 4 3 8 3s7 5 7 5-3 5-7 5-7-5-7-5Z"/><line x1="1.5" y1="14" x2="14.5" y2="2"/></svg>';
 
-/** Access tools: entrance (ground floor) + interior door (any floor). */
-function buildAccessPanel(cb: PaletteCallbacks): HTMLElement {
-  const section = document.createElement("div");
-  section.appendChild(heading("Access"));
-
-  const row = document.createElement("div");
-  row.className = "floor-actions";
-
-  const entranceBtn = document.createElement("button");
-  entranceBtn.type = "button";
-  entranceBtn.className = "secondary";
-  entranceBtn.textContent = "+ Entrance";
-  entranceBtn.addEventListener("click", () => cb.onPlaceEntrance());
-  row.appendChild(entranceBtn);
-
-  const doorBtn = document.createElement("button");
-  doorBtn.type = "button";
-  doorBtn.className = "secondary";
-  doorBtn.textContent = "+ Door";
-  doorBtn.addEventListener("click", () => cb.onPlaceDoor());
-  row.appendChild(doorBtn);
-
-  section.appendChild(row);
-
-  const note = document.createElement("p");
-  note.className = "hint-text";
-  note.textContent =
-    "Entrance: click just outside a ground-floor exterior wall (the reachability root). " +
-    "Door: hover an interior wall between two spaces to open a doorway — reachability is door-based.";
-  section.appendChild(note);
-  return section;
+/**
+ * The right-hand hairline, doubling as a 6px col-resize handle (248–480px).
+ * Width is session state and is never saved: it is how someone is working right
+ * now, not something about the design.
+ */
+function buildResizeHandle(root: HTMLElement): HTMLElement {
+  const handle = document.createElement("div");
+  handle.id = "palette-resize";
+  handle.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = root.getBoundingClientRect().width;
+    const move = (ev: PointerEvent) => {
+      const w = Math.max(248, Math.min(480, startW + (ev.clientX - startX)));
+      root.style.flex = `0 0 ${w}px`;
+      root.style.width = `${w}px`;
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  });
+  return handle;
 }
 
-function buildProjectPanel(cb: PaletteCallbacks): HTMLElement {
-  const section = document.createElement("div");
-  section.appendChild(heading("Project"));
-
-  const actions = document.createElement("div");
-  actions.className = "floor-actions";
-
-  const exportBtn = document.createElement("button");
-  exportBtn.type = "button";
-  exportBtn.className = "secondary";
-  exportBtn.textContent = "Export";
-  exportBtn.addEventListener("click", () => cb.onExport());
-  actions.appendChild(exportBtn);
-
-  const importBtn = document.createElement("button");
-  importBtn.type = "button";
-  importBtn.className = "secondary";
-  importBtn.textContent = "Import";
-  importBtn.addEventListener("click", () => cb.onImport());
-  actions.appendChild(importBtn);
-
-  const unitBtn = document.createElement("button");
-  unitBtn.type = "button";
-  unitBtn.className = "secondary";
-  unitBtn.textContent = "Export unit";
-  unitBtn.addEventListener("click", () => cb.onExportUnit());
-  actions.appendChild(unitBtn);
-
-  section.appendChild(actions);
-
-  const note = document.createElement("p");
-  note.className = "hint-text";
-  note.textContent =
-    "Save the whole project to a .json file, or import one (also drag a file onto the view). " +
-    "“Export unit” writes a dwelling-unit bridge file for the building packer.";
-  section.appendChild(note);
-  return section;
-}
 
 function buildFloorsPanel(cb: PaletteCallbacks, state: FloorState): HTMLElement {
   const section = document.createElement("div");
-  section.appendChild(heading("Floors"));
+  section.appendChild(sectionHeading("Floors"));
 
   const tabs = document.createElement("div");
   tabs.className = "floor-tabs";
@@ -196,19 +220,6 @@ function buildFloorsPanel(cb: PaletteCallbacks, state: FloorState): HTMLElement 
   return section;
 }
 
-function buildSection(
-  title: string,
-  defs: ModuleDef[],
-  cb: PaletteCallbacks
-): HTMLElement {
-  const section = document.createElement("div");
-  section.appendChild(heading(title));
-  const list = document.createElement("div");
-  list.className = "palette-list";
-  for (const def of defs) list.appendChild(createPaletteItem(def, cb));
-  section.appendChild(list);
-  return section;
-}
 
 function createPaletteItem(def: ModuleDef, cb: PaletteCallbacks): HTMLElement {
   const item = document.createElement("div");
@@ -221,7 +232,12 @@ function createPaletteItem(def: ModuleDef, cb: PaletteCallbacks): HTMLElement {
 
   const label = document.createElement("div");
   label.className = "palette-label";
-  label.innerHTML = `<span class="name">${def.name}</span><span class="desc">${def.description}</span>`;
+  // The size, not the shape word. `description` reads "RECTANGLE · 7×5" and at
+  // the grid's 9px the word is repeated eleven times for no information; the
+  // footprint is what someone choosing a room actually reads.
+  const w = Math.max(...def.cells.map((c) => c.cx)) + 1;
+  const d = Math.max(...def.cells.map((c) => c.cz)) + 1;
+  label.innerHTML = `<span class="name">${def.name}</span><span class="desc">${w}×${d}</span>`;
 
   item.appendChild(swatch);
   item.appendChild(label);

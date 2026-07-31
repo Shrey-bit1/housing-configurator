@@ -81,8 +81,9 @@ body {
 
 /* ---- Sidebar ---- */
 #sidebar {
-  width: 272px;
-  flex: 0 0 272px;
+  /* Design default 296px, resizable 248-480 (see #palette-resize). */
+  width: 296px;
+  flex: 0 0 296px;
   background: var(--black);
   border-right: 2px solid var(--line);
   padding: 20px 18px;
@@ -1447,4 +1448,171 @@ button.primary:hover {
 #viewport button:focus-visible {
   outline: 2px solid var(--violet);
   outline-offset: 1px;
+}
+
+/* ============================================================
+   Left palette (handoff Part 2, 1a)
+   PLACE / FLOORS / BRIEF. Resizable 248-480px via the hairline
+   on its right edge, which doubles as a 6px col-resize handle.
+   ============================================================ */
+
+#sidebar {
+  position: relative;
+  padding: 0;
+  gap: 0;
+  overflow: visible; /* the resize handle sits on the edge */
+  border-right: 0; /* the handle draws the hairline now */
+}
+
+/* The scroller, with its scrollbar on the LEFT edge: `direction: rtl` moves it,
+   and the child flips back to ltr so the content still reads normally. */
+#palette-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  direction: rtl;
+  padding: 16px 14px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#palette-scroll > * {
+  direction: ltr;
+}
+
+/* Section heading (PLACE / FLOORS / BRIEF): 2px ink rule beneath. */
+.section-title {
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--ink);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.palette-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Group heading inside PLACE: quieter than the section rule above it. */
+.group-title {
+  margin: 0;
+  color: var(--meta);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.palette-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* Entries become compact hairline boxes: swatch, name, size. The 2-column grid
+   is what lets three groups fit where two flat lists used to. */
+.palette-grid .palette-item {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line-paper);
+}
+.palette-grid .palette-item:hover {
+  border-color: var(--ink);
+  background: var(--plate);
+}
+.palette-grid .palette-swatch {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border: 1px solid var(--ink);
+  background: var(--bg);
+}
+.palette-grid .palette-label {
+  min-width: 0;
+}
+.palette-grid .palette-label .name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.15;
+}
+/* Only the footprint, not the shape word: "7x5" is what a person placing a room
+   needs, and "RECTANGLE" repeated eleven times is noise at this size. */
+.palette-grid .palette-label .desc {
+  font-size: 9px;
+  color: var(--meta);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The two placement TOOLS, outlined in the mark each one leaves. */
+.palette-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line-paper);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-tap) var(--ease-out),
+    border-color var(--dur-tap) var(--ease-out);
+}
+.palette-tool:hover {
+  background: var(--plate);
+}
+.palette-tool .pt-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.palette-tool .pt-size {
+  font-size: 9px;
+  color: var(--meta);
+}
+.tool-entrance {
+  border-color: var(--entry);
+}
+.tool-doorway {
+  border-color: var(--violet);
+}
+
+/* The right hairline, which IS the resize handle. */
+#palette-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent 2px,
+    var(--line-paper) 2px,
+    var(--line-paper) 3px,
+    transparent 3px
+  );
+  z-index: 5;
+  transition: background var(--dur-tap) var(--ease-out);
+}
+#palette-resize:hover {
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent 2px,
+    var(--accent) 2px,
+    var(--accent) 3px,
+    transparent 3px
+  );
 }
