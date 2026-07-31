@@ -25,3 +25,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | A0001 | 2026-07-31 | Design system synced to claude.ai/design as Re_Configure | complete | A0001-design-system-synced-to-claude-design.report.md |
 | 0015 | 2026-07-31 | Drag gesture trial from the Claude Design handoff | complete | 0015-drag-gesture-trial-from-the-handoff.report.md |
 | 0016 | 2026-07-31 | Paper studio reskin on a branch, README Part 2 | partial | 0016-paper-studio-reskin-on-a-branch.report.md |
+| 0017 | 2026-07-31 | Finish the reskin, bottom sheet and copy rewrite | complete | 0017-finish-the-reskin-bottom-sheet-and-copy.report.md |
