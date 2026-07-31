@@ -59,7 +59,7 @@ work-in-progress research artifact, not a production app.
 | **Layout rules engine** (advisory, on-demand) | `src/core/rules.ts` | `RULES: Rule[]`, `validate(graph)`, `computeEntranceDepths(graph)`. See §8 for the full current rule table. |
 | Rules-violation **3D highlighting** | `src/scene/highlight.ts` | `applyRoomHighlights(floors, violations)` / `clearRoomHighlights(floors)`: emissive tint on implicated room/cluster/stair shells + entrance markers, across ALL floors, resolved via `parseDwellingNodeId`. Plus `setHoverEmphasis`/`clearHoverEmphasis`: an intensity-only boost on top of an active tint, for report-card hover — see §2j. |
 | Bubble-diagram **view** | `src/ui/graphView.ts` | Toggleable full-screen 2D force-directed diagram of the WHOLE dwelling at once — one column per floor, stairs straddling their floor-pair boundary, draggable/pinnable nodes. See §2j. |
-| Validation report panel | `src/ui/validationPanel.ts` | `renderValidationPanel()`: on `reskin-1a` this is the 256px horizontal bottom sheet of §2s — a header of counts and metrics over a rail of one card per violation. On `main` it is still the vertical top-left column with grouped hard/soft/note sections. Either way, cards with a resolvable target fire `onHoverViolation` on mouseenter/leave (orchestrated in main.ts — see §2j); dwelling-level cards don't. |
+| Validation report panel | `src/ui/validationPanel.ts` | `renderValidationPanel()`: the 256px horizontal bottom sheet of §2s, a header of counts and metrics over a rail of one card per violation. It replaced a vertical top-left column with grouped sections. Cards with a resolvable target fire `onHoverViolation` on mouseenter/leave (orchestrated in main.ts — see §2j); dwelling-level cards don't. |
 | **Project save / load** | `src/core/projectIO.ts` | `serializeProject(floors) → ProjectFile`, `parseProject(text) → ParsedProject` (tolerant/versioned). Per-floor `entrances` AND `doors` are additive edge-bound lists (`normalizeEdgeBound` serves both). See §3. Camera state and floor visibility are deliberately excluded (view state, not design state). |
 | **Elastic-room expansion** (derived effective footprints) | `src/core/expansion.ts` | `computeExpansion(floor) → Map<instanceId, Cell[]>` — pure, per-floor, recomputed on every layout change. See §2m for the class split, algorithm, and the two-tier occupancy contract. `isElastic(def)` lives in modules.ts. |
 | **Unit export — flat → building bridge** | `src/core/unitExport.ts` (+ `docs/bridge-format.md`) | `buildUnitExport(fm, name, color) → {ok, file \| reason}`: the `dwelling-unit` v1 exporter for the bottom-up-design building packer. READ-ONLY (no store mutation, no history commit). Envelope per storey = `buildSpaceTargets` key set; edges classified entrance/glazed/open/blank by reusing graph entrance re-validation, `computeWindows`, and Outdoor-cluster membership. See §9. |
@@ -705,7 +705,7 @@ same `window` node all fire in registration order in the SAME dispatch — by
 the time a later listener inspects state, an earlier one may have already
 mutated it. One arbitrator, checked top-to-bottom, has no such race.
 
-**Selection readout** (`#selection-readout`, bottom-centre; on `reskin-1a` it lifts to `bottom: 312px` while the layout-check sheet is open, §2s):
+**Selection readout** (`#selection-readout`, bottom-centre; lifts to `bottom: 312px` while the layout-check sheet is open, §2s):
 `updateSelectionReadout()` in main.ts, driven by `SelectionController`'s
 `onSelectionChange` callback. Empty when nothing is selected (hidden via a
 `.visible` CSS class toggle — NOT `style.display = ""`, which would fall back
@@ -1102,7 +1102,7 @@ in testing, §6).
 `computeWindows` (it now has `northAngle`), stashed on `floor.windowStats`,
 carried onto `node.glazing`. So **no new graph-node fields** — OR1 reads
 `node.glazing.northLit`, the report's "Glazing orientation" line reads
-`node.glazing.sectors` (`validationPanel.glazingCard` on `reskin-1a`, `appendOrientation` on `main`), both already
+`node.glazing.sectors` (`validationPanel.glazingCard`), both already
 flowing through the existing `node.glazing` pipe.
 
 **OR1** (soft, §8): habitable-or-kitchen room whose glazing is all north-facing.
@@ -1730,11 +1730,13 @@ Unchanged, and verified unchanged: `R` rotate, `M` mirror, Escape arbitration in
 `main.ts`, `controls.enabled = false` while placing, the export, the rules, and
 both canonical panels.
 
-### 2s. Paper studio reskin (runs 0016 and 0017, branch `reskin-1a`)
+### 2s. Paper studio reskin (runs 0016 and 0017)
 
-Part 2 of the Claude Design handoff, direction 1a, complete as of run 0017. THIS
-SECTION DESCRIBES THE BRANCH, not `main`. If the branch is dropped, delete this
-section with it.
+Part 2 of the Claude Design handoff, direction 1a, complete as of run 0017. It was
+built on a branch called `reskin-1a` so it could be judged before it was adopted,
+and Shrey merged that branch into `main` on 31 July and pushed it, so this section
+now describes the only version of the app there is. The branch was deleted after
+the merge; every commit it carried is in `main`'s history.
 
 **TOKENS AND THE PALETTE.** `src/style.css` gains the design system by its own
 names (`--bg --ink --panel --panel-ink --line-paper --line-dark --meta --plate
@@ -2479,8 +2481,9 @@ screenshots):**
     correctly too (`hoverIds`/`hoverEdge` matched exactly). Hovering the
     dwelling-level G1 card ("Whole dwelling", no nodeIds/edge) produced no
     diagram change and its DOM row correctly lacked the `.hoverable` class —
-    confirmed by querying every report card's class list against its rule id
-    (`.vp-item` on `main`, `.vs-card` on `reskin-1a`).
+    confirmed by querying every report card's class list against its rule id.
+    That run predates §2s, so the cards were `.vp-item` then and are `.vs-card`
+    now.
     In the 3D view (report panel open over the 3D scene, not the diagram):
     hovering S6 read the actual THREE.js materials directly — both Kitchen's
     and Bathroom's `emissiveIntensity` were exactly `1.0`

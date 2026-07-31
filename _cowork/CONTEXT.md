@@ -26,18 +26,16 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** the working tree is CHECKED OUT ON `reskin-1a`, which run 0017 left
-deliberately so a reload shows the finished reskin. Its last code commit is
-`b6e3bd4`; the commits above that are merges bringing `main`'s bridge records
-forward, because this file is tracked and would otherwise read as `main`'s copy
-while the tree sits on the branch. The branch carries the whole of the "Paper
-studio" chrome reskin: the tokens, top bar, palette and overlays from run 0016,
-then the layout-check bottom sheet, the Must fix / Worth a look / Note copy,
-themed scrollbars and the removal of the viewport hint line from run 0017. It is
-a strict superset of `main`, which is demo-ready and contains none of the
-reskin. Whether it merges is Shrey's call after the 4 August review; if it is
-dropped, PROJECT_STATE's §2s goes with it. A run that needs the pre-reskin app
-must check out `main` first.
+**Branch:** `main`, and it is the only branch now. The "Paper studio" chrome
+reskin was built on `reskin-1a` across runs 0016 and 0017 so it could be judged
+before being adopted; Shrey merged it into `main` on 31 July and pushed, and the
+branch was deleted afterwards with every one of its commits already in `main`'s
+history. So the app a run opens today is the reskinned one: paper ground and ink
+rules, a 52px top bar with a MODEL / PLAN / DIAGRAM segmented control, a
+resizable PLACE / FLOORS / BRIEF palette, three viewport overlay clusters, and
+the layout check as a 256px bottom sheet whose tiers read Must fix / Worth a look
+/ Note. PROJECT_STATE's §2s describes it and is no longer conditional on a
+branch surviving.
 **Last updated:** 2026-07-31
 
 ## What this project is
