@@ -56,6 +56,9 @@ const graphToggleDepth = document.getElementById("graph-toggle-depth") as HTMLIn
 const graphRelayoutBtn = document.getElementById("graph-relayout") as HTMLButtonElement;
 const checkBtn = document.getElementById("check-layout") as HTMLButtonElement;
 const validationPanel = document.getElementById("validation-panel") as HTMLElement;
+// Declared up here rather than beside the file-drop handlers below, because
+// `clearValidation` reaches for it and can run during the ?project= load.
+const viewport = document.getElementById("viewport") as HTMLElement;
 const undoBtn = document.getElementById("undo-btn") as HTMLButtonElement;
 const redoBtn = document.getElementById("redo-btn") as HTMLButtonElement;
 const selectionReadout = document.getElementById("selection-readout") as HTMLElement;
@@ -663,6 +666,9 @@ let validated = false;
 function clearValidation(): void {
   validationPanel.style.display = "none";
   validationPanel.replaceChildren();
+  // The sheet covers the bottom 256px of the viewport, so the overlay clusters
+  // anchored there lift while it is open and return when it closes.
+  viewport.classList.remove("sheet-open");
   graphView.clearHighlights();
   clearHoverEmphasis();
   if (validated) clearRoomHighlights(floors.floors);
@@ -685,7 +691,8 @@ function runCheck(): void {
   const depths = computeEntranceDepths(graph);
   graphView.setHover(null); // a stale hover from the previous report shouldn't survive a re-check
   clearHoverEmphasis();
-  renderValidationPanel(validationPanel, graph, violations, depths, "Dwelling", clearValidation, onHoverViolation);
+  renderValidationPanel(validationPanel, graph, violations, depths, clearValidation, onHoverViolation);
+  viewport.classList.add("sheet-open");
   graphView.setHighlights(violations);
   // (Diagram depth badges are computed by GraphView itself each frame from the
   // live graph when its depth toggle is on — no longer pushed from here, so
@@ -694,7 +701,11 @@ function runCheck(): void {
   validated = true;
 }
 
-checkBtn.addEventListener("click", runCheck);
+// Check Layout both opens the sheet and closes it again. Escape is NOT a second
+// way out: it already arbitrates drag-abort, selection-clear and plan-view exit
+// (see the keydown handler), and giving it a fourth meaning would make which one
+// fires depend on state the user cannot see.
+checkBtn.addEventListener("click", () => (validated ? clearValidation() : runCheck()));
 // A stale report is worse than none: drop it as soon as any floor's layout
 // changes (validation spans the whole dwelling now).
 floors.onLayoutChange = () => clearValidation();
@@ -930,7 +941,6 @@ if (import.meta.env.DEV) {
 
 // Drag-and-drop a .json onto the viewport. A depth counter keeps the highlight
 // stable as the pointer moves over child elements (each fires dragenter/leave).
-const viewport = document.getElementById("viewport") as HTMLElement;
 const dropOverlay = document.getElementById("drop-overlay") as HTMLElement;
 let dragDepth = 0;
 

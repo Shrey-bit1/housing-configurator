@@ -554,22 +554,268 @@ button.primary:hover {
 
 
 
-/* ---- Validation report panel (top-left, under the view toggle) ---- */
+/* ============================================================
+   Layout check — the horizontal bottom sheet (handoff Part 2, 1a)
+   256px tall, spanning the viewport, hairline on top: a header of
+   fixed blocks over a rail of 300px cards that scrolls sideways.
+   This REPLACED a 300px column pinned to the top left that scrolled
+   vertically through grouped sections; everything it showed is still
+   here, on the other axis.
+   ============================================================ */
 #validation-panel {
   display: none;
   position: absolute;
-  top: 58px;
-  left: 16px;
-  z-index: 3;
-  width: 300px;
-  max-height: calc(100% - 76px);
-  overflow-y: auto;
-  background: var(--black);
-  border: 2px solid var(--line-soft);
-  color: var(--text);
-  padding: 0 0 8px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 256px;
+  z-index: 4;
+  flex-direction: column;
+  background: var(--bg);
+  border-top: 1px solid var(--line-paper);
+  color: var(--ink);
+  animation: vs-rise var(--dur-panel) var(--ease-out);
 }
 
+/* One arrival, then still. Re-running Check Layout replaces the sheet's
+   children, never the container, so the slide does not run a second time. */
+@keyframes vs-rise {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.vs-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-paper);
+}
+
+.vs-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* The 340px summary block: proportional severity bar over the counts. */
+.vs-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 340px;
+  width: 340px;
+}
+
+.vs-bar {
+  display: flex;
+  height: 8px;
+}
+
+.vs-bar-seg.hard {
+  background: var(--accent);
+}
+
+.vs-bar-seg.soft {
+  background: var(--soft);
+}
+
+.vs-bar-seg.note {
+  background: var(--note);
+}
+
+.vs-bar-seg.clear {
+  background: var(--plate);
+}
+
+.vs-counts {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--meta);
+}
+
+.vs-count strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.vs-ok {
+  color: var(--note);
+  font-weight: 600;
+}
+
+.vs-when {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.vs-metrics {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--meta);
+}
+
+.vs-close {
+  background: transparent;
+  border: none;
+  color: var(--meta);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.vs-close:hover {
+  color: var(--ink);
+}
+
+/* ---- The rail: one card per issue, then the informational cards ---- */
+.vs-rail {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.vs-card {
+  flex: 0 0 300px;
+  padding: 12px;
+  border: 1px solid var(--line-paper);
+  border-top: 3px solid var(--plate);
+  background: transparent;
+  overflow-y: auto;
+}
+
+.vs-card.hard {
+  border-top-color: var(--accent);
+}
+
+.vs-card.soft {
+  border-top-color: var(--soft);
+}
+
+.vs-card.note {
+  border-top-color: var(--note);
+}
+
+/* Only cards with a resolvable target (a room/edge to emphasize) get the
+   hover affordance — a dwelling-level card stays plain. */
+.vs-card.hoverable {
+  cursor: pointer;
+  transition: background var(--dur-tap) var(--ease-out);
+}
+
+.vs-card.hoverable:hover {
+  background: #e3dfd5;
+}
+
+.vs-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.vs-tier {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vs-tier.hard {
+  color: var(--accent);
+}
+
+.vs-tier.soft {
+  color: var(--soft);
+}
+
+.vs-tier.note {
+  color: var(--note);
+}
+
+.vs-tier.info {
+  color: var(--meta);
+}
+
+.vs-rule {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--meta);
+  white-space: nowrap;
+}
+
+.vs-msg {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.vs-card-foot {
+  margin-top: 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vs-where {
+  font-size: 10px;
+  padding: 3px 7px;
+  background: var(--plate);
+  color: var(--ink);
+}
+
+.vs-action {
+  font-size: 10px;
+  color: var(--meta);
+}
+
+/* The two informational cards that close the rail (glazing orientation, depth
+   from entrance) — the trailing sections of the old vertical panel. */
+.vs-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.vs-list-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 11px;
+  border-top: 1px solid var(--line-paper);
+}
+
+.vs-list-row:first-child {
+  border-top: none;
+}
+
+.vs-list-name {
+  color: var(--ink);
+}
+
+.vs-list-val {
+  color: var(--meta);
+  font-weight: 600;
+}
+
+/* ---- Shared panel chrome. The shortcuts panel and the unit-export dialog
+        read these three, so they outlive the vertical report panel. ---- */
 .vp-header {
   display: flex;
   align-items: center;
@@ -600,138 +846,6 @@ button.primary:hover {
 
 .vp-close:hover {
   color: var(--text);
-}
-
-.vp-summary {
-  padding: 9px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
-}
-
-.vp-summary.ok {
-  color: #4fd08a;
-}
-
-.vp-group-heading {
-  padding: 10px 12px 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-
-.vp-item {
-  margin: 5px 10px;
-  padding: 8px 10px;
-  background: var(--black-2);
-  border-left: 4px solid var(--line-soft);
-}
-
-.vp-item.hard {
-  border-left-color: #d32f2f;
-}
-
-.vp-item.soft {
-  border-left-color: #e6a100;
-}
-
-.vp-item.note {
-  border-left-color: #2e7d32;
-}
-
-/* Only cards with a resolvable target (a room/edge to emphasize) get the
-   hover affordance — a dwelling-level card (no nodeIds/edge) stays plain. */
-.vp-item.hoverable {
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.vp-item.hoverable:hover {
-  background: #292929;
-}
-
-.vp-tag {
-  display: inline-block;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  margin-bottom: 5px;
-  color: var(--black);
-}
-
-.vp-tag.hard {
-  background: #d32f2f;
-  color: #fff;
-}
-
-.vp-tag.soft {
-  background: #e6a100;
-}
-
-.vp-tag.note {
-  background: #2e7d32;
-  color: #fff;
-}
-
-.vp-desc {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text);
-}
-
-.vp-rooms {
-  margin-top: 4px;
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  color: var(--text-dim);
-}
-
-/* ---- Depth-from-entrance metric (informational) ---- */
-.vp-depth-summary {
-  padding: 4px 12px 8px;
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  color: var(--text-dim);
-}
-
-/* ---- Circulation efficiency (informational net-to-gross line) ---- */
-.vp-metric {
-  padding: 8px 12px 4px;
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  color: var(--text-dim);
-}
-
-.vp-depth-list {
-  margin: 0 10px 8px;
-  border: 1px solid var(--line-soft);
-}
-
-.vp-depth-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 5px 9px;
-  font-size: 11px;
-  border-top: 1px solid var(--line-soft);
-}
-
-.vp-depth-row:first-child {
-  border-top: none;
-}
-
-.vp-depth-name {
-  color: var(--text);
-}
-
-.vp-depth-val {
-  color: var(--text-dim);
-  font-weight: 700;
 }
 
 /* ---- Reset View button (top-right of viewport, below Check Layout) ---- */
@@ -1772,4 +1886,27 @@ button.primary:hover {
   font-size: 9px;
   color: var(--meta);
   line-height: 1.2;
+}
+
+/* ---- Lift clear of the layout-check sheet ----
+   The sheet is 256px tall and covers the bottom of the viewport, so everything
+   anchored there rises by 256px while it is open. The handoff names the two
+   bottom clusters; the selection readout (bottom 56px) and the diagram legend
+   (bottom 16px) sit inside the same band and are lifted with them rather than
+   left buried. */
+#bottom-left,
+#view-controls,
+#graph-legend,
+#selection-readout {
+  transition: bottom var(--dur-panel) var(--ease-out);
+}
+
+#viewport.sheet-open #bottom-left,
+#viewport.sheet-open #view-controls,
+#viewport.sheet-open #graph-legend {
+  bottom: 272px;
+}
+
+#viewport.sheet-open #selection-readout {
+  bottom: 312px;
 }
