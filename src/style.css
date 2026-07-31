@@ -347,7 +347,15 @@ button.secondary:disabled {
   color: var(--text-dim);
 }
 
-.field input {
+/* The two form controls in BRIEF share one look: the grid-size number inputs and
+   the Prefer / Avoid sector selects. The select was falling through to the
+   browser's own widget, which on Windows is a rounded white box with a grey
+   system caret, so it read as a piece of the operating system dropped onto the
+   paper next to two inputs that did not. `appearance: none` removes that widget,
+   and the caret is redrawn as a flat ink triangle in the same squared-off
+   language as everything else. */
+.field input,
+.field select {
   width: 100%;
   padding: 8px;
   background: var(--black-2);
@@ -358,9 +366,35 @@ button.secondary:disabled {
   font-size: 14px;
 }
 
-.field input:focus {
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 26px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23141317'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+
+.field select:hover {
+  border-color: var(--ink);
+}
+
+/* The popup list itself is drawn by the OS on Windows, which honours only these
+   two properties. It gets the paper and the ink so the open state is not a white
+   sheet either. */
+.field select option {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* Focus rings are --violet throughout the design system, never the accent: the
+   red is reserved for the active and the failing. */
+.field input:focus,
+.field select:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--violet);
+  box-shadow: inset 0 0 0 1px var(--violet);
 }
 
 button.primary {
