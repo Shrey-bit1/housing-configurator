@@ -1529,12 +1529,15 @@ button.primary:hover {
   border-color: var(--ink);
   background: var(--plate);
 }
+/* The footprint silhouette. No border on the box: the SVG strokes the shape's
+   own outline, so a frame around it would read as a second, wrong footprint. */
 .palette-grid .palette-swatch {
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
-  border: 1px solid var(--ink);
-  background: var(--bg);
+  display: block;
+  background: none;
+  border: 0;
 }
 .palette-grid .palette-label {
   min-width: 0;

@@ -250,32 +250,6 @@ function createPaletteItem(def: ModuleDef, cb: PaletteCallbacks): HTMLElement {
   return item;
 }
 
-/**
- * A small SVG of the footprint, in the def's colour, scaled so any footprint
- * (a 1-cell module or a 7×6 room) fits the swatch box.
- */
-function shapeIcon(def: ModuleDef): string {
-  const color = "#" + def.color.toString(16).padStart(6, "0");
-  const maxX = Math.max(...def.cells.map((c) => c.cx)) + 1;
-  const maxZ = Math.max(...def.cells.map((c) => c.cz)) + 1;
-  const box = 30;
-  const pad = 3;
-  const u = (box - pad * 2) / Math.max(maxX, maxZ);
-  const offX = pad + ((Math.max(maxX, maxZ) - maxX) * u) / 2;
-  const offZ = pad + ((Math.max(maxX, maxZ) - maxZ) * u) / 2;
-  const gap = u > 4 ? 0.8 : 0.3;
-
-  const rects = def.cells
-    .map((c) => {
-      const x = offX + c.cx * u;
-      const y = offZ + c.cz * u;
-      return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(u - gap).toFixed(
-        2
-      )}" height="${(u - gap).toFixed(2)}" fill="${color}"/>`;
-    })
-    .join("");
-  return `<svg width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">${rects}</svg>`;
-}
 
 /**
  * The project's orientation preference: one sector it would like habitable
@@ -403,4 +377,80 @@ function clampInt(raw: string, min: number, max: number, fallback: number): numb
   const n = Math.round(Number(raw));
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, n));
+}
+
+/**
+ * The footprint, drawn as a SILHOUETTE at its true aspect ratio: a 7x5 living
+ * room reads as a wide rectangle, a 3x3 bathroom as a square, the 2x6 stair as a
+ * tall sliver. That shape is the information; the name beside it says which room
+ * it is.
+ *
+ * Cells are filled with NO gap so neighbours merge into one solid shape, and the
+ * outline is stroked once around the whole silhouette. The previous version drew
+ * one gapped rect per cell, which was legible in the old 36px swatch and turned a
+ * 35-cell room into a grey mesh once the palette went to a 20px swatch in a
+ * two-column grid. Interior cell divisions come back only when a cell is at
+ * least {@link DIVISION_MIN_PX} across, so they inform instead of smearing.
+ *
+ * The silhouette approach also survives a non-rectangular preset: `lShape` is
+ * still exported from modules.ts, and an L would draw correctly here without
+ * this function knowing about it.
+ */
+const DIVISION_MIN_PX = 3.5;
+
+function shapeIcon(def: ModuleDef): string {
+  const color = "#" + def.color.toString(16).padStart(6, "0");
+  const w = Math.max(...def.cells.map((c) => c.cx)) + 1;
+  const d = Math.max(...def.cells.map((c) => c.cz)) + 1;
+  const box = 20;
+  const pad = 1.5;
+  // One unit per cell, scaled so the LONGER side fills the box: the aspect ratio
+  // is what carries the footprint, so it must not be normalised away.
+  const u = (box - pad * 2) / Math.max(w, d);
+  const offX = (box - w * u) / 2;
+  const offZ = (box - d * u) / 2;
+
+  const cells = def.cells
+    .map(
+      (c) =>
+        `<rect x="${(offX + c.cx * u).toFixed(2)}" y="${(offZ + c.cz * u).toFixed(2)}" ` +
+        `width="${u.toFixed(2)}" height="${u.toFixed(2)}" fill="${color}"/>`
+    )
+    .join("");
+
+  // Divisions: one hairline per shared cell boundary, drawn only when there is
+  // room for them to read.
+  let lines = "";
+  if (u >= DIVISION_MIN_PX) {
+    const has = new Set(def.cells.map((c) => `${c.cx},${c.cz}`));
+    for (const c of def.cells) {
+      if (has.has(`${c.cx + 1},${c.cz}`)) {
+        const x = offX + (c.cx + 1) * u;
+        lines += `<line x1="${x.toFixed(2)}" y1="${(offZ + c.cz * u).toFixed(2)}" x2="${x.toFixed(2)}" y2="${(offZ + (c.cz + 1) * u).toFixed(2)}" stroke="#141317" stroke-width=".4" opacity=".35"/>`;
+      }
+      if (has.has(`${c.cx},${c.cz + 1}`)) {
+        const y = offZ + (c.cz + 1) * u;
+        lines += `<line x1="${(offX + c.cx * u).toFixed(2)}" y1="${y.toFixed(2)}" x2="${(offX + (c.cx + 1) * u).toFixed(2)}" y2="${y.toFixed(2)}" stroke="#141317" stroke-width=".4" opacity=".35"/>`;
+      }
+    }
+  }
+
+  // The outline: every cell edge with no neighbour across it, which is the
+  // silhouette of any footprint, rectangular or not.
+  const has = new Set(def.cells.map((c) => `${c.cx},${c.cz}`));
+  let outline = "";
+  for (const c of def.cells) {
+    const x0 = offX + c.cx * u;
+    const y0 = offZ + c.cz * u;
+    const x1 = x0 + u;
+    const y1 = y0 + u;
+    const seg = (a: number, b: number, cc: number, dd: number) =>
+      `<line x1="${a.toFixed(2)}" y1="${b.toFixed(2)}" x2="${cc.toFixed(2)}" y2="${dd.toFixed(2)}" stroke="#141317" stroke-width="1" stroke-linecap="square"/>`;
+    if (!has.has(`${c.cx},${c.cz - 1}`)) outline += seg(x0, y0, x1, y0);
+    if (!has.has(`${c.cx},${c.cz + 1}`)) outline += seg(x0, y1, x1, y1);
+    if (!has.has(`${c.cx - 1},${c.cz}`)) outline += seg(x0, y0, x0, y1);
+    if (!has.has(`${c.cx + 1},${c.cz}`)) outline += seg(x1, y0, x1, y1);
+  }
+
+  return `<svg width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">${cells}${lines}${outline}</svg>`;
 }
