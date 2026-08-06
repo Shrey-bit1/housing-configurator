@@ -37,6 +37,7 @@ import {
 } from "./core/projectIO";
 import { buildUnitExport } from "./core/unitExport";
 import { slugifyUnitName } from "./library/ids";
+import { createUnitBrowser } from "./library/unitBrowser";
 
 const DEFAULT_COLS = 16;
 const DEFAULT_ROWS = 16;
@@ -858,6 +859,7 @@ function saveUnitToLibrary(name: string, color: string): void {
       .then((r: { ok: boolean; entry?: { id: string; areaM2: number }; error?: string }) => {
         if (r.ok && r.entry) {
           showToast("info", `Saved "${name}" to the library as ${r.entry.id} (${r.entry.areaM2} m²).`);
+          void unitBrowser.refresh(); // an open panel shows the new card at once
         } else {
           showToast("error", `Library save failed: ${r.error ?? "unknown error"}`);
         }
@@ -890,8 +892,10 @@ function isEmptyProject(): boolean {
   );
 }
 
-/** Validate, confirm, then load — keeping the app's state intact on any failure. */
-function importProjectText(text: string): void {
+/** Validate, confirm, then load — keeping the app's state intact on any failure.
+ *  Returns true when a project was actually loaded (the unit browser closes
+ *  itself only then; a declined confirm leaves it open). */
+function importProjectText(text: string): boolean {
   let parsed;
   try {
     parsed = parseProject(text);
@@ -901,7 +905,7 @@ function importProjectText(text: string): void {
         ? err.message
         : "Could not read this file.";
     showToast("error", `Import failed: ${msg}`);
-    return;
+    return false;
   }
 
   // Newer-than-app files: warn prominently and fold the replace confirm in, so
@@ -922,7 +926,7 @@ function importProjectText(text: string): void {
         `than you're running (v${APP_PROJECT_VERSION}). Some elements may not load correctly.` +
         (replacing ? " This will also replace your current layout." : "") +
         " Continue?";
-    if (!window.confirm(confirmMsg)) return;
+    if (!window.confirm(confirmMsg)) return false;
   }
 
   let skippedRooms = 0;
@@ -936,7 +940,7 @@ function importProjectText(text: string): void {
   } catch (err) {
     console.error(err);
     showToast("error", "Import failed while loading — the file may be corrupt.");
-    return;
+    return false;
   }
   // Tolerant drop, never silent — cause-neutral (collision under current
   // preset footprints, out-of-bounds, whatever made the normal path refuse).
@@ -954,6 +958,7 @@ function importProjectText(text: string): void {
       `Loaded a newer-version (v${parsed.fileVersion}) file on an older app (v${APP_PROJECT_VERSION}). Some elements may be missing.`
     );
   else showToast("info", "Project imported.");
+  return true;
 }
 
 function readAndImport(file: File): void {
@@ -979,6 +984,40 @@ fileInput.addEventListener("change", () => {
   fileInput.value = ""; // allow re-importing the same file
 });
 document.body.appendChild(fileInput);
+
+// ---- Unit library browser (docs/library-format.md) ----
+// The browser is the self-contained src/library module: it takes the manifest
+// URL and hands back the fetched dwelling-unit file. Extracting sourceProject
+// and running it through the NORMAL import path (confirm included) happens
+// here, where the app's import machinery lives — the module knows nothing
+// about this app's formats.
+const unitBrowser = createUnitBrowser({
+  manifestUrl: "/units/index.json",
+  mount: viewport,
+  onOpen: (file) => {
+    file
+      .text()
+      .then((text) => {
+        let src: unknown;
+        try {
+          src = (JSON.parse(text) as { sourceProject?: unknown }).sourceProject;
+        } catch {
+          src = undefined;
+        }
+        if (!src || typeof src !== "object") {
+          showToast("error", `${file.name} carries no sourceProject — cannot open a copy.`);
+          return;
+        }
+        // A copy, not the library file: the import names nothing, so saving
+        // the opened design later creates a NEW entry (ids suffix, never
+        // overwrite). The panel closes only when something actually loaded —
+        // declining the replace-confirm keeps it open.
+        if (importProjectText(JSON.stringify(src))) unitBrowser.close();
+      })
+      .catch((err: Error) => showToast("error", `Could not read ${file.name}: ${err.message}`));
+  },
+});
+document.getElementById("units-btn")!.addEventListener("click", () => unitBrowser.toggle());
 
 // ---- Dev-only `?project=` loader ------------------------------------------
 // Opens the app with a project already loaded, so a fixture can be examined
