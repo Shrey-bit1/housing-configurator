@@ -596,6 +596,9 @@ function updateNorthBadge(): void {
   const dx = northWorld.x - originNDC.x;
   const dyUp = northWorld.y - originNDC.y; // NDC y is up
   const angle = (Math.atan2(dx, dyUp) * 180) / Math.PI; // clockwise from up
+  // The first frame can run before the ResizeObserver has sized the canvas, so
+  // the projection divides by a zero viewport and the angle comes out NaN.
+  if (!Number.isFinite(angle)) return;
   northBadgeRot.setAttribute("transform", `rotate(${angle} 20 20)`);
 }
 
