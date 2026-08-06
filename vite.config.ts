@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
-import { assignUnitId } from "./src/library/ids";
+import { assignUnitId } from "./src/library/ids.ts";
 
 /**
  * DEV-ONLY capture sink. The app renders to a WebGL canvas, so the only way to
