@@ -26,20 +26,20 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** the working tree is left on `run/0018` (run 0018's own branch, the
-first run of the branch-per-run workflow; pushed to `origin/run/0018`, code
-HEAD `b7ec1ca`). `main` gained nothing from that run and still holds the
-merged "Paper studio" reskin from runs 0016/0017: paper ground and ink rules,
-a 52px top bar with a MODEL / PLAN / DIAGRAM segmented control, a resizable
-PLACE / FLOORS / BRIEF palette, three viewport overlay clusters, and the
-layout check as a 256px bottom sheet whose tiers read Must fix / Worth a look
-/ Note. PROJECT_STATE's §2s describes it. Run 0018 added the unit library on
-its branch: `public/units/` (dwelling-unit JSON + JPEG preview per unit under
-a validated `index.json` manifest), `src/library/` (self-contained browser
-module + manifest/id logic, documented in `docs/library-format.md`), a Units
-top-bar button, and a Save to library action in the export dialog backed by a
-dev-only Vite endpoint. PROJECT_STATE §10 describes it.
-**Last updated:** 2026-08-06
+**Branch:** the working tree is on `main`. Run 0018 (the first run of the
+branch-per-run workflow) was built on `run/0018` and merged into `main` on
+7 August at merge commit `9089329`, pushed; `origin/run/0018` still exists as
+the run's record, every commit already in `main`'s history. So `main` holds
+both the "Paper studio" reskin from runs 0016/0017 (paper ground and ink
+rules, a 52px top bar with a MODEL / PLAN / DIAGRAM segmented control, a
+resizable PLACE / FLOORS / BRIEF palette, three viewport overlay clusters,
+the layout check as a 256px bottom sheet — PROJECT_STATE §2s) and run 0018's
+unit library: `public/units/` (dwelling-unit JSON + JPEG preview per unit
+under a validated `index.json` manifest), `src/library/` (self-contained
+browser module + manifest/id logic, documented in `docs/library-format.md`),
+a Units top-bar button, and a Save to library action in the export dialog
+backed by a dev-only Vite endpoint. PROJECT_STATE §10 describes it.
+**Last updated:** 2026-08-07
 
 ## What this project is
 
