@@ -36,6 +36,8 @@ import {
   type ProjectFile,
 } from "./core/projectIO";
 import { buildUnitExport } from "./core/unitExport";
+import { slugifyUnitName } from "./library/ids";
+import { createUnitBrowser } from "./library/unitBrowser";
 
 const DEFAULT_COLS = 16;
 const DEFAULT_ROWS = 16;
@@ -596,6 +598,9 @@ function updateNorthBadge(): void {
   const dx = northWorld.x - originNDC.x;
   const dyUp = northWorld.y - originNDC.y; // NDC y is up
   const angle = (Math.atan2(dx, dyUp) * 180) / Math.PI; // clockwise from up
+  // The first frame can run before the ResizeObserver has sized the canvas, so
+  // the projection divides by a zero viewport and the angle comes out NaN.
+  if (!Number.isFinite(angle)) return;
   northBadgeRot.setAttribute("transform", `rotate(${angle} 20 20)`);
 }
 
@@ -758,8 +763,9 @@ function openUnitExportDialog(): void {
 }
 
 unitDialog.addEventListener("close", () => {
-  if (unitDialog.returnValue !== "export") return;
-  exportUnit(unitNameInput.value.trim() || "Unit", unitColorInput.value);
+  const name = unitNameInput.value.trim() || "Unit";
+  if (unitDialog.returnValue === "export") exportUnit(name, unitColorInput.value);
+  else if (unitDialog.returnValue === "library") saveUnitToLibrary(name, unitColorInput.value);
 });
 
 function exportUnit(name: string, color: string): void {
@@ -793,6 +799,88 @@ function exportUnit(name: string, color: string): void {
   showToast("info", `Unit "${name}" exported (${result.file.storeys.length} storey(s)).`);
 }
 
+// ---- Save to library (docs/library-format.md) ----
+// The same gates and advisory confirm as exportUnit — deliberately restated
+// rather than factored out of it, so the export path above stays untouched —
+// then the unit JSON plus a canvas JPEG preview go to the dev server's library
+// sink (vite.config.ts), which assigns the id and appends the manifest entry.
+// A production build has no sink, so the same pair downloads instead.
+
+/** Anchor-download a Blob or data URL under `filename`. Local to the library
+ *  save path; exportProject/exportUnit keep their own inlined equivalent. */
+function downloadAs(href: string, filename: string, revoke: boolean): void {
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if (revoke) URL.revokeObjectURL(href);
+}
+
+function saveUnitToLibrary(name: string, color: string): void {
+  const result = buildUnitExport(floors, name, color);
+  if (!result.ok) {
+    showToast("error", `Library save refused: ${result.reason}`);
+    return;
+  }
+  const hard = validate(
+    computeDwellingGraph(floors.floors),
+    floors.orientationPreference
+  ).filter((v) => v.severity === "hard");
+  if (hard.length > 0) {
+    const ok = window.confirm(
+      `Check Layout reports ${hard.length} MUST FIX issue(s) in this dwelling.\n` +
+        `The unit will save anyway (rules are advisory). Continue?`
+    );
+    if (!ok) return;
+  }
+  // The preview: render and read back in the same turn (the context has no
+  // preserveDrawingBuffer), then BYTE-CHECK — a hidden canvas "succeeds" with
+  // an empty image, and an empty preview in the library is worse than a
+  // refused save.
+  renderer.render(scene, camera);
+  const preview = canvas.toDataURL("image/jpeg", 0.9);
+  const previewBytes = Math.max(0, Math.floor(((preview.length - preview.indexOf(",") - 1) * 3) / 4));
+  if (!preview.startsWith("data:image/jpeg") || previewBytes < 1000) {
+    showToast(
+      "error",
+      `Preview capture read back ${previewBytes} bytes — make the 3D view visible, then save again.`
+    );
+    return;
+  }
+  if (import.meta.env.DEV) {
+    fetch("/__library/save", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, color, unit: result.file, preview }),
+    })
+      .then((r) => r.json())
+      .then((r: { ok: boolean; entry?: { id: string; areaM2: number }; error?: string }) => {
+        if (r.ok && r.entry) {
+          showToast("info", `Saved "${name}" to the library as ${r.entry.id} (${r.entry.areaM2} m²).`);
+          void unitBrowser.refresh(); // an open panel shows the new card at once
+        } else {
+          showToast("error", `Library save failed: ${r.error ?? "unknown error"}`);
+        }
+      })
+      .catch((err: Error) => showToast("error", `Library save failed: ${err.message}`));
+  } else {
+    // No sink in a production build. Download the pair the sink would have
+    // written, named by the name's slug alone — collision suffixes need the
+    // manifest, and only the dev server owns that.
+    const id = slugifyUnitName(name);
+    const blob = new Blob([JSON.stringify(result.file, null, 2)], { type: "application/json" });
+    downloadAs(URL.createObjectURL(blob), `${id}.json`, true);
+    downloadAs(preview, `${id}.jpg`, false);
+    showToast(
+      "warn",
+      `This build has no dev server, so the library was not written. Downloaded ${id}.json and ` +
+        `${id}.jpg — move them into units/ beside index.json and add a manifest entry.`
+    );
+  }
+}
+
 /** Nothing authored yet: one floor, nothing placed, no doors, no entrances. Used
  *  to decide whether an import has anything to destroy. */
 function isEmptyProject(): boolean {
@@ -804,8 +892,10 @@ function isEmptyProject(): boolean {
   );
 }
 
-/** Validate, confirm, then load — keeping the app's state intact on any failure. */
-function importProjectText(text: string): void {
+/** Validate, confirm, then load — keeping the app's state intact on any failure.
+ *  Returns true when a project was actually loaded (the unit browser closes
+ *  itself only then; a declined confirm leaves it open). */
+function importProjectText(text: string): boolean {
   let parsed;
   try {
     parsed = parseProject(text);
@@ -815,7 +905,7 @@ function importProjectText(text: string): void {
         ? err.message
         : "Could not read this file.";
     showToast("error", `Import failed: ${msg}`);
-    return;
+    return false;
   }
 
   // Newer-than-app files: warn prominently and fold the replace confirm in, so
@@ -836,7 +926,7 @@ function importProjectText(text: string): void {
         `than you're running (v${APP_PROJECT_VERSION}). Some elements may not load correctly.` +
         (replacing ? " This will also replace your current layout." : "") +
         " Continue?";
-    if (!window.confirm(confirmMsg)) return;
+    if (!window.confirm(confirmMsg)) return false;
   }
 
   let skippedRooms = 0;
@@ -850,7 +940,7 @@ function importProjectText(text: string): void {
   } catch (err) {
     console.error(err);
     showToast("error", "Import failed while loading — the file may be corrupt.");
-    return;
+    return false;
   }
   // Tolerant drop, never silent — cause-neutral (collision under current
   // preset footprints, out-of-bounds, whatever made the normal path refuse).
@@ -868,6 +958,7 @@ function importProjectText(text: string): void {
       `Loaded a newer-version (v${parsed.fileVersion}) file on an older app (v${APP_PROJECT_VERSION}). Some elements may be missing.`
     );
   else showToast("info", "Project imported.");
+  return true;
 }
 
 function readAndImport(file: File): void {
@@ -893,6 +984,40 @@ fileInput.addEventListener("change", () => {
   fileInput.value = ""; // allow re-importing the same file
 });
 document.body.appendChild(fileInput);
+
+// ---- Unit library browser (docs/library-format.md) ----
+// The browser is the self-contained src/library module: it takes the manifest
+// URL and hands back the fetched dwelling-unit file. Extracting sourceProject
+// and running it through the NORMAL import path (confirm included) happens
+// here, where the app's import machinery lives — the module knows nothing
+// about this app's formats.
+const unitBrowser = createUnitBrowser({
+  manifestUrl: "/units/index.json",
+  mount: viewport,
+  onOpen: (file) => {
+    file
+      .text()
+      .then((text) => {
+        let src: unknown;
+        try {
+          src = (JSON.parse(text) as { sourceProject?: unknown }).sourceProject;
+        } catch {
+          src = undefined;
+        }
+        if (!src || typeof src !== "object") {
+          showToast("error", `${file.name} carries no sourceProject — cannot open a copy.`);
+          return;
+        }
+        // A copy, not the library file: the import names nothing, so saving
+        // the opened design later creates a NEW entry (ids suffix, never
+        // overwrite). The panel closes only when something actually loaded —
+        // declining the replace-confirm keeps it open.
+        if (importProjectText(JSON.stringify(src))) unitBrowser.close();
+      })
+      .catch((err: Error) => showToast("error", `Could not read ${file.name}: ${err.message}`));
+  },
+});
+document.getElementById("units-btn")!.addEventListener("click", () => unitBrowser.toggle());
 
 // ---- Dev-only `?project=` loader ------------------------------------------
 // Opens the app with a project already loaded, so a fixture can be examined

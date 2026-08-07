@@ -3042,8 +3042,8 @@ advisory-not-blocking holds at both scales (the packer scores against burying
 authored intent — it never forbids it — and reports the conflict).
 
 **Export path** (`src/core/unitExport.ts` + the `#unit-export-dialog` in
-index.html + `exportUnit` in main.ts, "Export unit" button in the palette's
-Project panel):
+index.html + `exportUnit` in main.ts, reached from the top bar's Save / Open
+menu; since run 0018 the same dialog also carries "Save to library" — §10):
 - Envelope per storey = the `buildSpaceTargets(floor, floorBelow)` key set —
   the same single source of truth doors/windows use (rooms + clusters +
   stairs + stair-hole projections), so the void over a stair is part of the
@@ -3099,3 +3099,81 @@ orientation (future `SunPosition` upgrade). Any future click-through from a
 placed unit back into this editor must COMPOSE the placement rotation into
 `northAngle` so re-derived windows match the as-built unit (spec'd in
 docs/bridge-format.md; not built).
+
+---
+
+## 10. The unit library (`public/units/` + `src/library/` + the dev save sink)
+
+**Doc source of truth: `docs/library-format.md`** (folder layout, manifest
+schema, module interface). Added in run 0018 after the 4 August guest review
+froze layout-rule work and set a visual browser of saved units as the first
+priority. The library entry IS the `dwelling-unit` export file unchanged — one
+file serves both apps because it already embeds a full save in
+`sourceProject` (§9); the format stays at v1 and `docs/bridge-format.md` is
+untouched.
+
+**Storage** — `public/units/`: one `<id>.json` (dwelling-unit) + one
+`<id>.jpg` (canvas-captured preview) per unit, plus `index.json`, the manifest
+(`{format: "unit-library", version: 1, units: [...]}`; per entry `id`, `name`,
+`color`, `file`, `preview`, `storeys`, `areaM2`, `savedAt`). Under Vite's
+`public/` root deliberately: served statically at `/units/…` in dev AND copied
+verbatim into `dist/units/` by a production build, with zero build-config
+change. `storeys`/`areaM2` are derived server-side from the posted unit file
+(areaM2 = all-storey cell count × 0.36, rounded to 2 dp — a GROSS figure), so
+the manifest cannot drift from the file it points at.
+
+**Ids** (`src/library/ids.ts`, pinned by `ids.test.ts`): lowercase slug of the
+display name (`[a-z0-9-]` runs), numeric suffix on collision — two saves under
+one display name coexist as `<slug>` and `<slug>-2`; files are named by id;
+nothing is ever overwritten (the old Unit_2 name-clash fix). Verified live
+under a 6-save burst: six distinct suffixed pairs, zero overwrites.
+
+**Save flow** — the `#unit-export-dialog` gained a THIRD submit value,
+`library`, beside cancel/export ("Save to library"); `exportUnit` and its
+download are byte-untouched (the close handler branches on `returnValue`).
+`saveUnitToLibrary` (main.ts) restates the same two hard gates + advisory
+hard-rule confirm as `exportUnit` (deliberately not factored out of it, so the
+export path stays untouched), renders one frame, reads
+`canvas.toDataURL("image/jpeg", 0.9)`, and BYTE-CHECKS it (≥1000 bytes; a
+hidden canvas "succeeds" with an empty image — same trap as `__app.capture`).
+DEV: POST `{name, color, unit, preview}` to `/__library/save` — the
+`library-sink` plugin in vite.config.ts (`apply: "serve"`, beside the
+capture-sink) assigns the id (manifest ids ∪ stray file basenames), writes the
+pair, appends the manifest entry, re-byte-checks server-side. PROD: no sink,
+so the same action downloads `<slug>.json` + `<slug>.jpg` with a sticky toast
+saying they belong in `units/` beside a hand-added manifest entry (slug
+without suffix — only the dev server owns the manifest).
+
+**Browser** — the "Units" top-bar button toggles a viewport-overlay panel of
+cards (preview, name, colour chip, storey count, area; one action each, "Open
+a copy"). Open fetches the entry's unit file and hands it to main.ts, which
+extracts `sourceProject` and feeds `importProjectText` — the NORMAL import
+path, replace-confirm included (`importProjectText` now returns a boolean:
+loaded or not, so a declined confirm leaves the panel open). The opened design
+belongs to the user; saving it back always creates a NEW entry.
+
+**The reusable boundary** — `src/library/` is self-contained: plain TS + DOM,
+no imports from app internals, styles injected under a `ulb-` prefix reading
+the host's tokens with hardcoded Paper-studio fallbacks. `createUnitBrowser({
+manifestUrl, onOpen(file, entry), mount? }) → { el, open, close, toggle,
+refresh, isOpen }`; `manifest.ts` exports `parseUnitLibraryIndex` (throwing
+validator, used by the browser AND the manifest test); `ids.ts` as above. The
+bottom-up repo builds its unit list against `docs/library-format.md`, lifting
+the module or just the schema.
+
+**Seeds** — `flat-2-single-storey` (69.84 m², pink) and `flat-3-terrace`
+(60.48 m², blue), converted through the REAL path (loaded via `?project=`,
+saved through the dialog action against the live canvas). The rule fixtures
+`flat-1-two-storey`/`flat-1-no-stair` stay OUT of the library (they are the
+Check-Layout baselines: 1+11 and 1+6 must-fix/worth-a-look respectively,
+re-verified this run).
+
+**Tests** — fast: `src/library/ids.test.ts` (slug + collision),
+`src/library/manifest.test.ts` (schema validator + the COMMITTED manifest
+through the same parser, cross-checked against the unit files — loaded via
+`?raw`/JSON imports, no node types needed under `src/`). Slow:
+`src/core/libraryRoundTrip.slow.test.ts` — each committed seed's
+`sourceProject` through a real FloorManager (stubDeps, §9's harness) and
+re-exported: storeys, edges, roomTypes, northAngle AND sourceProject reproduce
+exactly. Suite counts as of run 0018: fast 47 passed (was 33), slow 6 passed +
+the standing french-window `it.fails`.

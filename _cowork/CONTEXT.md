@@ -26,17 +26,20 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** `main`, and it is the only branch now. The "Paper studio" chrome
-reskin was built on `reskin-1a` across runs 0016 and 0017 so it could be judged
-before being adopted; Shrey merged it into `main` on 31 July and pushed, and the
-branch was deleted afterwards with every one of its commits already in `main`'s
-history. So the app a run opens today is the reskinned one: paper ground and ink
-rules, a 52px top bar with a MODEL / PLAN / DIAGRAM segmented control, a
-resizable PLACE / FLOORS / BRIEF palette, three viewport overlay clusters, and
-the layout check as a 256px bottom sheet whose tiers read Must fix / Worth a look
-/ Note. PROJECT_STATE's §2s describes it and is no longer conditional on a
-branch surviving.
-**Last updated:** 2026-07-31
+**Branch:** the working tree is left on `run/0018` (run 0018's own branch, the
+first run of the branch-per-run workflow; pushed to `origin/run/0018`, code
+HEAD `b7ec1ca`). `main` gained nothing from that run and still holds the
+merged "Paper studio" reskin from runs 0016/0017: paper ground and ink rules,
+a 52px top bar with a MODEL / PLAN / DIAGRAM segmented control, a resizable
+PLACE / FLOORS / BRIEF palette, three viewport overlay clusters, and the
+layout check as a 256px bottom sheet whose tiers read Must fix / Worth a look
+/ Note. PROJECT_STATE's §2s describes it. Run 0018 added the unit library on
+its branch: `public/units/` (dwelling-unit JSON + JPEG preview per unit under
+a validated `index.json` manifest), `src/library/` (self-contained browser
+module + manifest/id logic, documented in `docs/library-format.md`), a Units
+top-bar button, and a Save to library action in the export dialog backed by a
+dev-only Vite endpoint. PROJECT_STATE §10 describes it.
+**Last updated:** 2026-08-06
 
 ## What this project is
 
@@ -102,18 +105,22 @@ rules engine and the export format are the mature parts, the UI is not.
 - **Node is not on PATH** in shells spawned by tooling. It lives at
   `C:\Program Files\nodejs` and has to be prepended before `npm` will resolve.
   `.claude/dev.cmd` exists purely to work around this.
-- **There are TWO test suites as of run 0014.** `npm test` is the fast one, about
-  0.9 s over 33 cases in three files: `src/core/exteriorEdges.test.ts` (five cases over
-  `isFacadeEdge`), `src/core/unitExport.test.ts` (three pure cases over the export
-  glazing invariant, whose header explains that it deliberately does not call
-  `buildUnitExport`), and `src/core/rules.test.ts` (25 cases, one firing and one silent
-  fixture for each of eleven rules, over HAND-BUILT `DwellingGraph` objects). `npm run
-  test:slow` is the second, about 5.5 s, holding anything named `*.slow.test.ts` — today
-  one file that drives a real `FloorManager` through a stubbed `FloorDeps` and calls the
-  real `buildUnitExport`. The split exists because that import graph pulls in three.js;
-  it is written in exactly two places, `test.exclude` in `vite.config.ts` and `include`
-  in `vitest.slow.config.ts`.
-- **`npm run test:slow` currently reports `4 passed | 1 expected fail`, and the
+- **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
+  half a second over 47 cases in five files as of run 0018:
+  `src/core/exteriorEdges.test.ts` (five cases over `isFacadeEdge`),
+  `src/core/unitExport.test.ts` (three pure cases over the export glazing
+  invariant, whose header explains that it deliberately does not call
+  `buildUnitExport`), `src/core/rules.test.ts` (25 cases over HAND-BUILT
+  `DwellingGraph` objects), and run 0018's `src/library/ids.test.ts` (6, id
+  slugs and collisions) and `src/library/manifest.test.ts` (8, manifest schema
+  plus the committed library validated through the browser's own parser).
+  `npm run test:slow` is the second, about 3.6 s, holding anything named
+  `*.slow.test.ts` — files that drive a real `FloorManager` through a stubbed
+  `FloorDeps` (`unitExport.slow.test.ts`, and run 0018's
+  `libraryRoundTrip.slow.test.ts`). The split exists because that import graph
+  pulls in three.js; it is written in exactly two places, `test.exclude` in
+  `vite.config.ts` and `include` in `vitest.slow.config.ts`.
+- **`npm run test:slow` currently reports `6 passed | 1 expected fail`, and the
   expected fail is deliberate.** French-window edges are built but never exported
   (`unitExport.ts:311` enumerates the envelope with the strict open-sky test, which
   skips edges whose neighbour cell is occupied, and a balcony cell is occupied). It is
