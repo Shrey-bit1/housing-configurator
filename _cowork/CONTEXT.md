@@ -26,11 +26,11 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** the working tree is on `run/0019`, pushed to `origin/run/0019`
-(code HEAD `2d17867`) and NOT yet merged. Run 0018 was built the same way on
-`run/0018` and merged into `main` on 7 August at merge commit `9089329`;
-`origin/run/0018` still exists as the run's record, every commit already in
-`main`'s history. So `main` holds
+**Branch:** the working tree is on `main`. Run 0019 was built on `run/0019`
+and merged into `main` on 10 August at merge commit `21d1d10`, pushed;
+`origin/run/0019` still exists as the run's record. Run 0018 was merged the
+same way on 7 August at `9089329`. Both branch records remain on the remote,
+every commit already in `main`'s history. So `main` holds
 both the "Paper studio" reskin from runs 0016/0017 (paper ground and ink
 rules, a 52px top bar with a MODEL / PLAN / DIAGRAM segmented control, a
 resizable PLACE / FLOORS / BRIEF palette, three viewport overlay clusters,
