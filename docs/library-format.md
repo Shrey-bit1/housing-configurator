@@ -70,16 +70,63 @@ it checks the discriminator, every field's type and pattern, the `<id>.json` /
 offending entry. The committed manifest is validated by
 `src/library/manifest.test.ts` through the same parser.
 
+## Names and numbers
+
+Since run 0019 a name is **a capitalised word, a space, and a number**, and
+nothing else: a project file is `Flat 4`, its unit and library entry are
+`Unit 4`, and **one design carries one number across both**. Ids follow as
+always, giving `flat-4` and `unit-4`. `src/library/naming.ts` owns the
+convention:
+
+```ts
+projectNameFor(n: number): string          // "Flat 4"
+unitNameFor(n: number): string             // "Unit 4"
+numberFromName(name: string): number|null  // "Unit 4" | "unit-4" → 4; descriptive names → null
+nextFreeNumber(entries): number            // LOWEST positive integer no entry holds
+findLibraryEntry(entries, name): entry|undefined  // what a save would collide with
+```
+
+The save dialog opens on `nextFreeNumber`, so authoring a run of units needs
+no typing. It is lowest-free rather than highest-plus-one, so a gap left by a
+deleted entry is offered again. The manifest is the **only persistent record**
+the app can read back — project and unit files are downloads — so a design
+saved without a library entry does not consume its number.
+
+Entries written before the convention keep their descriptive names
+(`Flat 2 — single storey`). `numberFromName` returns null for those, so they
+hold no number and never block one.
+
 ## Saving — dev endpoint and production fallback
 
-**Dev.** The unit-export dialog's "Save to library" action POSTs
-`{ name, color, unit, preview }` to `/__library/save` — `unit` is the
+**Dev.** The save dialog's Library entry checkbox POSTs
+`{ name, color, unit, preview, replace }` to `/__library/save` — `unit` is the
 `dwelling-unit` JSON built by the untouched export path
 (`src/core/unitExport.ts`), `preview` a `data:image/jpeg` URL read from the
 canvas in the same frame it was rendered. The `library-sink` middleware in
 `vite.config.ts` (dev-only, `apply: "serve"`) assigns the id, writes
 `<id>.json` and `<id>.jpg` into `public/units/`, and appends the manifest
-entry. It responds `{ ok: true, entry }` or `{ ok: false, error }`.
+entry. It responds `{ ok: true, entry, replaced }` or `{ ok: false, error }`.
+
+**Replace or new.** When `replace` is true and an entry already matches the
+name (by id or by exact name, mirroring `findLibraryEntry`), that entry is
+overwritten **in place**: its id is kept, so the filenames it points at and
+anything referencing it stay valid, and only the payload, colour and `savedAt`
+move. Without `replace`, the id takes a numeric suffix and a second entry
+appears, which is the pre-0019 behaviour and remains the fallback when an
+author declines the replace prompt.
+
+## Renaming — `POST /__library/rename`
+
+`{ id, name }` changes an entry's **display name only**. The id and both
+filenames stay put, so nothing that already points at the entry breaks and the
+number the id carries is not silently freed. The endpoint updates the manifest
+row **and** the unit file's own `name` field, because the building reads the
+latter and the two must not drift. Responds `{ ok: true, entry }`, or 404 when
+no entry has that id.
+
+Dev-only, like saving: the manifest lives on disk beside the units and only
+the dev server can write it. In a production build the browser's `onRename`
+callback is omitted and cards are read-only.
 
 The preview is **byte-checked on both sides** (≥ 1000 bytes): a hidden canvas
 "succeeds" with an empty image, and an empty preview in the library is worse
@@ -106,6 +153,7 @@ createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser
 interface UnitBrowserOptions {
   manifestUrl: string;                                  // URL of units/index.json
   onOpen: (file: File, entry: UnitManifestEntry) => void;
+  onRename?: (entry: UnitManifestEntry, newName: string) => Promise<void>;
   mount?: HTMLElement;                                  // default document.body
 }
 interface UnitBrowser {
