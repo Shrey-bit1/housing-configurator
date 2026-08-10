@@ -35,8 +35,27 @@ import {
   APP_PROJECT_VERSION,
   type ProjectFile,
 } from "./core/projectIO";
-import { buildUnitExport } from "./core/unitExport";
+import { buildUnitExport, type DwellingUnitFile } from "./core/unitExport";
 import { slugifyUnitName } from "./library/ids";
+import { projectNameFor, unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
+import { parseUnitLibraryIndex, type UnitManifestEntry } from "./library/manifest";
+import {
+  planOutputs,
+  isEmptySelection,
+  needsUnitBuild,
+  needsRuleConfirm,
+  unitGateResults,
+  outputLabel,
+  type OutputKind,
+  type OutputResult,
+  type SaveSelection,
+} from "./core/savePlan";
+import {
+  projectFileText,
+  unitFileText,
+  projectFileName,
+  unitFileName,
+} from "./core/saveFiles";
 import { createUnitBrowser } from "./library/unitBrowser";
 
 const DEFAULT_COLS = 16;
@@ -320,15 +339,6 @@ function renderSidebar(): void {
         selection.deselect();
         doorController.start();
       },
-      onExport() {
-        exportProject();
-      },
-      onImport() {
-        fileInput.click();
-      },
-      onExportUnit() {
-        openUnitExportDialog();
-      },
       onSetOrientationPreference(pref) {
         // Design state, so it is undoable and it lands in the project file. No
         // geometry re-derives: the preference only changes how OR2 reads the
@@ -544,17 +554,17 @@ saveOpenBtn.addEventListener("click", (e) => {
   setSaveOpenOpen(!saveOpenMenu.classList.contains("open"));
 });
 document.addEventListener("click", () => setSaveOpenOpen(false));
-document.getElementById("menu-export")!.addEventListener("click", () => {
+// One Save item, and Open project beside it. The three separate items (Export
+// project, Export unit, and the dialog's own Save to library action) are
+// retired: the save dialog writes any combination of the three, so a second
+// route to a subset of them is only a way to forget one.
+document.getElementById("menu-save")!.addEventListener("click", () => {
   setSaveOpenOpen(false);
-  exportProject();
+  void openSaveDialog();
 });
 document.getElementById("menu-import")!.addEventListener("click", () => {
   setSaveOpenOpen(false);
   fileInput.click();
-});
-document.getElementById("menu-export-unit")!.addEventListener("click", () => {
-  setSaveOpenOpen(false);
-  openUnitExportDialog();
 });
 
 // ---- North compass + orientation-aware windows ----
@@ -714,29 +724,24 @@ checkBtn.addEventListener("click", () => (validated ? clearValidation() : runChe
 // changes (validation spans the whole dwelling now).
 floors.onLayoutChange = () => clearValidation();
 
-// ---- Project save / load (export & import JSON) ----
-// Manual, client-side only. Export downloads a real .json; import replaces the
-// whole project (after a confirm) and rebuilds it through the normal placement
-// path, so a loaded design is identical to a hand-built one.
+// ---- One save, three outputs (run 0019; PROJECT_STATE §11) ----
+// Saving used to cost three trips through the menu: Export project, Export
+// unit, Save to library. One dialog now asks which of the three to write and
+// writes them, and the three outputs stay three separate things on disk and in
+// the model. What collapsed is the doing.
+//
+// The design NUMBER is the only text input: it names the project file `Flat n`
+// and the unit and its library entry `Unit n` (src/library/naming.ts), so one
+// dwelling carries one number across both. The dialog opens on the next free
+// number, so a run of units needs no typing at all.
+//
+// The decision rules live in src/core/savePlan.ts, pure and tested; the bytes
+// and filenames live in src/core/saveFiles.ts, so the guarantee that this
+// writes exactly what the old paths wrote is testable rather than asserted.
 
-function exportProject(): void {
-  const data = serializeProject(floors.floors, floors.northAngle, floors.orientationPreference);
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `flat-project-${fileTimestamp()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-// ---- Unit export (flat → building bridge, docs/bridge-format.md) ----
-// READ-ONLY: no store mutation, no history commit. Name + colour are
-// export-time inputs collected by the <dialog> in index.html — NOT new
-// project-file fields. Hard gates (entrance, connectivity) toast-and-refuse;
-// hard RULE violations only confirm (advisory stance — export anyway on OK).
+/** Where the library manifest is served from. One constant, read by the save
+ *  dialog (next free number, replace-or-new) and the browser alike. */
+const UNITS_MANIFEST_URL = "/units/index.json";
 
 /** Small deterministic default palette; picked by name hash so the same name
  *  always proposes the same colour (bottom-up's catalog colour family). */
@@ -747,67 +752,7 @@ function defaultUnitColor(name: string): string {
   return UNIT_COLORS[h % UNIT_COLORS.length];
 }
 
-const unitDialog = document.getElementById("unit-export-dialog") as HTMLDialogElement;
-const unitNameInput = document.getElementById("unit-export-name") as HTMLInputElement;
-const unitColorInput = document.getElementById("unit-export-color") as HTMLInputElement;
-let unitColorTouched = false;
-unitColorInput.addEventListener("input", () => (unitColorTouched = true));
-unitNameInput.addEventListener("input", () => {
-  if (!unitColorTouched) unitColorInput.value = defaultUnitColor(unitNameInput.value || "Unit");
-});
-
-function openUnitExportDialog(): void {
-  unitColorTouched = false;
-  unitColorInput.value = defaultUnitColor(unitNameInput.value || "Unit");
-  unitDialog.showModal();
-}
-
-unitDialog.addEventListener("close", () => {
-  const name = unitNameInput.value.trim() || "Unit";
-  if (unitDialog.returnValue === "export") exportUnit(name, unitColorInput.value);
-  else if (unitDialog.returnValue === "library") saveUnitToLibrary(name, unitColorInput.value);
-});
-
-function exportUnit(name: string, color: string): void {
-  // Hard gates first (fail fast with a clear toast)…
-  const result = buildUnitExport(floors, name, color);
-  if (!result.ok) {
-    showToast("error", `Unit export refused: ${result.reason}`);
-    return;
-  }
-  // …then the ADVISORY hard-rule confirm: violations never block, only inform.
-  const hard = validate(
-    computeDwellingGraph(floors.floors),
-    floors.orientationPreference
-  ).filter((v) => v.severity === "hard");
-  if (hard.length > 0) {
-    const ok = window.confirm(
-      `Check Layout reports ${hard.length} MUST FIX issue(s) in this dwelling.\n` +
-        `The unit will export anyway (rules are advisory). Continue?`
-    );
-    if (!ok) return;
-  }
-  const blob = new Blob([JSON.stringify(result.file, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `unit-${name.replace(/[^\w-]+/g, "_")}-${fileTimestamp()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  showToast("info", `Unit "${name}" exported (${result.file.storeys.length} storey(s)).`);
-}
-
-// ---- Save to library (docs/library-format.md) ----
-// The same gates and advisory confirm as exportUnit — deliberately restated
-// rather than factored out of it, so the export path above stays untouched —
-// then the unit JSON plus a canvas JPEG preview go to the dev server's library
-// sink (vite.config.ts), which assigns the id and appends the manifest entry.
-// A production build has no sink, so the same pair downloads instead.
-
-/** Anchor-download a Blob or data URL under `filename`. Local to the library
- *  save path; exportProject/exportUnit keep their own inlined equivalent. */
+/** Anchor-download a Blob URL or data URL under `filename`. */
 function downloadAs(href: string, filename: string, revoke: boolean): void {
   const a = document.createElement("a");
   a.href = href;
@@ -818,23 +763,214 @@ function downloadAs(href: string, filename: string, revoke: boolean): void {
   if (revoke) URL.revokeObjectURL(href);
 }
 
-function saveUnitToLibrary(name: string, color: string): void {
-  const result = buildUnitExport(floors, name, color);
-  if (!result.ok) {
-    showToast("error", `Library save refused: ${result.reason}`);
-    return;
+const saveDialog = document.getElementById("save-dialog") as HTMLDialogElement;
+const saveNumberInput = document.getElementById("save-number") as HTMLInputElement;
+const saveColorInput = document.getElementById("save-color") as HTMLInputElement;
+const saveNamesLine = document.getElementById("save-names") as HTMLElement;
+const saveResultsEl = document.getElementById("save-results") as HTMLElement;
+const saveGoBtn = document.getElementById("save-go") as HTMLButtonElement;
+const saveWhatInputs: Record<OutputKind, HTMLInputElement> = {
+  project: document.getElementById("save-what-project") as HTMLInputElement,
+  unit: document.getElementById("save-what-unit") as HTMLInputElement,
+  library: document.getElementById("save-what-library") as HTMLInputElement,
+};
+
+/** REMEMBERED FOR THE SESSION (never serialized — this is how you save, not
+ *  part of the design). All three default to on, because all three are what
+ *  the three retired menu items were being used for together; after the first
+ *  save the second unit costs one click. Reset on reload, like every other
+ *  view-state default. */
+let saveSelection: SaveSelection = { project: true, unit: true, library: true };
+/** Once the colour is touched by hand it stops following the name hash, for
+ *  the rest of the session. */
+let saveColorTouched = false;
+
+function readSaveSelection(): SaveSelection {
+  return {
+    project: saveWhatInputs.project.checked,
+    unit: saveWhatInputs.unit.checked,
+    library: saveWhatInputs.library.checked,
+  };
+}
+
+/** The design number in the field, floored at 1 so a cleared or nonsense field
+ *  cannot produce `Flat NaN`. */
+function saveDesignNumber(): number {
+  const n = Math.floor(Number(saveNumberInput.value));
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+/** Names line, proposed colour, and the Save button's enabled state, all
+ *  re-derived from the two inputs. Nothing ticked is not a save. */
+function syncSaveDialog(): void {
+  const n = saveDesignNumber();
+  saveSelection = readSaveSelection();
+  const parts: string[] = [];
+  if (saveSelection.project) parts.push(projectNameFor(n));
+  if (saveSelection.unit || saveSelection.library) parts.push(unitNameFor(n));
+  saveNamesLine.textContent = parts.length
+    ? `Writes ${parts.join(" and ")}`
+    : "Nothing selected";
+  if (!saveColorTouched) saveColorInput.value = defaultUnitColor(unitNameFor(n));
+  saveGoBtn.disabled = isEmptySelection(saveSelection);
+}
+
+/** The library manifest, or an empty one when it cannot be read. The dialog
+ *  must still open when the library is unreachable; it just cannot propose a
+ *  number derived from it, and says so by proposing 1. */
+async function readManifestEntries(): Promise<UnitManifestEntry[]> {
+  try {
+    const res = await fetch(UNITS_MANIFEST_URL, { cache: "no-store" });
+    if (!res.ok) return [];
+    return parseUnitLibraryIndex(await res.text()).units;
+  } catch {
+    return [];
   }
-  const hard = validate(
-    computeDwellingGraph(floors.floors),
-    floors.orientationPreference
-  ).filter((v) => v.severity === "hard");
-  if (hard.length > 0) {
-    const ok = window.confirm(
-      `Check Layout reports ${hard.length} MUST FIX issue(s) in this dwelling.\n` +
-        `The unit will save anyway (rules are advisory). Continue?`
+}
+
+/** Open on the NEXT FREE NUMBER: the lowest positive integer no library entry
+ *  holds (src/library/naming.ts), re-read on every open so a save made a
+ *  moment ago is already counted. */
+async function openSaveDialog(): Promise<void> {
+  saveResultsEl.replaceChildren();
+  for (const kind of ["project", "unit", "library"] as OutputKind[])
+    saveWhatInputs[kind].checked = saveSelection[kind];
+  syncSaveDialog();
+  saveDialog.showModal();
+  const entries = await readManifestEntries();
+  saveNumberInput.value = String(nextFreeNumber(entries));
+  syncSaveDialog();
+}
+
+// ---- Result lines -----------------------------------------------------------
+// One per selected output, in the dialog rather than as toasts, because a unit
+// that failed its gate must not read as a project save that failed. The dialog
+// stays open on Save so these can be read.
+
+const saveResults = new Map<OutputKind, OutputResult>();
+
+function renderSaveResults(): void {
+  saveResultsEl.replaceChildren(
+    ...[...saveResults.values()].map((r) => {
+      const line = document.createElement("p");
+      line.className = `sr-line sr-${r.status}`;
+      const label = document.createElement("span");
+      label.className = "sr-label";
+      label.textContent = outputLabel(r.kind);
+      const detail = document.createElement("span");
+      detail.className = "sr-detail";
+      detail.textContent = r.detail;
+      line.append(label, detail);
+      return line;
+    })
+  );
+}
+
+function setSaveResult(kind: OutputKind, status: OutputResult["status"], detail: string): void {
+  saveResults.set(kind, { kind, status, detail });
+  renderSaveResults();
+}
+
+/**
+ * Write whichever outputs are ticked, reporting each on its own line.
+ *
+ * The order matters: the project file is written FIRST and never depends on
+ * the unit build, so a hard gate failure (no usable entrance, disconnected
+ * footprint) or a declined layout-check confirm costs only the unit-derived
+ * outputs. That is the rule `unitGateResults` encodes and `savePlan.test.ts`
+ * pins.
+ */
+async function runSave(): Promise<void> {
+  const sel = readSaveSelection();
+  if (isEmptySelection(sel)) return;
+  saveSelection = sel; // remembered for the next save this session
+  const n = saveDesignNumber();
+  const color = saveColorInput.value;
+  const unitName = unitNameFor(n);
+
+  saveResults.clear();
+  for (const kind of planOutputs(sel)) setSaveResult(kind, "pending", "writing…");
+  saveGoBtn.disabled = true;
+
+  // The unit is built ONCE and feeds both the unit file and the library entry.
+  let unitFile: DwellingUnitFile | null = null;
+  if (needsUnitBuild(sel)) {
+    const built = buildUnitExport(floors, unitName, color);
+    if (built.ok) unitFile = built.file;
+    else
+      for (const r of unitGateResults(sel, built.reason))
+        if (r.status === "failed") setSaveResult(r.kind, "failed", r.detail);
+  }
+
+  // ONE advisory confirm for the whole save, and only when a unit is actually
+  // being written: rules describe the dwelling the unit promises the building,
+  // so a project save alone never asks.
+  if (unitFile) {
+    const hard = validate(
+      computeDwellingGraph(floors.floors),
+      floors.orientationPreference
+    ).filter((v) => v.severity === "hard");
+    if (needsRuleConfirm(sel, hard.length)) {
+      const ok = window.confirm(
+        `Check Layout reports ${hard.length} MUST FIX issue(s) in this dwelling.\n` +
+          `The unit will be written anyway (rules are advisory). Continue?`
+      );
+      if (!ok) {
+        unitFile = null;
+        const why = "not written — you chose not to continue past the layout check";
+        if (sel.unit) setSaveResult("unit", "skipped", why);
+        if (sel.library) setSaveResult("library", "skipped", why);
+      }
+    }
+  }
+
+  // 1. The project file. Independent of everything above.
+  if (sel.project) {
+    const data = serializeProject(floors.floors, floors.northAngle, floors.orientationPreference);
+    const text = projectFileText(data);
+    const name = projectFileName(n);
+    downloadAs(URL.createObjectURL(new Blob([text], { type: "application/json" })), name, true);
+    setSaveResult(
+      "project",
+      "written",
+      `${name} downloaded — ${floors.floors.length} floor(s), ${text.length} bytes`
     );
-    if (!ok) return;
   }
+
+  // 2. The unit file.
+  if (sel.unit && unitFile) {
+    const text = unitFileText(unitFile);
+    const name = unitFileName(n);
+    downloadAs(URL.createObjectURL(new Blob([text], { type: "application/json" })), name, true);
+    setSaveResult(
+      "unit",
+      "written",
+      `${name} downloaded — ${unitFile.storeys.length} storey(s), ${text.length} bytes`
+    );
+  }
+
+  // 3. The library entry.
+  if (sel.library && unitFile) await saveLibraryEntry(unitName, color, unitFile);
+
+  saveGoBtn.disabled = isEmptySelection(readSaveSelection());
+}
+
+/**
+ * The library entry: the unit file plus a canvas JPEG preview plus a manifest
+ * row, written by the dev sink (vite.config.ts). A production build has no
+ * sink, so the pair downloads instead.
+ *
+ * REPLACE OR NEW: when the manifest already holds this name, ask. Answering
+ * yes overwrites that entry in place, keeping its id; answering no falls back
+ * to the suffixed-id behaviour and makes a second entry. Silently making the
+ * second one was the behaviour before run 0019 and is what an author re-saving
+ * a design almost never wants.
+ */
+async function saveLibraryEntry(
+  name: string,
+  color: string,
+  unitFile: DwellingUnitFile
+): Promise<void> {
   // The preview: render and read back in the same turn (the context has no
   // preserveDrawingBuffer), then BYTE-CHECK — a hidden canvas "succeeds" with
   // an empty image, and an empty preview in the library is worse than a
@@ -843,43 +979,75 @@ function saveUnitToLibrary(name: string, color: string): void {
   const preview = canvas.toDataURL("image/jpeg", 0.9);
   const previewBytes = Math.max(0, Math.floor(((preview.length - preview.indexOf(",") - 1) * 3) / 4));
   if (!preview.startsWith("data:image/jpeg") || previewBytes < 1000) {
-    showToast(
-      "error",
-      `Preview capture read back ${previewBytes} bytes — make the 3D view visible, then save again.`
+    setSaveResult(
+      "library",
+      "failed",
+      `not written — the preview read back ${previewBytes} bytes; make the 3D view visible and save again`
     );
     return;
   }
-  if (import.meta.env.DEV) {
-    fetch("/__library/save", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, color, unit: result.file, preview }),
-    })
-      .then((r) => r.json())
-      .then((r: { ok: boolean; entry?: { id: string; areaM2: number }; error?: string }) => {
-        if (r.ok && r.entry) {
-          showToast("info", `Saved "${name}" to the library as ${r.entry.id} (${r.entry.areaM2} m²).`);
-          void unitBrowser.refresh(); // an open panel shows the new card at once
-        } else {
-          showToast("error", `Library save failed: ${r.error ?? "unknown error"}`);
-        }
-      })
-      .catch((err: Error) => showToast("error", `Library save failed: ${err.message}`));
-  } else {
+
+  if (!import.meta.env.DEV) {
     // No sink in a production build. Download the pair the sink would have
     // written, named by the name's slug alone — collision suffixes need the
     // manifest, and only the dev server owns that.
     const id = slugifyUnitName(name);
-    const blob = new Blob([JSON.stringify(result.file, null, 2)], { type: "application/json" });
-    downloadAs(URL.createObjectURL(blob), `${id}.json`, true);
+    downloadAs(
+      URL.createObjectURL(new Blob([unitFileText(unitFile)], { type: "application/json" })),
+      `${id}.json`,
+      true
+    );
     downloadAs(preview, `${id}.jpg`, false);
-    showToast(
-      "warn",
-      `This build has no dev server, so the library was not written. Downloaded ${id}.json and ` +
-        `${id}.jpg — move them into units/ beside index.json and add a manifest entry.`
+    setSaveResult(
+      "library",
+      "failed",
+      `no dev server in this build, so nothing was written to the library — downloaded ${id}.json and ${id}.jpg instead; move them into units/ beside index.json and add a manifest row`
+    );
+    return;
+  }
+
+  const existing = findLibraryEntry(await readManifestEntries(), name);
+  let replace = false;
+  if (existing) {
+    replace = window.confirm(
+      `The library already holds "${existing.name}" (${existing.id}, saved ${existing.savedAt.slice(0, 10)}).\n\n` +
+        `OK replaces that entry. Cancel keeps it and adds a second one under a new id.`
     );
   }
+
+  try {
+    const res = await fetch("/__library/save", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, color, unit: unitFile, preview, replace }),
+    });
+    const r = (await res.json()) as {
+      ok: boolean;
+      entry?: { id: string; areaM2: number };
+      replaced?: boolean;
+      error?: string;
+    };
+    if (r.ok && r.entry) {
+      setSaveResult(
+        "library",
+        "written",
+        `${r.replaced ? "replaced" : "added"} ${r.entry.id} in units/ — ${r.entry.areaM2} m², preview ${Math.round(previewBytes / 1024)} kB`
+      );
+      void unitBrowser.refresh(); // an open panel shows the new card at once
+    } else {
+      setSaveResult("library", "failed", `not written — ${r.error ?? "unknown error"}`);
+    }
+  } catch (err) {
+    setSaveResult("library", "failed", `not written — ${(err as Error).message}`);
+  }
 }
+
+saveNumberInput.addEventListener("input", syncSaveDialog);
+saveColorInput.addEventListener("input", () => (saveColorTouched = true));
+for (const input of Object.values(saveWhatInputs))
+  input.addEventListener("change", syncSaveDialog);
+saveGoBtn.addEventListener("click", () => void runSave());
+document.getElementById("save-close")!.addEventListener("click", () => saveDialog.close());
 
 /** Nothing authored yet: one floor, nothing placed, no doors, no entrances. Used
  *  to decide whether an import has anything to destroy. */
@@ -968,11 +1136,6 @@ function readAndImport(file: File): void {
   reader.readAsText(file);
 }
 
-function fileTimestamp(): string {
-  // App code (not a workflow script) — Date is fine here.
-  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-}
-
 // Hidden native file picker, driven by the sidebar's Import button.
 const fileInput = document.createElement("input");
 fileInput.type = "file";
@@ -992,8 +1155,24 @@ document.body.appendChild(fileInput);
 // here, where the app's import machinery lives — the module knows nothing
 // about this app's formats.
 const unitBrowser = createUnitBrowser({
-  manifestUrl: "/units/index.json",
+  manifestUrl: UNITS_MANIFEST_URL,
   mount: viewport,
+  // Rename is DEV-ONLY for the same reason saving is: the manifest lives on
+  // disk beside the units and only the dev server can write it. Omitting the
+  // callback in a production build leaves the cards read-only, which is what
+  // the module does without it.
+  onRename: import.meta.env.DEV
+    ? async (entry, newName) => {
+        const res = await fetch("/__library/rename", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id: entry.id, name: newName }),
+        });
+        const r = (await res.json()) as { ok: boolean; error?: string };
+        if (!r.ok) throw new Error(r.error ?? "unknown error");
+        showToast("info", `Renamed ${entry.id} to "${newName}".`);
+      }
+    : undefined,
   onOpen: (file) => {
     file
       .text()

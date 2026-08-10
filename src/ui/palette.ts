@@ -31,12 +31,6 @@ export interface PaletteCallbacks {
   onPlaceEntrance: () => void;
   /** Enter door-placement mode (interior boundaries, any floor). */
   onPlaceDoor: () => void;
-  /** Download the whole project as a .json file. */
-  onExport: () => void;
-  /** Open the native file picker to import a project .json. */
-  onImport: () => void;
-  /** Export the dwelling as a `dwelling-unit` bridge file (docs/bridge-format.md). */
-  onExportUnit: () => void;
   /** Replace the project's orientation preference. Either half may be
    *  undefined, which means no opinion; the caller stores it and commits
    *  history, because it is design state that belongs in the project file. */

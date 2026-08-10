@@ -34,9 +34,8 @@
             Save / Open <span class="tb-caret" aria-hidden="true">▾</span>
           </button>
           <div id="saveopen-menu" role="menu">
-            <button id="menu-export" type="button" role="menuitem">Export project</button>
+            <button id="menu-save" type="button" role="menuitem">Save…</button>
             <button id="menu-import" type="button" role="menuitem">Open project</button>
-            <button id="menu-export-unit" type="button" role="menuitem">Export unit</button>
           </div>
         </div>
         <button id="shortcuts-btn" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
@@ -133,23 +132,48 @@
         <div id="selection-readout"></div>
         <div id="drop-overlay"><span>Drop project file to import</span></div>
         <div id="toast"></div>
-        <!-- Unit-export dialog (flat → building bridge, docs/bridge-format.md):
-             name + colour are EXPORT-TIME inputs, not project-file fields. -->
-        <dialog id="unit-export-dialog">
-          <form method="dialog">
-            <p class="vp-title">Export unit</p>
-            <label>Name
-              <input id="unit-export-name" type="text" value="Unit" autocomplete="off" />
+        <!-- ONE save dialog, three outputs (run 0019). The design NUMBER is the
+             single input: it names the project file `Flat n` and the unit and
+             its library entry `Unit n`, so one dwelling carries one number
+             across both. The checkboxes say what to write; the choice is
+             remembered for the session. Results are reported IN HERE, one line
+             per output, because a unit that fails its gate must not look like
+             a project save that failed. Name + colour remain SAVE-TIME inputs,
+             never project-file fields. -->
+        <dialog id="save-dialog">
+          <p class="vp-title">Save</p>
+          <div class="save-fields">
+            <label>Design number
+              <input id="save-number" type="number" min="1" step="1" value="1" autocomplete="off" />
             </label>
             <label>Colour
-              <input id="unit-export-color" type="color" value="#4dabf7" />
+              <input id="save-color" type="color" value="#4dabf7" />
             </label>
-            <div class="dialog-actions">
-              <button value="cancel" class="secondary" type="submit">Cancel</button>
-              <button value="library" class="secondary" type="submit">Save to library</button>
-              <button value="export" class="primary" type="submit">Export</button>
-            </div>
-          </form>
+          </div>
+          <p id="save-names" class="save-names"></p>
+          <fieldset id="save-what">
+            <legend>What to write</legend>
+            <label>
+              <input type="checkbox" id="save-what-project" checked />
+              <span class="sw-name">Project file</span>
+              <span class="sw-note">the whole design, the only thing that reopens for editing</span>
+            </label>
+            <label>
+              <input type="checkbox" id="save-what-unit" checked />
+              <span class="sw-name">Unit file</span>
+              <span class="sw-note">the contract with the building</span>
+            </label>
+            <label>
+              <input type="checkbox" id="save-what-library" checked />
+              <span class="sw-name">Library entry</span>
+              <span class="sw-note">the unit plus a preview, browsable under Units</span>
+            </label>
+          </fieldset>
+          <div id="save-results" role="status" aria-live="polite"></div>
+          <div class="dialog-actions">
+            <button id="save-close" class="secondary" type="button">Close</button>
+            <button id="save-go" class="primary" type="button">Save</button>
+          </div>
         </dialog>
       </main>
     </div>

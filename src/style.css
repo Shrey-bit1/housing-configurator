@@ -1286,26 +1286,34 @@ button.primary:hover {
   color: var(--text);
 }
 
-/* ---- Unit-export dialog (flat -> building bridge) ---- */
-#unit-export-dialog {
+/* ---- Save dialog: one save, three outputs (run 0019) ----
+   The design number is the only text input; the checkboxes say what to write;
+   the result block below them reports one line per output and is why the
+   dialog stays open after Save. */
+#save-dialog {
   background: var(--black-2);
   color: var(--text);
   border: 2px solid var(--line);
   padding: 16px;
-  min-width: 240px;
+  min-width: 380px;
+  max-width: 460px;
 }
 
-#unit-export-dialog::backdrop {
+#save-dialog::backdrop {
   background: rgba(0, 0, 0, 0.45);
 }
 
-#unit-export-dialog form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+#save-dialog .vp-title {
+  margin: 0 0 12px;
 }
 
-#unit-export-dialog label {
+.save-fields {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+#save-dialog label {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1313,16 +1321,17 @@ button.primary:hover {
   color: var(--text-dim);
 }
 
-#unit-export-dialog input[type="text"] {
+#save-dialog input[type="number"] {
   background: var(--black);
   color: var(--text);
   border: 1px solid var(--line-soft);
   padding: 5px 7px;
   font-family: inherit;
   font-size: 13px;
+  width: 92px;
 }
 
-#unit-export-dialog input[type="color"] {
+#save-dialog input[type="color"] {
   width: 44px;
   height: 26px;
   padding: 0;
@@ -1331,11 +1340,107 @@ button.primary:hover {
   cursor: pointer;
 }
 
-#unit-export-dialog .dialog-actions {
+/* What the number resolves to, restated in the dialog so the two names are
+   never a guess. */
+.save-names {
+  margin: 10px 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+#save-what {
+  border: 1px solid var(--line-soft);
+  padding: 10px 12px 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+#save-what legend {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--meta);
+  padding: 0 5px;
+}
+
+#save-what label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  align-items: baseline;
+  cursor: pointer;
+}
+
+#save-what input[type="checkbox"] {
+  grid-row: span 2;
+  accent-color: var(--ink);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+#save-what .sw-name {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+#save-what .sw-note {
+  grid-column: 2;
+  font-size: 11px;
+  color: var(--meta);
+}
+
+/* One line per output. The status colours are the app's existing three: the
+   accent marks the failing, the note green the written. */
+#save-results:not(:empty) {
+  margin-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sr-line {
+  margin: 0;
+  font-size: 11px;
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.sr-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sr-detail {
+  color: var(--meta);
+}
+
+.sr-written .sr-label {
+  color: var(--note);
+}
+
+.sr-failed .sr-label,
+.sr-failed .sr-detail {
+  color: var(--accent);
+}
+
+.sr-skipped .sr-label {
+  color: var(--soft);
+}
+
+#save-dialog .dialog-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  margin-top: 4px;
+  margin-top: 14px;
 }
 
 /* ============================================================
