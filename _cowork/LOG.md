@@ -27,3 +27,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0016 | 2026-07-31 | Paper studio reskin on a branch, README Part 2 | partial | 0016-paper-studio-reskin-on-a-branch.report.md |
 | 0017 | 2026-07-31 | Finish the reskin, bottom sheet and copy rewrite | complete | 0017-finish-the-reskin-bottom-sheet-and-copy.report.md |
 | 0018 | 2026-08-06 | The unit library and browser | complete | 0018-the-unit-library-and-browser.report.md |
+| 0019 | 2026-08-10 | One save, and say what you are saving | complete | 0019-one-save.report.md |

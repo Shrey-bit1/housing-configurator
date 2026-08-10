@@ -26,10 +26,11 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** the working tree is on `main`. Run 0018 (the first run of the
-branch-per-run workflow) was built on `run/0018` and merged into `main` on
-7 August at merge commit `9089329`, pushed; `origin/run/0018` still exists as
-the run's record, every commit already in `main`'s history. So `main` holds
+**Branch:** the working tree is on `run/0019`, pushed to `origin/run/0019`
+(code HEAD `2d17867`) and NOT yet merged. Run 0018 was built the same way on
+`run/0018` and merged into `main` on 7 August at merge commit `9089329`;
+`origin/run/0018` still exists as the run's record, every commit already in
+`main`'s history. So `main` holds
 both the "Paper studio" reskin from runs 0016/0017 (paper ground and ink
 rules, a 52px top bar with a MODEL / PLAN / DIAGRAM segmented control, a
 resizable PLACE / FLOORS / BRIEF palette, three viewport overlay clusters,
@@ -39,7 +40,21 @@ under a validated `index.json` manifest), `src/library/` (self-contained
 browser module + manifest/id logic, documented in `docs/library-format.md`),
 a Units top-bar button, and a Save to library action in the export dialog
 backed by a dev-only Vite endpoint. PROJECT_STATE §10 describes it.
-**Last updated:** 2026-08-07
+
+Run 0019 (on `run/0019`) then collapsed saving into ONE dialog. Save / Open
+now holds just `Save…` and `Open project`; the separate Export project, Export
+unit and Save to library actions are gone. The dialog takes a DESIGN NUMBER
+and three checkboxes, writing `Flat n` (project file), `Unit n` (unit file)
+and the library entry in any combination, reporting one result line per output
+inside itself. Names follow Shrey's convention, a capitalised word and a
+number, one number per design across both kinds, and the dialog opens on the
+next free number read from the library manifest. Library entries can now be
+replaced instead of silently duplicated, and renamed from their card.
+PROJECT_STATE §11 describes it. **The Netlify site is `reconfigure-flat`**, so
+a branch deploy is `https://run-NNNN--reconfigure-flat.netlify.app`; it is
+password-protected, so an unauthenticated check gets 401 rather than 200, and
+404 means the build has not finished.
+**Last updated:** 2026-08-10
 
 ## What this project is
 
@@ -102,18 +117,25 @@ rules engine and the export format are the mature parts, the UI is not.
 ## How to work with it
 
 - `npm run dev` starts Vite on port 5173. `npm run build` runs `tsc && vite build`.
-- **Node is not on PATH** in shells spawned by tooling. It lives at
-  `C:\Program Files\nodejs` and has to be prepended before `npm` will resolve.
-  `.claude/dev.cmd` exists purely to work around this.
+- **Node is on PATH on the current machine** (macOS, `/usr/local/bin/node`,
+  v24.19.0 as of run 0019) and `npm`/`npx` resolve without help. The earlier
+  note here described a Windows machine where node lived at
+  `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
+  worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  half a second over 47 cases in five files as of run 0018:
-  `src/core/exteriorEdges.test.ts` (five cases over `isFacadeEdge`),
-  `src/core/unitExport.test.ts` (three pure cases over the export glazing
+  a second over 84 cases in eight files as of run 0019:
+  `src/core/rules.test.ts` (25, over HAND-BUILT `DwellingGraph` objects),
+  `src/library/naming.test.ts` (14, the `Flat n` / `Unit n` convention and the
+  number the save dialog proposes), `src/core/savePlan.test.ts` (14, all eight
+  save-checkbox combinations and the rule that a failed unit never cancels the
+  project file), `src/library/manifest.test.ts` (9, manifest schema plus the
+  committed library validated through the browser's own parser),
+  `src/core/saveFiles.test.ts` (8, the byte-identity guarantee for both
+  downloads), `src/library/ids.test.ts` (6, id slugs and collisions),
+  `src/core/exteriorEdges.test.ts` (5, over `isFacadeEdge`), and
+  `src/core/unitExport.test.ts` (3 pure cases over the export glazing
   invariant, whose header explains that it deliberately does not call
-  `buildUnitExport`), `src/core/rules.test.ts` (25 cases over HAND-BUILT
-  `DwellingGraph` objects), and run 0018's `src/library/ids.test.ts` (6, id
-  slugs and collisions) and `src/library/manifest.test.ts` (8, manifest schema
-  plus the committed library validated through the browser's own parser).
+  `buildUnitExport`).
   `npm run test:slow` is the second, about 3.6 s, holding anything named
   `*.slow.test.ts` — files that drive a real `FloorManager` through a stubbed
   `FloorDeps` (`unitExport.slow.test.ts`, and run 0018's
