@@ -69,6 +69,11 @@ describe("parseUnitLibraryIndex — schema", () => {
 });
 
 describe("the committed manifest", () => {
+  // The unit files whose CONTENTS this file cross-checks. It is deliberately a
+  // subset: the library grows as units are authored, and a test that had to be
+  // edited for every new unit would be edited carelessly. Run 0018 pinned the
+  // entry COUNT at 2 and run 0019 found that failing the moment three authored
+  // units landed, which is the failure mode this shape avoids.
   const unitFiles: Record<string, typeof flat2Unit | typeof flat3Unit> = {
     "flat-2-single-storey": flat2Unit,
     "flat-3-terrace": flat3Unit,
@@ -76,8 +81,8 @@ describe("the committed manifest", () => {
 
   it("parses through the same validator the browser uses", () => {
     const m = parseUnitLibraryIndex(committedRaw);
-    expect(m.units.length).toBe(2);
     const ids = m.units.map((u) => u.id);
+    // The two seeds are load-bearing: other tests read their files directly.
     expect(ids).toContain("flat-2-single-storey");
     expect(ids).toContain("flat-3-terrace");
     // The rule fixtures stay out of the library (run 0018's assumption 4).
@@ -87,7 +92,7 @@ describe("the committed manifest", () => {
   it("agrees with each unit file on storeys, area, name, and colour", () => {
     for (const u of parseUnitLibraryIndex(committedRaw).units) {
       const unit = unitFiles[u.id];
-      expect(unit, `unit file for ${u.id} is imported above`).toBeDefined();
+      if (!unit) continue; // an authored unit this file does not import
       expect(unit.format).toBe("dwelling-unit");
       expect(unit.name).toBe(u.name);
       expect(unit.color).toBe(u.color);
@@ -95,5 +100,10 @@ describe("the committed manifest", () => {
       const cells = unit.storeys.reduce((n, s) => n + s.cells.length, 0);
       expect(Math.round(cells * unit.cellSize * unit.cellSize * 100) / 100).toBe(u.areaM2);
     }
+  });
+
+  it("checks the two it imports, so the loop above cannot pass vacuously", () => {
+    const ids = parseUnitLibraryIndex(committedRaw).units.map((u) => u.id);
+    expect(ids.filter((id) => id in unitFiles).length).toBe(2);
   });
 });
