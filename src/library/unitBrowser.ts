@@ -28,6 +28,12 @@ export interface UnitBrowserOptions {
    *  card's "Open a copy" is pressed. The browser itself never parses the
    *  unit file — what to do with it is the host's business. */
   onOpen: (file: File, entry: UnitManifestEntry) => void;
+  /** OPTIONAL. When given, each card grows a Rename control that collects a
+   *  new display name and hands it over. The module knows nothing about how a
+   *  rename is persisted — the host owns that endpoint — so this stays as
+   *  portable as `onOpen`. Resolve to apply, reject to leave the card alone;
+   *  the browser refreshes itself either way. Cards are read-only without it. */
+  onRename?: (entry: UnitManifestEntry, newName: string) => Promise<void>;
   /** Where to attach the panel. Default `document.body`. The panel positions
    *  absolutely, so the mount should be a positioning context. */
   mount?: HTMLElement;
@@ -125,8 +131,8 @@ const CSS = `
   border: 1px solid var(--ink, #141317);
 }
 .ulb-meta { padding: 0 10px 9px 28px; font-size: 10px; color: var(--meta, #6d6a62); }
-.ulb-openbtn {
-  margin: 0 10px 10px;
+.ulb-actions { display: flex; gap: 6px; margin: 0 10px 10px; }
+.ulb-openbtn, .ulb-renamebtn {
   padding: 7px 10px;
   background: transparent;
   border: 1px solid var(--ink, #141317);
@@ -138,8 +144,10 @@ const CSS = `
   text-transform: uppercase;
   cursor: pointer;
 }
-.ulb-openbtn:hover { background: var(--ink, #141317); color: var(--panel-ink, #edece8); }
-.ulb-openbtn:disabled { opacity: 0.5; cursor: default; }
+.ulb-openbtn { flex: 1; }
+.ulb-renamebtn { color: var(--meta, #6d6a62); border-color: var(--line-paper, #c9c5bb); }
+.ulb-openbtn:hover, .ulb-renamebtn:hover { background: var(--ink, #141317); color: var(--panel-ink, #edece8); }
+.ulb-openbtn:disabled, .ulb-renamebtn:disabled { opacity: 0.5; cursor: default; }
 `;
 
 function ensureStyles(doc: Document): void {
@@ -232,7 +240,32 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
         .finally(() => (openBtn.disabled = false));
     });
 
-    c.append(img, nameRow, meta, openBtn);
+    c.append(img, nameRow, meta);
+
+    // Two actions at most, so the card stays one obvious thing to press.
+    const actions = document.createElement("div");
+    actions.className = "ulb-actions";
+    actions.appendChild(openBtn);
+    if (opts.onRename) {
+      const renameBtn = document.createElement("button");
+      renameBtn.type = "button";
+      renameBtn.className = "ulb-renamebtn";
+      renameBtn.textContent = "Rename";
+      renameBtn.addEventListener("click", () => {
+        const next = window.prompt(`Rename "${entry.name}" to:`, entry.name);
+        if (next === null) return; // cancelled
+        const trimmed = next.trim();
+        if (!trimmed || trimmed === entry.name) return;
+        renameBtn.disabled = true;
+        opts
+          .onRename!(entry, trimmed)
+          .then(() => refresh())
+          .catch((err: Error) => status(`Could not rename ${entry.id}: ${err.message}`))
+          .finally(() => (renameBtn.disabled = false));
+      });
+      actions.appendChild(renameBtn);
+    }
+    c.appendChild(actions);
     return c;
   }
 

@@ -3041,9 +3041,10 @@ entrance needs corridor, blank is party-wall material); and
 advisory-not-blocking holds at both scales (the packer scores against burying
 authored intent — it never forbids it — and reports the conflict).
 
-**Export path** (`src/core/unitExport.ts` + the `#unit-export-dialog` in
-index.html + `exportUnit` in main.ts, reached from the top bar's Save / Open
-menu; since run 0018 the same dialog also carries "Save to library" — §10):
+**Export path** (`src/core/unitExport.ts`, driven since run 0019 by the ONE
+save dialog — `#save-dialog` in index.html, `runSave` in main.ts, §11. The
+`buildUnitExport` contract below is unchanged by that; only its trigger moved,
+from a dedicated "Export unit" menu item to a checkbox):
 - Envelope per storey = the `buildSpaceTargets(floor, floorBelow)` key set —
   the same single source of truth doors/windows use (rooms + clusters +
   stairs + stair-hole projections), so the void over a stair is part of the
@@ -3128,38 +3129,49 @@ one display name coexist as `<slug>` and `<slug>-2`; files are named by id;
 nothing is ever overwritten (the old Unit_2 name-clash fix). Verified live
 under a 6-save burst: six distinct suffixed pairs, zero overwrites.
 
-**Save flow** — the `#unit-export-dialog` gained a THIRD submit value,
-`library`, beside cancel/export ("Save to library"); `exportUnit` and its
-download are byte-untouched (the close handler branches on `returnValue`).
-`saveUnitToLibrary` (main.ts) restates the same two hard gates + advisory
-hard-rule confirm as `exportUnit` (deliberately not factored out of it, so the
-export path stays untouched), renders one frame, reads
+**Save flow** — since run 0019 the library entry is one CHECKBOX of the single
+save dialog (§11); `saveLibraryEntry` in main.ts renders one frame, reads
 `canvas.toDataURL("image/jpeg", 0.9)`, and BYTE-CHECKS it (≥1000 bytes; a
 hidden canvas "succeeds" with an empty image — same trap as `__app.capture`).
-DEV: POST `{name, color, unit, preview}` to `/__library/save` — the
+DEV: POST `{name, color, unit, preview, replace}` to `/__library/save` — the
 `library-sink` plugin in vite.config.ts (`apply: "serve"`, beside the
 capture-sink) assigns the id (manifest ids ∪ stray file basenames), writes the
 pair, appends the manifest entry, re-byte-checks server-side. PROD: no sink,
-so the same action downloads `<slug>.json` + `<slug>.jpg` with a sticky toast
-saying they belong in `units/` beside a hand-added manifest entry (slug
-without suffix — only the dev server owns the manifest).
+so the same checkbox downloads `<slug>.json` + `<slug>.jpg` and its result line
+says they belong in `units/` beside a hand-added manifest entry (slug without
+suffix — only the dev server owns the manifest).
+
+**Replace or new, and rename (run 0019).** With `replace: true` the sink
+overwrites the entry matching the name IN PLACE (`findEntryIndex`, id match or
+exact name match), keeping its id so the filenames it points at stay valid;
+only payload, colour and `savedAt` move, and the reply carries
+`replaced: true`. Without it the suffixed-id path runs and a second entry
+appears, which is what happens when the author declines the prompt.
+`POST /__library/rename` with `{id, name}` changes an entry's DISPLAY NAME
+only, updating the manifest row AND the unit file's own `name` (the building
+reads the latter), leaving the id and both filenames alone so the number the id
+carries is not silently freed.
 
 **Browser** — the "Units" top-bar button toggles a viewport-overlay panel of
-cards (preview, name, colour chip, storey count, area; one action each, "Open
-a copy"). Open fetches the entry's unit file and hands it to main.ts, which
-extracts `sourceProject` and feeds `importProjectText` — the NORMAL import
-path, replace-confirm included (`importProjectText` now returns a boolean:
-loaded or not, so a declined confirm leaves the panel open). The opened design
-belongs to the user; saving it back always creates a NEW entry.
+cards (preview, name, colour chip, storey count, area; two actions since run
+0019, "Open a copy" and "Rename"). Open fetches the entry's unit file and hands
+it to main.ts, which extracts `sourceProject` and feeds `importProjectText` —
+the NORMAL import path, replace-confirm included (`importProjectText` returns a
+boolean: loaded or not, so a declined confirm leaves the panel open). The
+opened design belongs to the user; saving it back under the same name offers to
+REPLACE the entry (run 0019) rather than silently adding a second one.
 
 **The reusable boundary** — `src/library/` is self-contained: plain TS + DOM,
 no imports from app internals, styles injected under a `ulb-` prefix reading
 the host's tokens with hardcoded Paper-studio fallbacks. `createUnitBrowser({
-manifestUrl, onOpen(file, entry), mount? }) → { el, open, close, toggle,
-refresh, isOpen }`; `manifest.ts` exports `parseUnitLibraryIndex` (throwing
-validator, used by the browser AND the manifest test); `ids.ts` as above. The
-bottom-up repo builds its unit list against `docs/library-format.md`, lifting
-the module or just the schema.
+manifestUrl, onOpen(file, entry), onRename?(entry, newName), mount? }) → { el,
+open, close, toggle, refresh, isOpen }` — `onRename` is OPTIONAL and the cards
+are read-only without it, which is how a production build (no dev server, no
+writable manifest) gets the same module. `manifest.ts` exports
+`parseUnitLibraryIndex` (throwing validator, used by the browser AND the
+manifest test); `ids.ts` and `naming.ts` as above. The bottom-up repo builds
+its unit list against `docs/library-format.md`, lifting the module or just the
+schema.
 
 **Seeds** — `flat-2-single-storey` (69.84 m², pink) and `flat-3-terrace`
 (60.48 m², blue), converted through the REAL path (loaded via `?project=`,
@@ -3177,3 +3189,76 @@ through the same parser, cross-checked against the unit files — loaded via
 re-exported: storeys, edges, roomTypes, northAngle AND sourceProject reproduce
 exactly. Suite counts as of run 0018: fast 47 passed (was 33), slow 6 passed +
 the standing french-window `it.fails`.
+
+---
+
+## 11. One save, three outputs (`#save-dialog` + `savePlan.ts` + `saveFiles.ts`)
+
+Added in run 0019, from Shrey's own bottleneck: authoring a baseline unit cost
+three separate trips through the menu (Export project, Export unit, Save to
+library). One dialog now asks which of the three to write and writes them.
+
+**The three outputs stay three separate things**, in the model and on disk. A
+project file is the whole design and the ONLY thing that reopens for editing
+(§3). A unit file is the contract with the building (§9, `docs/bridge-format.md`).
+A library entry is a unit plus a preview plus a manifest row (§10,
+`docs/library-format.md`). What collapsed is the doing, not the model.
+
+**The dialog** (`#save-dialog` in index.html, wired in main.ts):
+- **Design number** — the only text input, `type="number"`, floored at 1 so a
+  cleared field cannot write `Flat NaN`. A live line restates what it resolves
+  to ("Writes Flat 4 and Unit 4"), so the two names are never a guess.
+- **Colour** — as before, proposed by hashing the unit name (`defaultUnitColor`,
+  so the same name always proposes the same colour) and left alone for the rest
+  of the session once touched by hand.
+- **Three checkboxes** — Project file / Unit file / Library entry, each with a
+  one-line note saying what that output IS. All three default ON, matching the
+  three trips they replace; the choice is REMEMBERED for the session (a plain
+  module-level `saveSelection`, never serialized — this is how you save, not
+  part of the design), so the second unit costs one click.
+- **A result block**, one line per selected output, rendered IN THE DIALOG,
+  which is why the dialog stays open on Save and closes on its own Close
+  button. Toasts were wrong here: a unit that failed its gate must not read as
+  a project save that failed.
+
+**The naming convention** (`src/library/naming.ts`, Shrey's, 10 August): a name
+is a capitalised word, a space and a number. `Flat 4` for the project, `Unit 4`
+for the unit and its library entry, ONE NUMBER PER DESIGN across both, ids
+following as `flat-4` / `unit-4` through the existing `slugifyUnitName`. The
+dialog opens on `nextFreeNumber`, the LOWEST positive integer no library entry
+holds, so a run of units needs no typing and a gap left by a deletion is
+offered again rather than stranded. The manifest is the only persistent record
+the app can read back, so a design saved WITHOUT a library entry does not
+consume its number — a real edge, and the honest one.
+
+**Order matters, and it is the point.** `runSave` builds the unit ONCE (both
+unit-derived outputs share it), raises the advisory hard-rule confirm at most
+once and only when a unit is actually being written, then writes the project
+file FIRST and independently. A hard gate failure (no usable entrance,
+disconnected footprint) or a declined confirm costs ONLY the unit-derived
+outputs; the project file still writes and its line still says so. Verified
+live on an empty project: `Project file — flat-4.json downloaded, 1 floor(s),
+240 bytes` beside two red lines carrying the gate's own reason.
+
+**Byte identity.** `src/core/saveFiles.ts` holds the two serialization
+expressions the retired paths used, carried over character for character:
+`JSON.stringify(data, null, 2)` for the project and
+`JSON.stringify(file, null, 2)` for the unit. Only the FILENAMES changed, and
+deliberately: `flat-4.json` / `unit-4.json` instead of a timestamp, following
+the ids. `src/core/saveFiles.test.ts` pins both against the same expressions
+and against a committed unit file's own bytes.
+
+**What was retired** — the `Export project` and `Export unit` menu items and
+the old dialog's `Save to library` action, all three subsumed. `Open project`
+survives: it is the import, not a save. Three DEAD callbacks
+(`onExport`/`onImport`/`onExportUnit`) were also removed from `PaletteDeps`
+(`src/ui/palette.ts`) — declared but never used since the reskin moved those
+controls to the top bar.
+
+**Purity, and why** — the decision rules are in `src/core/savePlan.ts`
+(`planOutputs`, `isEmptySelection`, `needsUnitBuild`, `needsRuleConfirm`,
+`unitGateResults`, `outputLabel`) with no DOM, canvas or server, so
+`savePlan.test.ts` walks all eight checkbox combinations exhaustively and pins
+the survives-a-failed-unit rule directly. main.ts is thin wiring over it.
+Suite counts as of run 0019: fast 84 passed in 8 files (was 47 in 5), slow 6
+passed + the standing french-window `it.fails`.

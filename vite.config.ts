@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
-import { assignUnitId } from "./src/library/ids.ts";
+import { assignUnitId, slugifyUnitName } from "./src/library/ids.ts";
 
 /**
  * DEV-ONLY capture sink. The app renders to a WebGL canvas, so the only way to
@@ -61,6 +61,37 @@ function captureSink(root: string): Plugin {
  * points at. `apply: "serve"` keeps it out of every production build; a
  * production save falls back to downloading the same pair (main.ts).
  */
+interface ManifestEntry {
+  id: string;
+  name: string;
+  color: string;
+  file: string;
+  preview: string;
+  storeys: number;
+  areaM2: number;
+  savedAt: string;
+}
+interface Manifest {
+  format: string;
+  version: number;
+  units: ManifestEntry[];
+}
+
+/** The manifest as it stands, or an empty one. */
+function readManifest(manifestPath: string): Manifest {
+  return existsSync(manifestPath)
+    ? (JSON.parse(readFileSync(manifestPath, "utf8")) as Manifest)
+    : { format: "unit-library", version: 1, units: [] };
+}
+
+/** Index of the entry a save under `name` collides with, mirroring
+ *  `findLibraryEntry` in src/library/naming.ts: id match or exact name match,
+ *  so a renamed entry is still found by the number it holds. */
+function findEntryIndex(units: ManifestEntry[], name: string): number {
+  const id = slugifyUnitName(name);
+  return units.findIndex((u) => u.id === id || u.name === name);
+}
+
 function librarySink(root: string): Plugin {
   const unitsDir = resolve(root, "public", "units");
   const manifestPath = join(unitsDir, "index.json");
@@ -79,11 +110,12 @@ function librarySink(root: string): Plugin {
         req.on("data", (c) => (body += c));
         req.on("end", () => {
           try {
-            const { name, color, unit, preview } = JSON.parse(body) as {
+            const { name, color, unit, preview, replace } = JSON.parse(body) as {
               name?: string;
               color?: string;
               unit?: { format?: string; cellSize?: number; storeys?: { cells: unknown[] }[] };
               preview?: string;
+              replace?: boolean;
             };
             if (!name || typeof name !== "string")
               return reply(400, { ok: false, error: "missing name" });
@@ -102,20 +134,28 @@ function librarySink(root: string): Plugin {
                 error: `preview is ${jpeg.length} bytes — the canvas read back empty (is the view visible?)`,
               });
 
-            // Taken ids: the manifest's, plus any stray file already named that
-            // way, so a save never overwrites a pair the manifest forgot.
-            const manifest = existsSync(manifestPath)
-              ? (JSON.parse(readFileSync(manifestPath, "utf8")) as {
-                  format: string;
-                  version: number;
-                  units: { id: string }[];
-                })
-              : { format: "unit-library" as const, version: 1, units: [] };
-            const taken = new Set(manifest.units.map((u) => u.id));
-            for (const f of existsSync(unitsDir) ? readdirSync(unitsDir) : [])
-              taken.add(f.replace(/\.(json|jpg)$/, ""));
-            taken.delete("index");
-            const id = assignUnitId(name, taken);
+            const manifest = readManifest(manifestPath);
+
+            // REPLACE OR NEW (run 0019). With `replace`, an existing entry
+            // under this name is overwritten IN PLACE, keeping its id so the
+            // files it points at and anything referencing it stay valid; only
+            // the payload, the colour and `savedAt` move. Without it, the id
+            // gets a numeric suffix and a second entry appears, which is the
+            // pre-0019 behaviour and stays the fallback.
+            const at = replace === true ? findEntryIndex(manifest.units, name) : -1;
+            let id: string;
+            if (at >= 0) {
+              id = manifest.units[at].id;
+            } else {
+              // Taken ids: the manifest's, plus any stray file already named
+              // that way, so a save never overwrites a pair the manifest
+              // forgot.
+              const taken = new Set(manifest.units.map((u) => u.id));
+              for (const f of existsSync(unitsDir) ? readdirSync(unitsDir) : [])
+                taken.add(f.replace(/\.(json|jpg)$/, ""));
+              taken.delete("index");
+              id = assignUnitId(name, taken);
+            }
 
             const cellSize = typeof unit.cellSize === "number" ? unit.cellSize : 0.6;
             const cellCount = unit.storeys.reduce((n, s) => n + s.cells.length, 0);
@@ -132,9 +172,51 @@ function librarySink(root: string): Plugin {
             mkdirSync(unitsDir, { recursive: true });
             writeFileSync(join(unitsDir, entry.file), JSON.stringify(unit, null, 2) + "\n");
             writeFileSync(join(unitsDir, entry.preview), jpeg);
-            manifest.units.push(entry);
+            if (at >= 0) manifest.units[at] = entry;
+            else manifest.units.push(entry);
             writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
-            reply(200, { ok: true, entry });
+            reply(200, { ok: true, entry, replaced: at >= 0 });
+          } catch (err) {
+            reply(500, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          }
+        });
+      });
+
+      // RENAME (run 0019): change an entry's DISPLAY NAME only. The id and the
+      // two filenames stay put, so nothing that already points at the entry
+      // breaks and the number the id carries is not silently freed. This is
+      // what saves an author from hand-editing index.json, which was the only
+      // way to fix a name before.
+      server.middlewares.use("/__library/rename", (req, res) => {
+        const reply = (status: number, payload: unknown) => {
+          res.statusCode = status;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify(payload));
+        };
+        if (req.method !== "POST") return reply(405, { ok: false, error: "POST only" });
+        let body = "";
+        req.on("data", (c) => (body += c));
+        req.on("end", () => {
+          try {
+            const { id, name } = JSON.parse(body) as { id?: string; name?: string };
+            if (!id || typeof id !== "string")
+              return reply(400, { ok: false, error: "missing id" });
+            if (!name || typeof name !== "string" || !name.trim())
+              return reply(400, { ok: false, error: "missing name" });
+            const manifest = readManifest(manifestPath);
+            const at = manifest.units.findIndex((u) => u.id === id);
+            if (at < 0) return reply(404, { ok: false, error: `no entry with id "${id}"` });
+            manifest.units[at] = { ...manifest.units[at], name: name.trim() };
+            writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+            // The unit file carries its own `name`, and the building reads THAT
+            // rather than the manifest, so the two must not drift.
+            const unitPath = join(unitsDir, manifest.units[at].file);
+            if (existsSync(unitPath)) {
+              const unit = JSON.parse(readFileSync(unitPath, "utf8")) as { name?: string };
+              unit.name = name.trim();
+              writeFileSync(unitPath, JSON.stringify(unit, null, 2) + "\n");
+            }
+            reply(200, { ok: true, entry: manifest.units[at] });
           } catch (err) {
             reply(500, { ok: false, error: err instanceof Error ? err.message : String(err) });
           }

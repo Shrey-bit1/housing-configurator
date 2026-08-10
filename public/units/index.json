@@ -21,6 +21,36 @@
       "storeys": 1,
       "areaM2": 60.48,
       "savedAt": "2026-08-06T20:59:43.145Z"
+    },
+    {
+      "id": "unit-1",
+      "name": "Unit 1",
+      "color": "#ff922b",
+      "file": "unit-1.json",
+      "preview": "unit-1.jpg",
+      "storeys": 1,
+      "areaM2": 48.96,
+      "savedAt": "2026-08-10T14:41:10.500Z"
+    },
+    {
+      "id": "unit-2",
+      "name": "Unit 2",
+      "color": "#ff6b6b",
+      "file": "unit-2.json",
+      "preview": "unit-2.jpg",
+      "storeys": 2,
+      "areaM2": 127.08,
+      "savedAt": "2026-08-10T14:52:43.982Z"
+    },
+    {
+      "id": "unit-3",
+      "name": "Unit 3",
+      "color": "#9775fa",
+      "file": "unit-3.json",
+      "preview": "unit-3.jpg",
+      "storeys": 1,
+      "areaM2": 52.92,
+      "savedAt": "2026-08-10T14:57:03.223Z"
     }
   ]
 }
