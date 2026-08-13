@@ -83,10 +83,22 @@ export function createScene(canvas: HTMLCanvasElement): SceneContext {
   // ---- Ground plane (invisible raycast target + shadow catcher) ----
   const groundGeo = new THREE.PlaneGeometry(1, 1);
   groundGeo.rotateX(-Math.PI / 2);
+  // A ShadowMaterial is transparent by definition: it paints nothing except
+  // where a shadow falls. It must therefore NOT write depth. It used to, and
+  // because the FloorManager parks this plane at the ACTIVE floor's height
+  // (floorManager.ts, `recomputeStack`), that made it an invisible occluder
+  // sitting directly above every lower storey. Transparent objects are sorted
+  // back-to-front by centroid, so whether this plane drew before or after the
+  // storey underneath it flipped with the camera angle, and whole stairs and
+  // rooms blinked out as the view orbited. Nothing about a shadow catcher
+  // should ever hide the thing casting the shadow.
   const groundMat = new THREE.ShadowMaterial({ opacity: 0.28 });
+  groundMat.depthWrite = false;
   const groundPlane = new THREE.Mesh(groundGeo, groundMat);
   groundPlane.receiveShadow = true;
   groundPlane.name = "ground";
+  // Draw before the other transparents, so it can never paint over them.
+  groundPlane.renderOrder = -1;
   scene.add(groundPlane);
 
   // ---- Orbit controls ----

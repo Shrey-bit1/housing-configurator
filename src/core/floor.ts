@@ -355,8 +355,10 @@ export class Floor {
   setDimmed(dimmed: boolean): void {
     this.dimmed = dimmed; // remembered so rebuilt seed outlines re-apply it
     // Per-instance rooms/modules: fall back to the room colour.
-    for (const inst of this.store.instances.values())
+    for (const inst of this.store.instances.values()) {
       fade(inst.group, dimmed, inst.def.color);
+      hideProps(inst.group, dimmed);
+    }
     // Merged connector-cluster walls: their materials carry their own baseColor.
     fade(this.clusterGroup, dimmed, EDGE_COLOR);
     fade(this.seedOutlines, dimmed, EDGE_COLOR);
@@ -403,11 +405,34 @@ function fade(root: THREE.Object3D, dimmed: boolean, fallback: number): void {
       mat.transparent = true;
       mat.opacity = (mat.userData.baseOpacity as number) * DIM_OPACITY;
       mat.depthWrite = false; // so the flight below shows through, not z-fights
+      // Draw dimmed storeys BEFORE the active one among the transparents. A
+      // transparent object's place in the queue is otherwise its centroid
+      // distance, which flips as the camera orbits, so an inactive floor could
+      // paint over the floor being edited from one angle and not the next.
+      o.renderOrder = -2;
     } else {
       mat.transparent = mat.userData.baseTransparent as boolean;
       mat.opacity = mat.userData.baseOpacity as number;
       mat.depthWrite = !mat.transparent;
+      o.renderOrder = 0;
     }
     mat.needsUpdate = true;
+  });
+}
+
+/**
+ * Furniture on an inactive floor is HIDDEN, not faded.
+ *
+ * Voxel props carry `userData.noDim` because their colour lives in an
+ * instanceColor buffer rather than a material, so the colour pass cannot fade
+ * them and they stayed at full strength on a floor that was otherwise a ghost:
+ * a dimmed storey read as a grey shell full of bright furniture. Ghosting them
+ * properly is not worth it either, since the reason to look at a floor you are
+ * not editing is its walls, its stair and its openings. So they simply go
+ * away, and come back when their floor does.
+ */
+function hideProps(root: THREE.Object3D, dimmed: boolean): void {
+  root.traverse((o) => {
+    if (o.userData.props) o.visible = !dimmed;
   });
 }

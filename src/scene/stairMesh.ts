@@ -37,6 +37,9 @@ const EDGE = 0x1a1a1a;
 const STEP_INSET = 0.06;
 /** Slab thickness under a spiral tread and under a landing, metres. */
 const SLAB_T = 0.12;
+/** Depth of a flight's raking soffit, measured vertically down from the pitch
+ *  (see {@link flightProfile}). 180 mm reads as a real stair slab. */
+const SOFFIT_T = 0.18;
 
 /** Reference rise the OLD deprecated stair was built at, kept because
  *  `FloorManager` still imports it for the deprecated type's scale path. */
@@ -186,11 +189,25 @@ interface Box {
 }
 
 /**
- * The stepped side of one flight as a closed (run, height) profile, solid to
- * the ground. `dir` is +1 when the flight climbs toward increasing run and −1
+ * One flight as a closed (run, height) profile: steps on top, a RAKING SOFFIT
+ * underneath. `dir` is +1 when the flight climbs toward increasing run and −1
  * when it climbs back. The last riser tops out onto whatever comes next (a
  * landing or the floor above), which is why there is one fewer going than
  * risers.
+ *
+ * THE SOFFIT IS THE POINT. These profiles used to close straight down to the
+ * ground, making every flight a solid mass from floor to underside. Two of
+ * those side by side is not a dogleg, it is a 1.8 × 3.6 × 3.0 m block with
+ * steps scratched into the top, and from most angles it reads as disjoint
+ * lumps meeting at odd places rather than as a stair. A real flight is a slab
+ * that rakes: you can see under the upper flight, and the underside is a
+ * straight soffit from foot to landing. That is what this draws, and it is
+ * what makes a dogleg legible from any angle.
+ *
+ * The soffit is measured VERTICALLY down from the pitch, so its perpendicular
+ * thickness is slightly less; that is how stair soffits are actually set out.
+ * At the foot it is clamped to the floor, so a ground-level flight sits on the
+ * slab instead of sinking through it.
  */
 function flightProfile(
   runStart: number,
@@ -202,8 +219,14 @@ function flightProfile(
 ): [number, number][] {
   const pts: [number, number][] = [];
   const goings = risers - 1;
-  // Up the face at the foot, then riser/tread alternating.
-  pts.push([runStart, yStart]);
+  const runEnd = runStart + dir * goings * treadM;
+  const yTop = yStart + risers * riserM;
+  const footBottom = Math.max(0, yStart - SOFFIT_T);
+
+  // Up the vertical face at the foot (degenerate, and skipped, when the flight
+  // starts on the floor), then riser and tread alternating along the top.
+  pts.push([runStart, footBottom]);
+  if (yStart > footBottom) pts.push([runStart, yStart]);
   let y = yStart;
   for (let i = 0; i < risers; i++) {
     y += riserM;
@@ -211,10 +234,8 @@ function flightProfile(
     pts.push([r, y]); // the riser
     if (i < goings) pts.push([r + dir * treadM, y]); // the tread
   }
-  // Close down to the ground and back along the base.
-  const runEnd = runStart + dir * goings * treadM;
-  pts.push([runEnd, 0]);
-  pts.push([runStart, 0]);
+  // Down the back face by the soffit depth, then back along the rake.
+  pts.push([runEnd, yTop - SOFFIT_T]);
   return pts;
 }
 
@@ -267,7 +288,7 @@ function doglegGeometry(plan: StairPlan, box: Box, mirrored: boolean): THREE.Buf
   const f1 = flightProfile(box.z0, 0, r1, riserM, treadM, 1);
   // Flight 2 starts at the landing level and climbs back toward the base.
   const f2 = flightProfile(zTurn, midY, r2, riserM, treadM, -1);
-  const land = slabProfile(zTurn, box.z1, midY, Math.max(SLAB_T, midY));
+  const land = slabProfile(zTurn, box.z1, midY, SLAB_T);
 
   const fullW = box.x1 - box.x0 - STEP_INSET;
   return [
@@ -306,11 +327,11 @@ function cGeometry(plan: StairPlan, box: Box, mirrored: boolean): THREE.BufferGe
     // Flight 1: across the near end, climbing toward +x.
     alongX(flightProfile(box.x0, 0, n1, riserM, treadM, 1), laneW, zNear, mx),
     // Landing at the near-right corner, level with the top of flight 1.
-    alongX(slabProfile(box.x0 + run1, box.x1, y1, Math.max(SLAB_T, y1)), laneW, zNear, mx),
+    alongX(slabProfile(box.x0 + run1, box.x1, y1, SLAB_T), laneW, zNear, mx),
     // Flight 2: down the right side, climbing toward +z.
     alongZ(flightProfile(box.z0 + fw, y1, n2, riserM, treadM, 1), laneW, xRight, mx),
     // Landing at the far-right corner, level with the top of flight 2.
-    alongZ(slabProfile(box.z0 + fw + run2, box.z1, y2, Math.max(SLAB_T, y2)), laneW, xRight, mx),
+    alongZ(slabProfile(box.z0 + fw + run2, box.z1, y2, SLAB_T), laneW, xRight, mx),
     // Flight 3: back across the far end, climbing toward −x, arriving upstairs.
     alongX(flightProfile(box.x1, y2, n3, riserM, treadM, -1), laneW, zFar, mx),
   ];

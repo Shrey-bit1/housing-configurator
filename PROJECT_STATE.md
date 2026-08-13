@@ -126,7 +126,12 @@ holds `scale.y` at 1, calling `rebuildStairRise` (a no-op unless the height
 actually moved) when a tall room changes the storey. Same in-place, same-material
 pattern as `rebuildRoomWalls`, so selection and violation tints survive.
 
-All four are solid to the ground, built in the un-rotated local frame and placed
+Each flight is a RAKING SLAB: steps on top, a 180 mm soffit underneath, ends
+closed vertically. They were briefly solid masses down to the ground, which
+made a dogleg a 1.8 × 3.6 × 3.0 m block with steps scratched into the top and
+read as disjoint lumps from most angles; a flight you can see under is what
+makes a stair legible. Landings are 120 mm slabs for the same reason. All four
+are built in the un-rotated local frame and placed
 in a subgroup rotated by −rotation·90°. Mirroring negates x centres and angles,
 NEVER `scale.x = -1` (which would invert winding and normals — the bug class
 behind the old stair-wedge fix). `mergeGeometries` is fed geometries normalized
@@ -183,6 +188,23 @@ were connecting to, for two separate reasons, both fixed:
   in `userData.baseOpacity`/`baseTransparent` on first touch and restored
   exactly, which is what keeps glazing (already transparent) from being
   flattened when its floor becomes active again.
+
+**Three follow-on fixes**, from testing the above against a real two-storey flat:
+- **The shadow-catcher was an invisible occluder.** `sceneSetup.ts`'s ground
+  plane is a `ShadowMaterial`, so it is transparent, and it had `depthWrite`
+  ON while the FloorManager parks it at the ACTIVE floor's height. Transparent
+  objects sort back-to-front by centroid, so whether it drew before or after
+  the storey beneath it flipped with the camera angle, and whole stairs and
+  rooms blinked out as the view orbited. This only surfaced once dimmed floors
+  became transparent themselves: while they were opaque they drew in the
+  earlier pass and were safe. It is now `depthWrite: false`, `renderOrder: -1`.
+- **Dimmed floors draw at `renderOrder = -2`**, so an inactive storey can never
+  paint over the one being edited regardless of orbit.
+- **Furniture on an inactive floor is HIDDEN, not faded** (`hideProps`, keyed on
+  the `userData.props` tag `props/place.ts` sets). Voxel props carry
+  `userData.noDim` because their colour lives in an instanceColor buffer that
+  the colour pass cannot reach, so a dimmed storey used to read as a grey shell
+  full of full-strength furniture.
 
 ### 2b. Wall / floor-to-floor height
 
