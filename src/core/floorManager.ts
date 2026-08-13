@@ -29,7 +29,7 @@ import type { SelectionController } from "../interaction/selection";
 import { markCutawayDirty } from "../scene/cutaway";
 import { rebuildClusterShells } from "../scene/clusterShells";
 import { rebuildRoomWalls } from "../scene/moduleMesh";
-import { REFERENCE_STAIR_RISE } from "../scene/stairMesh";
+import { rebuildStairRise } from "../scene/stairMesh";
 
 /** Height (cells) assumed for a floor with no rooms yet, so spacing is stable. */
 const DEFAULT_FLOOR_CELLS = 4;
@@ -231,14 +231,26 @@ export class FloorManager {
     this.syncing = false;
   }
 
-  /** Scale each stair's geometry so its rise matches its floor's actual height
-   *  (built at {@link REFERENCE_STAIR_RISE}); ≈1 unless the floor holds a tall
-   *  room. Cheap; rebuilt stair groups (on rotate) get re-scaled here too. */
+  /**
+   * Keep each stair's rise equal to its floor's actual floor-to-floor height.
+   *
+   * Until run 0020 this stretched `group.scale.y` from a fixed 3.0 m reference
+   * flight, which meant the risers on screen were never the risers the model
+   * meant and the 2R + T proportion drifted with the floor height. Stairs are
+   * now BUILT at the true rise (scene/stairMesh.ts, from core/stairSpec.ts), so
+   * this reconciles by rebuilding the geometry when the height has actually
+   * moved, exactly as {@link rebuildAllShells} does for walls, and holds
+   * `scale.y` at 1. `rebuildStairRise` is a no-op when nothing changed, which
+   * is the common case.
+   */
   private updateStairScales(): void {
     for (const floor of this.floors) {
-      const scale = this.floorHeight(floor) / REFERENCE_STAIR_RISE;
-      for (const inst of floor.store.instances.values())
-        if (inst.def.category === "stair") inst.group.scale.y = scale;
+      const height = this.floorHeight(floor);
+      for (const inst of floor.store.instances.values()) {
+        if (inst.def.category !== "stair") continue;
+        inst.group.scale.y = 1;
+        rebuildStairRise(inst.group, inst.def, inst.rotation, inst.mirrored, height);
+      }
     }
   }
 

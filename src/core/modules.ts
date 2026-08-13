@@ -72,7 +72,16 @@ export function isElastic(def: ModuleDef): boolean {
  * {@link isBathroom} and rules.ts's node-level `ctx.is.bathroom`, so the two can
  * never drift when a bathroom preset is added.
  */
-export const BATHROOM_TYPES = ["bathroom_small", "bathroom_large"];
+export const BATHROOM_TYPES = [
+  "bathroom_small",
+  "bathroom_large",
+  // Run 0020: the minimal WC and the two full bathrooms. Adding them HERE is
+  // what gives them the solid wall against outdoor space, the wet-room
+  // treatment, and rules.ts's `ctx.is.bathroom`, with no other edit anywhere.
+  "wc",
+  "bathroom_full",
+  "bathroom_full_compact",
+];
 
 /**
  * Whether this def is a bathroom. A bathroom keeps a SOLID wall against outdoor
@@ -138,18 +147,78 @@ export function lShape(w: number, d: number, nw: number, nd: number): Cell[] {
 // ---- Definitions -------------------------------------------------------------
 
 export const MODULE_DEFS: Record<string, ModuleDef> = {
-  // ----- Stairs (two-floor structural object) -----
-  // A 180° DOGLEG: two 1-cell-wide flights running side by side in opposite
-  // directions, with a full-width half-landing at the far end (the 180° turn).
-  // Footprint 2 cells wide (x) × 6 cells long (z) at rotation 0 = 1.2 m × 3.6 m,
-  // all on the grid: each flight run = 4.5 cells (2.7 m), landing = 1.5 cells
-  // (0.9 m). `height` is nominal — the actual rise is the floor-to-floor gap,
-  // applied at render time via scale.y (stairMesh + FloorManager). Neutral
-  // concrete grey; not a room. Geometry detail lives in stairMesh.ts.
+  // ----- Stairs (two-floor structural objects) -----
+  // FOUR REAL STAIRS, added in run 0020 after the 13 August meeting called the
+  // old one-cell flight illegal. Every proportion is derived in
+  // core/stairSpec.ts from the storey height, at riser target 170 mm and tread
+  // 270 mm, and drawn at that true size by scene/stairMesh.ts. `height` is
+  // nominal: the real rise is the floor-to-floor gap, which the mesh is now
+  // built at directly rather than scaled to.
+  //
+  // The DEPRECATED one-cell dogleg is kept at the bottom of this block.
+  stair_straight: {
+    type: "stair_straight",
+    name: "Stair — Straight",
+    description: "One flight · 2×8 · 1.2 m wide",
+    category: "stair",
+    group: "Stairs",
+    color: 0x8a8a8a,
+    cells: rect(2, 8),
+    height: 1,
+  },
+  stair_dogleg: {
+    type: "stair_dogleg",
+    name: "Stair — Dogleg",
+    description: "Two flights · 3×6 · 1.8 m tight",
+    category: "stair",
+    group: "Stairs",
+    color: 0x8a8a8a,
+    cells: rect(3, 6),
+    height: 1,
+  },
+  stair_dogleg_wide: {
+    type: "stair_dogleg_wide",
+    name: "Stair — Dogleg, generous",
+    description: "Two flights · 4×6 · 2.4 m wide",
+    category: "stair",
+    group: "Stairs",
+    color: 0x8a8a8a,
+    cells: rect(4, 6),
+    height: 1,
+  },
+  stair_spiral: {
+    type: "stair_spiral",
+    name: "Stair — Spiral",
+    description: "One turn · 4×4 · 2.4 m circle",
+    category: "stair",
+    group: "Stairs",
+    color: 0x8a8a8a,
+    cells: rect(4, 4),
+    height: 1,
+  },
+  stair_c: {
+    type: "stair_c",
+    name: "Stair — C, three flights",
+    description: "Three flights round a well · 4×6",
+    category: "stair",
+    group: "Stairs",
+    color: 0x8a8a8a,
+    cells: rect(4, 6),
+    height: 1,
+  },
+
+  // DEPRECATED (run 0020). The original 2×6 dogleg, whose flights were ONE CELL
+  // (0.6 m) wide. It is absent from {@link STAIR_LIST} so it can no longer be
+  // placed, and it stays in this registry ONLY so that projects saved before
+  // run 0020 still load: `loadProject` resolves every instance through
+  // MODULE_DEFS by type, and deleting the entry would silently drop the stair
+  // out of an old flat, taking its stairwell hole and its floor-to-floor
+  // connection with it. Anything placed from an old file still renders and can
+  // still be deleted; nothing new can be created.
   stair: {
     type: "stair",
-    name: "Stair (dogleg)",
-    description: "180° dogleg · 2×6 · to floor above",
+    name: "Stair (dogleg, retired)",
+    description: "Deprecated 0.6 m flights · load-only",
     category: "stair",
     group: "Stairs",
     color: 0x8a8a8a,
@@ -212,6 +281,42 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
     color: 0xd8d4cb,
     cells: rect(4, 4),
     height: ROOM_HEIGHT,  },
+
+  // The two bathrooms the 13 August user test asked for, added in run 0020.
+  // The participant wanted a small room with only a basin and a WC; the meeting
+  // added that a proper bathroom with a bathtub should sit beside it. Both are
+  // WET rooms and carry everything the existing bathrooms carry, because
+  // BATHROOM_TYPES is the one list every consumer reads.
+  //
+  // Sizes verified against the props drawn at true size (scene/props/rooms.ts):
+  // WC 400 × 700, basin 500 × 400, bathtub 1700 × 750.
+  wc: {
+    type: "wc",
+    name: "WC — minimal",
+    description: "Basin and WC · 2×3 · 1.2 × 1.8 m",
+    category: "room",
+    group: "Bathroom",
+    color: 0xd8d4cb,
+    cells: rect(2, 3),
+    height: ROOM_HEIGHT,  },
+  bathroom_full: {
+    type: "bathroom_full",
+    name: "Bathroom — Full",
+    description: "Bath, basin, WC · 4×4 · 2.4 × 2.4 m",
+    category: "room",
+    group: "Bathroom",
+    color: 0xd8d4cb,
+    cells: rect(4, 4),
+    height: ROOM_HEIGHT,  },
+  bathroom_full_compact: {
+    type: "bathroom_full_compact",
+    name: "Bathroom — Full, compact",
+    description: "Bath, basin, WC · 3×4 · 1.8 × 2.4 m",
+    category: "room",
+    group: "Bathroom",
+    color: 0xd8d4cb,
+    cells: rect(3, 4),
+    height: ROOM_HEIGHT,  },
   recreation: {
     type: "recreation",
     name: "Recreation Room",
@@ -270,8 +375,16 @@ export const MODULE_DEFS: Record<string, ModuleDef> = {
 };
 
 
-/** Stairs, in palette order (its own category — spans two floors). */
-export const STAIR_LIST: ModuleDef[] = [MODULE_DEFS.stair];
+/** Stairs, in palette order (its own category — spans two floors). The
+ *  deprecated `stair` is deliberately absent: it stays in MODULE_DEFS so old
+ *  files load, and out of here so nothing new can be placed. */
+export const STAIR_LIST: ModuleDef[] = [
+  MODULE_DEFS.stair_straight,
+  MODULE_DEFS.stair_dogleg,
+  MODULE_DEFS.stair_dogleg_wide,
+  MODULE_DEFS.stair_spiral,
+  MODULE_DEFS.stair_c,
+];
 
 /** Room presets, in palette order. */
 export const ROOM_LIST: ModuleDef[] = [
@@ -279,6 +392,9 @@ export const ROOM_LIST: ModuleDef[] = [
   MODULE_DEFS.kitchen,
   MODULE_DEFS.bedroom_small,
   MODULE_DEFS.bedroom_large,
+  MODULE_DEFS.wc,
+  MODULE_DEFS.bathroom_full,
+  MODULE_DEFS.bathroom_full_compact,
   MODULE_DEFS.bathroom_small,
   MODULE_DEFS.bathroom_large,
   MODULE_DEFS.recreation,
