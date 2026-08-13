@@ -26,11 +26,13 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** the working tree is on `main`. Run 0019 was built on `run/0019`
-and merged into `main` on 10 August at merge commit `21d1d10`, pushed;
-`origin/run/0019` still exists as the run's record. Run 0018 was merged the
-same way on 7 August at `9089329`. Both branch records remain on the remote,
-every commit already in `main`'s history. So `main` holds
+**Branch:** the working tree is on `run/0020`, pushed to `origin/run/0020`
+(code HEAD `9ad4e36`) and NOT merged. **Run 0019 IS merged**, contrary to what
+run 0020's prompt assumed: it went into `main` on 10 August at merge commit
+`21d1d10` and was pushed, so the one-save dialog and the naming convention are
+live on `main`, and `run/0020` was cut from a main that contains them. Run 0018
+was merged the same way on 7 August at `9089329`. All three branch records
+remain on the remote. `main` holds
 both the "Paper studio" reskin from runs 0016/0017 (paper ground and ink
 rules, a 52px top bar with a MODEL / PLAN / DIAGRAM segmented control, a
 resizable PLACE / FLOORS / BRIEF palette, three viewport overlay clusters,
@@ -50,11 +52,26 @@ inside itself. Names follow Shrey's convention, a capitalised word and a
 number, one number per design across both kinds, and the dialog opens on the
 next free number read from the library manifest. Library entries can now be
 replaced instead of silently duplicated, and renamed from their card.
-PROJECT_STATE §11 describes it. **The Netlify site is `reconfigure-flat`**, so
+PROJECT_STATE §11 describes it.
+
+Run 0020 (on `run/0020`, unmerged) replaced the stairs and added bathrooms.
+The old 0.6 m-wide stair is retired from the palette, kept in `MODULE_DEFS` so
+pre-0020 files still load. Five palette entries now: straight 2×8, dogleg 3×6
+(the default, 1.8 m tight), dogleg generous 4×6, spiral 4×4, C of three flights
+4×6. All proportions derive from the storey height in `src/core/stairSpec.ts`
+(pure, tested), at riser target 170 mm and tread 270 mm, and stairs are BUILT
+at the floor's true height rather than scaled. Three new wet rooms: `wc` 2×3,
+`bathroom_full` 4×4, `bathroom_full_compact` 3×4. An inactive floor now renders
+TRANSLUCENT rather than flat grey and a stairwell opening is see-through, so a
+flight below reads through it. PROJECT_STATE §2a and §2t describe all of it.
+**The storey height is derived, not configured**: (tallest room, min 4 cells,
++ 1 clearance cell) × 0.6 m, so 3.0 m by default.
+
+**The Netlify site is `reconfigure-flat`**, so
 a branch deploy is `https://run-NNNN--reconfigure-flat.netlify.app`; it is
 password-protected, so an unauthenticated check gets 401 rather than 200, and
 404 means the build has not finished.
-**Last updated:** 2026-08-10
+**Last updated:** 2026-08-13
 
 ## What this project is
 
@@ -123,7 +140,10 @@ rules engine and the export format are the mature parts, the UI is not.
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 84 cases in eight files as of run 0019:
+  a second over 126 cases in ten files as of run 0020 (84 in eight before it,
+  plus `src/core/stairSpec.test.ts` 23, the stair proportions and the spiral's
+  miss, and `src/scene/props/bathroomFit.test.ts` 19, the bathroom fixture fit).
+  The eight older files are:
   `src/core/rules.test.ts` (25, over HAND-BUILT `DwellingGraph` objects),
   `src/library/naming.test.ts` (14, the `Flat n` / `Unit n` convention and the
   number the save dialog proposes), `src/core/savePlan.test.ts` (14, all eight
