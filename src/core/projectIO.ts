@@ -33,6 +33,12 @@ export interface InstanceData {
   /** Left/right footprint flip. ADDITIVE (v1): absent in older files → false,
    *  defaulted by {@link normalizeInstance}, so no version bump/migration. */
   mirrored?: boolean;
+  /** DOUBLE HEIGHT (run 0021): this room takes the volume of the floor above
+   *  its own footprint. Additive and OPTIONAL exactly like `mirrored`, and
+   *  defaulted false by {@link normalizeInstance}, so a project written before
+   *  run 0021 loads with every room single height, which is what it meant.
+   *  No version bump, no migration. */
+  doubleHeight?: boolean;
 }
 
 /** A ground-floor entrance: host cell + the exterior side it binds to. */
@@ -115,6 +121,7 @@ export function serializeProject(
         cz: i.origin.cz,
         rotation: i.rotation,
         mirrored: i.mirrored,
+        doubleHeight: i.doubleHeight,
       })),
       entrances: f.entrances.map((e) => ({ cx: e.cell.cx, cz: e.cell.cz, side: e.side })),
       doors: f.doors.map((d) => ({ cx: d.cell.cx, cz: d.cell.cz, side: d.side, swing: d.swing })),
@@ -272,6 +279,7 @@ function normalizeInstance(raw: unknown): InstanceData | null {
     cz: Math.round(num(o.cz, 0)),
     rotation: (((Math.round(num(o.rotation, 0)) % 4) + 4) % 4),
     mirrored: o.mirrored === true, // absent/older files → false
+    doubleHeight: o.doubleHeight === true, // absent/older files → false
   };
 }
 

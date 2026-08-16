@@ -31,6 +31,8 @@ export interface PaletteCallbacks {
   onPlaceEntrance: () => void;
   /** Enter door-placement mode (interior boundaries, any floor). */
   onPlaceDoor: () => void;
+  /** Enter double-height mode: click a room to open it into the storey above. */
+  onMarkDoubleHeight: () => void;
   /** Replace the project's orientation preference. Either half may be
    *  undefined, which means no opinion; the caller stores it and commits
    *  history, because it is design state that belongs in the project file. */
@@ -91,8 +93,11 @@ function caption(text: string): HTMLElement {
 }
 
 /** STRUCTURE & ACCESS: the stair and the two placement tools. They sit together
- *  because none of them is a room, and all three are things a plan needs before
- *  it is finished. */
+ *  because none of them is a room, and all of them are things a plan needs
+ *  before it is finished. Run 0021 added a third tool, Double height, which
+ *  marks a room rather than placing anything — the same shape of act as
+ *  Entrance and Doorway, which is why it lives here rather than as a button
+ *  attached to the selection. */
 function buildStructureGroup(cb: PaletteCallbacks): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "palette-group";
@@ -118,8 +123,15 @@ function buildStructureGroup(cb: PaletteCallbacks): HTMLElement {
   doorway.className = "palette-tool tool-doorway";
   doorway.innerHTML = '<span class="pt-name">Doorway</span><span class="pt-size">interior wall</span>';
   doorway.addEventListener("click", () => cb.onPlaceDoor());
+  const doubleHeight = document.createElement("button");
+  doubleHeight.type = "button";
+  doubleHeight.className = "palette-tool tool-double-height";
+  doubleHeight.innerHTML =
+    '<span class="pt-name">Double height</span><span class="pt-size">room into the storey above</span>';
+  doubleHeight.addEventListener("click", () => cb.onMarkDoubleHeight());
   grid.appendChild(entrance);
   grid.appendChild(doorway);
+  grid.appendChild(doubleHeight);
 
   wrap.appendChild(grid);
   return wrap;

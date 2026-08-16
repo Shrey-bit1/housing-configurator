@@ -1200,6 +1200,35 @@ button.primary:hover {
   pointer-events: none;
 }
 
+/* The readout is pointer-transparent so it never eats a click meant for the
+   canvas underneath. Its one control has to opt back in (run 0021). */
+#double-height-toggle {
+  pointer-events: auto;
+  margin-left: 10px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--line-soft);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+#double-height-toggle:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* Pressed: the room already carries the mark. */
+#double-height-toggle.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
 #selection-readout.visible {
   display: block;
 }
@@ -1848,6 +1877,15 @@ button.primary:hover {
 .tool-entrance {
   border-color: var(--entry);
 }
+.tool-double-height {
+  border-color: var(--note);
+  color: var(--note);
+}
+.tool-double-height:hover {
+  background: var(--note);
+  color: var(--bg);
+}
+
 .tool-doorway {
   border-color: var(--violet);
 }

@@ -206,6 +206,84 @@ were connecting to, for two separate reasons, both fixed:
   the colour pass cannot reach, so a dimmed storey used to read as a grey shell
   full of full-strength furniture.
 
+### 2u. Double-height rooms (run 0021)
+
+A resident could author a flat over two storeys and nothing said a room may
+open into the storey above. The building app was guessing from stacked room
+ids, right on 170 of 185 seams and wrong on 15. This is the property that
+replaces the guess.
+
+**The room BELOW owns the void.** `ModuleInstance.doubleHeight` (store.ts) is
+a per-instance flag on the lower room, toggled only through
+`ModuleStore.setDoubleHeight(id, on)`, never written directly, because the
+floor above has to be checked first. Only a non-cluster ROOM can carry it:
+furniture has no volume worth opening, and a connector is drawn as one merged
+cluster shell so a flag on a single piece would mean nothing coherent.
+
+**One void concept, two causes.** `FloorManager.voidCells(floor)` returns the
+stair footprints AND the double-height footprints together, and that one list
+drives everything: the floor above's `setHoles` (which blocks placement and
+draws no plate), and the export's `openCeilings`. Stairwells and double-height
+rooms are different intentions with the same consequence, so they meet in one
+place rather than being tracked apart.
+
+**Refusal, never deletion.** `store.doubleHeightObstruction` (set by the
+FloorManager, which is the only thing that knows the stack) returns the
+OBSTRUCTING CELLS rather than a boolean, so the refusal can name them. Marking
+a room whose volume above is occupied fails and the toast lists the cells;
+nothing on the floor above is ever removed to make room. Verified: a 7×5
+living room under a 5×4 bedroom refuses with 20 cells named, the bedroom
+intact.
+
+**The derived storey height does NOT change.** The room takes the storey above
+rather than making its own storey taller, so `maxRoomHeightCells` still reads
+`def.height` and the stack does not move. Measured: the walls rise to 6.0 m
+while the floor spacing stays 3.0 m.
+
+**A mark on the topmost floor CREATES the floor above**, exactly as a stair
+does, because the mark claims a storey and that storey had better exist.
+`syncStairsAndHoles` reads `voidCells(top)` rather than `stairCells(top)` for
+that branch, so both cases take one path. Appending a floor no longer drops
+plan mode either: `onStructureChange` extends `prePlanVisibility` and re-applies
+it rather than exiting, so placing a stair while reading a plan leaves you in
+the plan.
+
+**Geometry.** `rebuildAllShells` passes `height + floorHeight(above)` for a
+marked room, so the walls rise through both storeys. It adds the floor ABOVE's
+own height rather than doubling this one, which stays correct when the two
+storeys differ. No ceiling had to be removed: `buildRoomShell` already draws an
+open-top shell. On the upper storey the footprint is a hole, and `HoleView`'s
+panel is now translucent (`VOID_OPACITY` 0.18, `depthWrite: false`) so the room
+below reads through it instead of being hidden behind a dark plate.
+
+**The void uses the SEED footprint, not the grown one.** An elastic room's
+effective cells are derived AFTER holes are set (expansion reads holes, so
+holes cannot read expansion without a cycle), and the seed is the stable,
+authored answer. The consequence is honest rather than approximate: a living
+room grown to 49 cells with a 35-cell seed reports 35 open ceilings, and the
+other 14 genuinely do have a floor above them, because nothing stopped
+placement there.
+
+**The control is a TOOL in Structure & Access**, beside Entrance and Doorway
+(`interaction/doubleHeightController.ts`, armed from `ui/palette.ts`). Arm it,
+click a room, and the mark toggles; the tool stays armed so several rooms can
+be marked in a row, hovering highlights the room the click would affect through
+the same emissive selection uses, and Escape disarms it through main.ts's
+central arbitrator. It is a tool rather than a button on the selection readout
+because marking a room is the same shape of act as placing an entrance or a
+doorway, and this app already says that with an armed mode and a click.
+
+**Serialization is additive.** `InstanceData.doubleHeight?: boolean` beside
+`mirrored`, defaulted false by `normalizeInstance`, so a pre-0021 project loads
+with every room single height, which is what it meant. `APP_PROJECT_VERSION`
+stays 1. `loadProject` restores the flag directly rather than through
+`setDoubleHeight`, because the floors above are still being filled in during
+the load loop and re-validating mid-load would reject valid projects on loop
+order alone.
+
+**On the bridge** it becomes `storeys[i].openCeilings` (§9 and
+docs/bridge-format.md), the per-cell list of seams with no floor.
+
 ### 2b. Wall / floor-to-floor height
 
 `FloorManager.floorHeight(floor)` (private) = `(max(DEFAULT_FLOOR_CELLS,
@@ -3186,6 +3264,20 @@ configured it rather than as a monochrome token:
   that ignores them produces byte-identical results (verified by the stash
   method — the export with the two fields stripped is byte-identical to the
   pre-change export on the same fixture).
+
+**`openCeilings` (run 0021, still v1).** `storeys[i].openCeilings` is the list
+of cells of storey i over which no floor is drawn between it and storey i+1,
+in the same normalized space as `cells`. It answers the building app's own
+question, which is per cell: does the floor above this cell exist. Chosen over
+a room-level "this room is double height" property because a room-level flag
+would make the consumer re-derive which cells a room covers and which storey it
+sits on, which is exactly the relationship a bridge loses; the per-cell list
+needs no inference and absorbs stairwells, which open a ceiling for a different
+reason and are the same fact to a reader. Derived from
+`FloorManager.voidCells`, translated by the same single unit normalization as
+`cells` and `edges`, and EMPTY on the top storey because the roof is out of
+scope. Optional and additive, so absent means every seam is floored, which is
+what every pre-0021 file meant: version stays 1.
 
 **Recorded v1 orientation limitation:** glazed edges were derived under the
 flat's authored `northAngle` (south bias). The packer may rotate units through

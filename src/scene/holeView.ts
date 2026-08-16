@@ -15,9 +15,10 @@ import { connectedComponents } from "../core/cluster";
  * style as the cluster shells.
  */
 const VOID_COLOR = 0x2a2a2a;
-/** How solid the opening's wash is. Low enough that a flight underneath reads
- *  straight through it, high enough that the opening still reads as an opening
- *  when there is nothing below to see. */
+/** How solid the opening's wash is. An opening has to read as an opening when
+ *  there is nothing below it, and get out of the way of whatever is below when
+ *  there is: a stairwell has to show its flight (run 0020) and a double-height
+ *  room has to show the room (run 0021). Low enough for both. */
 const VOID_OPACITY = 0.18;
 const OUTLINE_COLOR = 0x1a1a1a;
 const DIM_BG = new THREE.Color(0xe9e5dc);
@@ -59,13 +60,15 @@ export class HoleView {
       const z0 = this.grid.gridToWorld(0, minZ).z - H;
       const z1 = this.grid.gridToWorld(0, maxZ).z + H;
 
-      // The opening, as a SEE-THROUGH shadow rather than a black hole (run
-      // 0020). This panel used to be an opaque dark plate, which is the one
-      // thing an opening must not be: it hid the stair arriving through it, so
-      // the flight you were connecting to was invisible from the floor it
-      // arrived at. It is now a faint translucent wash that reads as a recess
-      // while letting the flight below show through, and it never writes depth,
-      // so nothing underneath is culled behind it.
+      // The opening, as a SEE-THROUGH shadow rather than a black hole. This
+      // panel used to be an opaque dark plate, which is the one thing an
+      // opening must not be. Runs 0020 and 0021 arrived at the same fix from
+      // opposite ends: it hid the stair arriving through it, so the flight you
+      // were connecting to was invisible from the floor it reached, and it hid
+      // a double-height room, whose whole point is that you can see it from the
+      // storey above. It is now a faint translucent wash that reads as a recess
+      // while letting whatever is below show through, and it never writes
+      // depth, so nothing underneath is culled behind it.
       const panelMat = new THREE.MeshBasicMaterial({
         color: VOID_COLOR,
         transparent: true,

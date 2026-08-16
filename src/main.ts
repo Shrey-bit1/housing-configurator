@@ -2,6 +2,7 @@ import "./style.css";
 import * as THREE from "three";
 import { type Grid } from "./core/grid";
 import { rotatedCells } from "./core/modules";
+import type { Cell } from "./core/grid";
 import { FloorManager } from "./core/floorManager";
 import { worldNorthDir } from "./core/orientation";
 import { createScene } from "./scene/sceneSetup";
@@ -11,6 +12,7 @@ import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
 import { SelectionController, type MarkerSelectionAdapter } from "./interaction/selection";
 import { updateCutaway, setCutawayEnabled } from "./scene/cutaway";
+import { setHovered } from "./scene/moduleMesh";
 import { createCompassDial } from "./ui/compassDial";
 import { computeDwellingGraph } from "./core/adjacencyGraph";
 import { validate, computeEntranceDepths, type Violation } from "./core/rules";
@@ -24,6 +26,7 @@ import {
 } from "./scene/highlight";
 import { EntranceController } from "./interaction/entranceController";
 import { DoorController } from "./interaction/doorController";
+import { DoubleHeightController } from "./interaction/doubleHeightController";
 import { buildPalette } from "./ui/palette";
 import { renderDragChrome } from "./ui/dragChrome";
 import { showToast } from "./ui/toast";
@@ -83,6 +86,7 @@ const viewport = document.getElementById("viewport") as HTMLElement;
 const undoBtn = document.getElementById("undo-btn") as HTMLButtonElement;
 const redoBtn = document.getElementById("redo-btn") as HTMLButtonElement;
 const selectionReadout = document.getElementById("selection-readout") as HTMLElement;
+const selectionText = document.getElementById("selection-text") as HTMLElement;
 const shortcutsBtn = document.getElementById("shortcuts-btn") as HTMLButtonElement;
 const shortcutsPanel = document.getElementById("shortcuts-panel") as HTMLElement;
 const shortcutsClose = document.getElementById("shortcuts-close") as HTMLButtonElement;
@@ -182,7 +186,7 @@ const selection = new SelectionController(
   // A placement tool (entrance/door) owns the canvas while armed — selection
   // stays out entirely (both controllers are declared below; this closure only
   // runs during pointer events, long after they're initialised).
-  () => entranceController.isActive || doorController.isActive
+  () => entranceController.isActive || doorController.isActive || doubleHeightController.isActive
 );
 
 floors.attach({ picker, ghost, groupGhost, dragDrop, selection, groundPlane, sizeGroundPlane });
@@ -204,7 +208,16 @@ dragDrop.onGesture = (state) => {
 // in plan mode would leave its by-index hidden-floor bookkeeping stale, so
 // leave plan mode first (safe/simple over trying to remap indices).
 floors.onStructureChange = () => {
-  if (planMode) exitPlanMode();
+  // A floor was APPENDED (a stair, or a double-height room, needed somewhere to
+  // go). This used to drop plan mode, which was jarring: placing a stair while
+  // reading a plan threw you back into the axo view for no reason the resident
+  // could see. Plan mode's only per-index bookkeeping is `prePlanVisibility`,
+  // and appending a floor just leaves it one short, which `applyPlanVisibility`
+  // already tolerates (`?? true`). So extend it and stay put.
+  if (planMode) {
+    while (prePlanVisibility.length < floors.floors.length) prePlanVisibility.push(true);
+    applyPlanVisibility();
+  }
   renderSidebar();
 };
 
@@ -260,6 +273,7 @@ function cancelPlacementModes(): void {
   entranceController.cancel();
   doorController.cancel();
   selection.cancelDuplicate();
+  doubleHeightController.cancel();
 }
 
 // ---- Sidebar (rebuilt whenever floor state changes) ----
@@ -299,7 +313,7 @@ function renderSidebar(): void {
         renderSidebar();
       },
       onAddFloor() {
-        if (planMode) exitPlanMode(); // stack shape changes — see onStructureChange
+        // Stays in plan mode: `onStructureChange` extends the bookkeeping.
         floors.addFloor();
         renderSidebar();
         commitHistory(); // adding a floor is an undoable action
@@ -338,6 +352,12 @@ function renderSidebar(): void {
         cancelPlacementModes(); // disarm palette drag / entrance tool / duplicate ghost
         selection.deselect();
         doorController.start();
+      },
+      onMarkDoubleHeight() {
+        // Marks a room on the active floor; same arming shape as the two above.
+        cancelPlacementModes();
+        selection.deselect();
+        doubleHeightController.start();
       },
       onSetOrientationPreference(pref) {
         // Design state, so it is undoable and it lands in the project file. No
@@ -401,9 +421,70 @@ function updateSelectionReadout(): void {
   } else if (doorSelected) {
     text = `Door · Floor ${floors.activeIndexValue}`;
   }
-  selectionReadout.textContent = text;
+  selectionText.textContent = text;
   selectionReadout.classList.toggle("visible", !!text);
+
 }
+
+/** Toggle one room's double-height mark, from the palette tool. A refusal names
+ *  the cells that blocked it rather than clearing them: the obstruction is
+ *  authored work on another floor and deleting it silently would be the worst
+ *  possible answer (see `ModuleStore.setDoubleHeight`). */
+function toggleDoubleHeight(instanceId: string): { ok: boolean; blockedBy?: Cell[] } {
+  const inst = floors.active.store.instances.get(instanceId);
+  if (!inst) return { ok: false };
+  const want = !inst.doubleHeight;
+  const res = floors.active.store.setDoubleHeight(inst.id, want);
+  if (!res.ok) {
+    const cells = res.blockedBy ?? [];
+    showToast(
+      "error",
+      cells.length
+        ? `Cannot open this room upward: the floor above already holds something over ` +
+            `${cells.length} of its cells (${cells
+              .slice(0, 4)
+              .map((c) => `${c.cx},${c.cz}`)
+              .join(" · ")}${cells.length > 4 ? " …" : ""}). Clear those cells first.`
+        : "This room cannot be made double height."
+    );
+    return res;
+  }
+  clearValidation();
+  updateSelectionReadout();
+  commitHistory(); // marking is a mutating action, so it is undoable
+  showToast(
+    "info",
+    want
+      ? `"${inst.def.name}" is now double height and claims the storey above.`
+      : `"${inst.def.name}" is single height again.`
+  );
+  return res;
+}
+
+/** The double-height TOOL: arm it from the palette, click rooms, Escape to
+ *  disarm — the same shape as the entrance and doorway tools. */
+const doubleHeightController = new DoubleHeightController(
+  canvas,
+  picker,
+  () => floors.active,
+  toggleDoubleHeight,
+  // Hover feedback reuses the emissive the selection controller already uses,
+  // so an armed tool highlights a room exactly the way hovering one does.
+  (id) => {
+    if (doubleHeightHovered && doubleHeightHovered !== id) {
+      const prev = floors.active.store.instances.get(doubleHeightHovered);
+      if (prev) setHovered(prev.group, false, false);
+    }
+    doubleHeightHovered = id;
+    if (id) {
+      const inst = floors.active.store.instances.get(id);
+      if (inst) setHovered(inst.group, true, false);
+    }
+  }
+);
+/** The room the double-height tool is hovering, so the previous one can be
+ *  un-highlighted when the cursor moves on. */
+let doubleHeightHovered: string | null = null;
 
 // ---- Shortcuts legend (static content in index.html; just a visibility toggle) ----
 shortcutsBtn.addEventListener("click", () => shortcutsPanel.classList.toggle("open"));
@@ -1221,6 +1302,13 @@ if (import.meta.env.DEV) {
      *  the same turn as the read, because the context is created without
      *  `preserveDrawingBuffer`, so anything read a frame later comes back
      *  cleared. */
+    /** Build a `dwelling-unit` export from the CURRENT state, through the real
+     *  exporter. Dev-only, beside `capture`, and for the same reason: it lets a
+     *  check produce the actual artefact rather than describe it. Run 0021 used
+     *  it to re-export every library unit so each carries `openCeilings`. */
+    buildUnit(name: string, color: string) {
+      return buildUnitExport(floors, name, color);
+    },
     capture(name: string): Promise<unknown> {
       renderer.render(scene, camera);
       return fetch(`/__capture?name=${encodeURIComponent(name)}`, {
@@ -1351,6 +1439,10 @@ window.addEventListener("keydown", (e) => {
     }
     if (entranceController.isActive) {
       entranceController.cancel();
+      return;
+    }
+    if (doubleHeightController.isActive) {
+      doubleHeightController.cancel();
       return;
     }
     if (doorController.isActive) {

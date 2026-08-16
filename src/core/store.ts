@@ -18,6 +18,14 @@ export interface ModuleInstance {
    *  rotation — see {@link occupiedCells}). Default false; chiral shapes
    *  (L-rooms, the dogleg stair) use it to reach their other handedness. */
   mirrored: boolean;
+  /** DOUBLE HEIGHT (run 0021): this room stands two storeys tall, taking the
+   *  volume of the floor above its own footprint. The room BELOW the void owns
+   *  it, so this flag lives on the lower room and the cells above are blocked
+   *  for placement exactly as a stairwell blocks them
+   *  ({@link FloorManager.voidCells}). Default false, meaningful only for a
+   *  non-cluster room; toggled through {@link ModuleStore.setDoubleHeight},
+   *  never written directly, because the floor above has to be checked first. */
+  doubleHeight: boolean;
   group: THREE.Group;
 }
 
@@ -46,6 +54,20 @@ export class ModuleStore {
    *  (which knows it); `buildModuleMesh` falls back to the def's own nominal
    *  height when this is unset. */
   wallHeightProvider?: () => number;
+
+  /**
+   * Can this room take the volume above its own footprint (run 0021)? Returns
+   * the cells that are in the way, EMPTY when the mark is allowed. Set by the
+   * FloorManager, which is the only thing that knows the floor stack. Unset
+   * means unknown, which is treated as allowed.
+   *
+   * Modelled on {@link extraPlacementCheck}, but it returns the OBSTRUCTION
+   * rather than a boolean, because refusing a double-height mark has to be able
+   * to say which cells stopped it. Silently deleting whatever is above is not
+   * an option: it would destroy authored rooms on a floor the resident is not
+   * even looking at.
+   */
+  doubleHeightObstruction?: (cells: Cell[]) => Cell[];
 
   /**
    * @param container the THREE container (a floor's group) meshes are added to,
@@ -104,7 +126,7 @@ export class ModuleStore {
     this.container.add(group);
 
     this.grid.occupy(cells, id);
-    const inst: ModuleInstance = { id, def, origin, rotation, mirrored, group };
+    const inst: ModuleInstance = { id, def, origin, rotation, mirrored, doubleHeight: false, group };
     this.instances.set(id, inst);
     this.onChange?.();
     return inst;
@@ -154,6 +176,37 @@ export class ModuleStore {
     const inst = this.instances.get(id);
     if (!inst) return false;
     return this.move(id, inst.origin, (inst.rotation + 1) % 4);
+  }
+
+  /**
+   * Mark a room double height, or clear the mark (run 0021). Returns
+   * `{ ok: true }` when it committed, or `{ ok: false, blockedBy }` naming the
+   * cells on the floor above that are in the way.
+   *
+   * THE ROOM BELOW OWNS THE VOID, so the mark lives here and the FloorManager
+   * turns it into blocked cells on the floor above. Only a real room can carry
+   * it: furniture has no volume worth opening, and a connector cluster is drawn
+   * as one merged shell, so a flag on a single piece of it would have nothing
+   * coherent to mean.
+   *
+   * Clearing the mark never fails. Setting it fails, loudly, when something
+   * already stands in the volume it wants, because the alternative is deleting
+   * a room on a floor the resident may not even be looking at.
+   */
+  setDoubleHeight(id: string, on: boolean): { ok: boolean; blockedBy?: Cell[] } {
+    const inst = this.instances.get(id);
+    if (!inst) return { ok: false };
+    if (inst.def.category !== "room" || inst.def.cluster) return { ok: false };
+    if (inst.doubleHeight === on) return { ok: true };
+
+    if (on) {
+      const cells = occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored);
+      const blockedBy = this.doubleHeightObstruction?.(cells) ?? [];
+      if (blockedBy.length > 0) return { ok: false, blockedBy };
+    }
+    inst.doubleHeight = on;
+    this.onChange?.();
+    return { ok: true };
   }
 
   /** Flip the instance's handedness in place, pivoting about its ORIGIN cell
