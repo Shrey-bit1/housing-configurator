@@ -106,6 +106,94 @@ describe("marking a room double height", () => {
   });
 });
 
+describe("growth, and the void that has to follow it", () => {
+  /**
+   * A living room with an ENCLOSED strip beside it that expansion will fill.
+   * The strip is cz 5, cx 1..7: walled by the living room above, two bathrooms
+   * below, and a connector at each end, so it is not border-reachable and is
+   * therefore a gap an elastic room can claim.
+   */
+  function withGrowth() {
+    const fm = new FloorManager(new THREE.Scene(), 16, 16);
+    fm.attach(stubDeps());
+    const f0 = fm.floors[0];
+    // A stair first, so floor 1 exists and can be occupied BEFORE any mark.
+    f0.store.place("stair", { cx: 12, cz: 0 }, 0, false);
+    const living = f0.store.place("living", { cx: 1, cz: 0 }, 0, false)!;
+    f0.store.place("bathroom_large", { cx: 1, cz: 6 }, 0, false);
+    f0.store.place("bathroom_large", { cx: 5, cz: 6 }, 0, false);
+    f0.store.place("circulation_single", { cx: 0, cz: 5 }, 0, false);
+    f0.store.place("circulation_single", { cx: 8, cz: 5 }, 0, false);
+    return { fm, f0, f1: fm.floors[1], living };
+  }
+
+  const grown = (f: (typeof FloorManager.prototype.floors)[number], id: string) =>
+    (f.effectiveCells.get(id) ?? []).length;
+
+  it("grows into the enclosed strip when nothing is above it", () => {
+    const { f0, living } = withGrowth();
+    expect(grown(f0, living.id)).toBe(42); // 35 seed + the 7-cell strip
+  });
+
+  it("VOIDS THE GROWN ROOM, not its seed", () => {
+    // The void has to be the room. Reading the seed left a grown
+    // double-height room roofed over the part it had grown into.
+    const { f0, f1, living } = withGrowth();
+    expect(f0.store.setDoubleHeight(living.id, true)).toEqual({ ok: true });
+    expect(grown(f0, living.id)).toBe(42);
+    expect(f1.grid.holeCount).toBe(42 + 12); // the room, plus the stairwell
+  });
+
+  it("REFUSES TO GROW where the storey above is occupied", () => {
+    // The upstairs bathroom covers cx 4..7 of the strip and none of the seed,
+    // so the mark is allowed and the growth is what has to give way.
+    const { f0, f1, living } = withGrowth();
+    expect(f1.store.place("bathroom_large", { cx: 4, cz: 5 }, 0, false)).toBeTruthy();
+    expect(grown(f0, living.id)).toBe(42); // still grown: not double height yet
+
+    expect(f0.store.setDoubleHeight(living.id, true)).toEqual({ ok: true });
+
+    // Retracted to the three strip cells whose volume above is free.
+    expect(grown(f0, living.id)).toBe(38);
+    const strip = (f0.effectiveCells.get(living.id) ?? [])
+      .filter((c) => c.cz === 5)
+      .map((c) => c.cx)
+      .sort((a, b) => a - b);
+    expect(strip).toEqual([1, 2, 3]);
+  });
+
+  it("keeps the hole exactly equal to what the room actually holds", () => {
+    const { f0, f1, living } = withGrowth();
+    f1.store.place("bathroom_large", { cx: 4, cz: 5 }, 0, false);
+    f0.store.setDoubleHeight(living.id, true);
+    // 38 room cells + 12 stairwell, and not one cell more: the hole tracks the
+    // retracted footprint rather than the growth the room wanted.
+    expect(f1.grid.holeCount).toBe(38 + 12);
+    expect(grown(f0, living.id) + 12).toBe(f1.grid.holeCount);
+  });
+
+  it("a SINGLE-height room is unaffected by what is above it", () => {
+    // The constraint is about claiming volume, so it must not leak into
+    // ordinary rooms: this one keeps the whole strip.
+    const { f0, f1, living } = withGrowth();
+    f1.store.place("bathroom_large", { cx: 4, cz: 5 }, 0, false);
+    expect(living.doubleHeight).toBe(false);
+    expect(grown(f0, living.id)).toBe(42);
+  });
+
+  it("gives the growth back when the obstruction upstairs is removed", () => {
+    const { f0, f1, living } = withGrowth();
+    const up = f1.store.place("bathroom_large", { cx: 4, cz: 5 }, 0, false)!;
+    f0.store.setDoubleHeight(living.id, true);
+    expect(grown(f0, living.id)).toBe(38);
+
+    f1.store.remove(up.id);
+
+    expect(grown(f0, living.id)).toBe(42);
+    expect(f1.grid.holeCount).toBe(42 + 12);
+  });
+});
+
 describe("the derived storey height", () => {
   it("does NOT change: the room takes the storey above, it does not grow its own", () => {
     const { fm, f0, living } = twoStorey();

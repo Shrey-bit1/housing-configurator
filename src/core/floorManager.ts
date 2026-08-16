@@ -200,14 +200,29 @@ export class FloorManager {
     return out;
   }
 
-  /** Absolute cells of every DOUBLE-HEIGHT room on `floor` (run 0021). These
-   *  claim the volume of the floor above, so the floor above must not build a
-   *  plate over them or let anything be placed there. */
+  /**
+   * Absolute cells of every DOUBLE-HEIGHT room on `floor` (run 0021). These
+   * claim the volume of the floor above, so the floor above must not build a
+   * plate over them or let anything be placed there.
+   *
+   * THE EFFECTIVE FOOTPRINT, not the seed. An elastic room that grew is that
+   * bigger room, and the void has to be the room: reading the seed left a
+   * grown double-height living room roofed over the part it had grown into,
+   * which is a floor hanging in the middle of a two-storey space. The seed is
+   * only the fallback for the moment before the first derive pass, when no
+   * effective footprint exists yet.
+   *
+   * This is what makes the derivation ORDER matter — see
+   * {@link deriveVoidsAndExpansion}.
+   */
   private doubleHeightCells(floor: Floor): Cell[] {
     const out: Cell[] = [];
     for (const inst of floor.store.instances.values())
       if (inst.doubleHeight)
-        out.push(...occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored));
+        out.push(
+          ...(floor.effectiveCells.get(inst.id) ??
+            occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored))
+        );
     return out;
   }
 
@@ -248,15 +263,10 @@ export class FloorManager {
       structureChanged = true;
     }
 
-    for (let j = 0; j < this.floors.length; j++) {
-      const below = j > 0 ? this.floors[j - 1] : null;
-      this.floors[j].setHoles(below ? this.voidCells(below) : []);
-    }
-
-    // Derive the elastic-room EFFECTIVE footprints (expansion.ts) — after
-    // holes (rooms never grow over the stairwell void), BEFORE door pruning
-    // and the shell rebuild, both of which read effective space.
-    this.recomputeExpansion();
+    // Holes and effective footprints, in one bottom-up pass — see
+    // deriveVoidsAndExpansion for why the order is what it is. Runs BEFORE door
+    // pruning and the shell rebuild, both of which read effective space.
+    this.deriveVoidsAndExpansion();
     this.pruneStaleDoors();
     this.recomputeStack();
     this.updateStairScales();
@@ -722,7 +732,7 @@ export class FloorManager {
    *  opening in both adjacent shells). Does NOT prune (those callers never
    *  strand a door). */
   refreshWalls(): void {
-    this.recomputeExpansion(); // cheap + idempotent; occupancy rarely changed here
+    this.deriveVoidsAndExpansion(); // cheap + idempotent; occupancy rarely changed here
     this.rebuildAllShells();
     markCutawayDirty();
   }
@@ -731,8 +741,34 @@ export class FloorManager {
    *  on top of them, its semi-exterior plan (core/semiExterior.ts — french
    *  windows onto qualifying balconies). Strictly per-floor; both are pure
    *  functions of the placed seeds + holes, and neither is ever serialized. */
-  private recomputeExpansion(): void {
-    for (const floor of this.floors) floor.setEffective(computeExpansion(floor));
+  private deriveVoidsAndExpansion(): void {
+    // BOTTOM-UP, INTERLEAVED, and it has to be. The dependencies look circular
+    // and are not:
+    //
+    //   holes(N)      ← voidCells(N-1) ← effective(N-1)
+    //   effective(N)  ← holes(N)  and  ← RAW occupancy(N+1)
+    //
+    // The first is a chain up the stack, so floor N-1 is always finished before
+    // floor N starts. The second reaches DOWNWARD only as far as raw placed
+    // cells, which are source of truth and derived from nothing, so it closes
+    // no loop. Doing all the holes first and all the expansion after, as this
+    // used to, meant a floor's holes were computed from the PREVIOUS pass's
+    // effective footprints: a grown double-height room kept a ceiling over the
+    // area it had just grown into until something else happened to trigger
+    // another sync.
+    for (let j = 0; j < this.floors.length; j++) {
+      const floor = this.floors[j];
+      const below = j > 0 ? this.floors[j - 1] : null;
+      floor.setHoles(below ? this.voidCells(below) : []);
+
+      const above = j + 1 < this.floors.length ? this.floors[j + 1] : null;
+      floor.setEffective(
+        computeExpansion(
+          floor,
+          above ? (cx, cz) => !above.grid.plateAvailable([{ cx, cz }]) : undefined
+        )
+      );
+    }
     // Semi-exterior derives FROM the effective footprints (a grown elastic room
     // gets french windows on whatever boundary it grew into contact with), so
     // it runs in a second pass, after every floor's expansion is settled.

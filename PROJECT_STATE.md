@@ -256,13 +256,40 @@ open-top shell. On the upper storey the footprint is a hole, and `HoleView`'s
 panel is now translucent (`VOID_OPACITY` 0.18, `depthWrite: false`) so the room
 below reads through it instead of being hidden behind a dark plate.
 
-**The void uses the SEED footprint, not the grown one.** An elastic room's
-effective cells are derived AFTER holes are set (expansion reads holes, so
-holes cannot read expansion without a cycle), and the seed is the stable,
-authored answer. The consequence is honest rather than approximate: a living
-room grown to 49 cells with a 35-cell seed reports 35 open ceilings, and the
-other 14 genuinely do have a floor above them, because nothing stopped
-placement there.
+**The void is the GROWN room, and growth is constrained by the storey above.**
+Both halves matter and they are one mechanism.
+
+An elastic room that grew IS that bigger room, so `doubleHeightCells` reads
+`floor.effectiveCells` and falls back to the seed only before the first derive
+pass. Reading the seed left a grown double-height room roofed over the part it
+had grown into, which is a floor hanging in mid-air inside a two-storey space.
+
+And a double-height room may only GROW where the storey above is free, because
+growing is how it claims more of that storey. `computeExpansion` takes an
+`occupiedAbove` predicate and skips a double-height room as a candidate for any
+gap cell whose volume above is occupied; the cell is still offered to other
+rooms, so an ordinary neighbour can take space the double-height room cannot.
+Single-height rooms are untouched by it, since they claim nothing up there.
+
+**The order this needs, and why it is not circular.** The dependencies read:
+
+    holes(N)     ← voidCells(N−1) ← effective(N−1)
+    effective(N) ← holes(N)  and  ← RAW occupancy(N+1)
+
+The first is a chain UP the stack, so floor N−1 finishes before floor N starts.
+The second reaches downward only as far as raw placed cells, which are source of
+truth and derived from nothing, so it closes no loop.
+`FloorManager.deriveVoidsAndExpansion` therefore walks the stack BOTTOM-UP,
+setting each floor's holes and then its effective footprints in the same step.
+Doing all the holes first and all the expansion after, which is what run 0021
+originally did, meant a floor's holes came from the PREVIOUS pass's effective
+footprints and lagged a whole sync behind the growth.
+
+Measured on a living room with a 35-cell seed and a 7-cell enclosed strip it
+grows into: it holds 42 cells and voids 42; put a bathroom on the storey above
+covering four of those strip cells and it retracts to 38 and voids 38; remove
+the bathroom and it returns to 42. `src/core/doubleHeight.slow.test.ts` pins all
+three, plus the rule that a single-height room in the same layout keeps all 42.
 
 **The control is a TOOL in Structure & Access**, beside Entrance and Doorway
 (`interaction/doubleHeightController.ts`, armed from `ui/palette.ts`). Arm it,

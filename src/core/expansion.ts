@@ -42,11 +42,23 @@ import type { Floor } from "./floor";
  * cells. Consumers (walls, windows, graph, doors, entrances, export, readout)
  * read these instead of the raw seed footprints.
  */
-export function computeExpansion(floor: Floor): Map<string, Cell[]> {
+export function computeExpansion(
+  floor: Floor,
+  /**
+   * Is the volume ABOVE this cell occupied on the next floor up (run 0021)?
+   * Only a DOUBLE-HEIGHT room is asked: growing is how such a room claims more
+   * of the storey above, so it may only grow where that storey is free. A
+   * single-height room is unaffected, because it claims nothing up there.
+   *
+   * Omitted on the top floor, and before the stack is known, where nothing can
+   * be in the way.
+   */
+  occupiedAbove?: (cx: number, cz: number) => boolean
+): Map<string, Cell[]> {
   const grid = floor.grid;
   const result = new Map<string, Cell[]>();
   const hard = new Set<string>();
-  const elastic: { id: string; num: number; cells: Cell[] }[] = [];
+  const elastic: { id: string; num: number; cells: Cell[]; doubleHeight: boolean }[] = [];
 
   for (const inst of floor.store.instances.values()) {
     const cells = occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored);
@@ -54,7 +66,12 @@ export function computeExpansion(floor: Floor): Map<string, Cell[]> {
     if (inst.def.category === "module") continue; // furniture: blocks, not a space
     result.set(inst.id, cells);
     if (isElastic(inst.def))
-      elastic.push({ id: inst.id, num: idNum(inst.id), cells });
+      elastic.push({
+        id: inst.id,
+        num: idNum(inst.id),
+        cells,
+        doubleHeight: inst.doubleHeight,
+      });
   }
   if (elastic.length === 0) return result;
 
@@ -79,9 +96,16 @@ export function computeExpansion(floor: Floor): Map<string, Cell[]> {
     for (let cx = 0; cx < grid.cols; cx++) {
       if (!isGap(cx, cz)) continue;
       const k = cellKey(cx, cz);
+      // A DOUBLE-HEIGHT room may not claim a cell whose volume above is
+      // occupied: growing here would claim a void it cannot have. It is skipped
+      // rather than the cell being abandoned, so an ordinary room standing
+      // beside it can still take the space — the gap is only unavailable to the
+      // room that would have to open it.
+      const blockedAbove = occupiedAbove?.(cx, cz) ?? false;
       let best = Infinity;
       let winner = -1;
       for (let i = 0; i < elastic.length; i++) {
+        if (blockedAbove && elastic[i].doubleHeight) continue;
         const d = dists[i].get(k);
         if (d !== undefined && d < best) {
           best = d;
