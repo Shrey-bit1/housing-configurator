@@ -15,6 +15,11 @@ import { connectedComponents } from "../core/cluster";
  * style as the cluster shells.
  */
 const VOID_COLOR = 0x2a2a2a;
+/** How solid the opening's wash is (run 0021). An opening has to read as an
+ *  opening when there is nothing below it, and disappear behind whatever is
+ *  below when there is: a double-height room's void has to show the room, and a
+ *  stairwell has to show the flight. Low enough for both. */
+const VOID_OPACITY = 0.18;
 const OUTLINE_COLOR = 0x1a1a1a;
 const DIM_BG = new THREE.Color(0xe9e5dc);
 
@@ -56,7 +61,17 @@ export class HoleView {
       const z1 = this.grid.gridToWorld(0, maxZ).z + H;
 
       // Recessed dark panel (reads as the opening), just below plate level.
-      const panelMat = new THREE.MeshBasicMaterial({ color: VOID_COLOR });
+      // SEE-THROUGH, not a black hole (run 0021). This panel was opaque, so an
+      // opening drew a dark plate exactly where the space below should show —
+      // which defeats a double-height room entirely, since the whole point of
+      // the mark is that you can see the room from the storey above. It never
+      // writes depth either, so nothing underneath is culled behind it.
+      const panelMat = new THREE.MeshBasicMaterial({
+        color: VOID_COLOR,
+        transparent: true,
+        opacity: VOID_OPACITY,
+        depthWrite: false,
+      });
       panelMat.userData.baseColor = VOID_COLOR;
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), panelMat);
       panel.rotation.x = -Math.PI / 2;

@@ -83,6 +83,8 @@ const viewport = document.getElementById("viewport") as HTMLElement;
 const undoBtn = document.getElementById("undo-btn") as HTMLButtonElement;
 const redoBtn = document.getElementById("redo-btn") as HTMLButtonElement;
 const selectionReadout = document.getElementById("selection-readout") as HTMLElement;
+const selectionText = document.getElementById("selection-text") as HTMLElement;
+const doubleHeightToggle = document.getElementById("double-height-toggle") as HTMLButtonElement;
 const shortcutsBtn = document.getElementById("shortcuts-btn") as HTMLButtonElement;
 const shortcutsPanel = document.getElementById("shortcuts-panel") as HTMLElement;
 const shortcutsClose = document.getElementById("shortcuts-close") as HTMLButtonElement;
@@ -401,9 +403,57 @@ function updateSelectionReadout(): void {
   } else if (doorSelected) {
     text = `Door · Floor ${floors.activeIndexValue}`;
   }
-  selectionReadout.textContent = text;
+  selectionText.textContent = text;
   selectionReadout.classList.toggle("visible", !!text);
+
+  // THE DOUBLE-HEIGHT CONTROL (run 0021). Shown only for exactly one real
+  // room, because that is the only thing the mark means anything for: a
+  // connector is drawn as a merged cluster shell and furniture has no volume
+  // to open. It reads as a toggle, pressed when the room already carries the
+  // mark, so the room's state is visible without opening anything.
+  const one = insts.length === 1 ? insts[0] : null;
+  const markable = one && one.def.category === "room" && !one.def.cluster;
+  doubleHeightToggle.hidden = !markable;
+  if (markable) {
+    doubleHeightToggle.classList.toggle("on", one!.doubleHeight);
+    doubleHeightToggle.setAttribute("aria-pressed", String(one!.doubleHeight));
+  }
 }
+
+/** Toggle the selected room's double-height mark. A refusal names the cells
+ *  that blocked it rather than clearing them: the obstruction is authored work
+ *  on another floor and deleting it silently would be the worst possible
+ *  answer (see `ModuleStore.setDoubleHeight`). */
+doubleHeightToggle.addEventListener("click", () => {
+  const insts = selection.selectedInstances;
+  if (insts.length !== 1) return;
+  const inst = insts[0];
+  const want = !inst.doubleHeight;
+  const res = floors.active.store.setDoubleHeight(inst.id, want);
+  if (!res.ok) {
+    const cells = res.blockedBy ?? [];
+    showToast(
+      "error",
+      cells.length
+        ? `Cannot open this room upward: the floor above already holds something over ` +
+            `${cells.length} of its cells (${cells
+              .slice(0, 4)
+              .map((c) => `${c.cx},${c.cz}`)
+              .join(" · ")}${cells.length > 4 ? " …" : ""}). Clear those cells first.`
+        : "This room cannot be made double height."
+    );
+    return;
+  }
+  clearValidation();
+  updateSelectionReadout();
+  commitHistory(); // marking is a mutating action, so it is undoable
+  showToast(
+    "info",
+    want
+      ? `"${inst.def.name}" is now double height and claims the storey above.`
+      : `"${inst.def.name}" is single height again.`
+  );
+});
 
 // ---- Shortcuts legend (static content in index.html; just a visibility toggle) ----
 shortcutsBtn.addEventListener("click", () => shortcutsPanel.classList.toggle("open"));

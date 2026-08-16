@@ -150,6 +150,14 @@ export class FloorManager {
     // A new/rebuilt room shell builds its walls directly at the floor's true
     // height — no post-build rescale (see rebuildWalls()).
     floor.store.wallHeightProvider = () => this.floorHeight(floor);
+    // A room may only claim the volume above it if that volume is free. The
+    // grid cannot see across floors, so the check lives here, and it returns
+    // the obstructing cells rather than a boolean so the refusal can name them.
+    floor.store.doubleHeightObstruction = (cells: Cell[]) => {
+      const above = this.floorAbove(floor);
+      if (!above) return []; // nothing above to obstruct: allowed, see §2u
+      return cells.filter((c) => !above.grid.plateAvailable([c]));
+    };
     floor.store.onChange = () => {
       // syncStairsAndHoles → rebuildAllShells rebuilds BOTH connector clusters
       // and room walls (with doors + windows) across every floor, prunes any
@@ -189,6 +197,31 @@ export class FloorManager {
     return out;
   }
 
+  /** Absolute cells of every DOUBLE-HEIGHT room on `floor` (run 0021). These
+   *  claim the volume of the floor above, so the floor above must not build a
+   *  plate over them or let anything be placed there. */
+  private doubleHeightCells(floor: Floor): Cell[] {
+    const out: Cell[] = [];
+    for (const inst of floor.store.instances.values())
+      if (inst.doubleHeight)
+        out.push(...occupiedCells(inst.def, inst.origin, inst.rotation, inst.mirrored));
+    return out;
+  }
+
+  /**
+   * Every cell of `floor` whose CEILING is open: a stairwell, or a
+   * double-height room claiming the storey above. This is the one list the
+   * floor above turns into blocked plate, and the one the export reads to tell
+   * the building app which seams carry no floor (`openCeilings`,
+   * docs/bridge-format.md).
+   *
+   * Stairs and double-height rooms are different intentions with the same
+   * consequence, which is why they meet here rather than being tracked apart.
+   */
+  voidCells(floor: Floor): Cell[] {
+    return [...this.stairCells(floor), ...this.doubleHeightCells(floor)];
+  }
+
   /**
    * Reconcile everything derived from stairs: auto-create a floor above the top
    * one if it now holds a stair, recompute every floor's stairwell holes (each
@@ -211,7 +244,7 @@ export class FloorManager {
 
     for (let j = 0; j < this.floors.length; j++) {
       const below = j > 0 ? this.floors[j - 1] : null;
-      this.floors[j].setHoles(below ? this.stairCells(below) : []);
+      this.floors[j].setHoles(below ? this.voidCells(below) : []);
     }
 
     // Derive the elastic-room EFFECTIVE footprints (expansion.ts) — after
@@ -324,8 +357,19 @@ export class FloorManager {
         // — only the Outdoor/Circulation CLUSTER drops its boundary segment
         // (clusterShells), so the doubled back-to-back wall becomes the room's
         // single wall face and the connector reads as open to it.
+        // A DOUBLE-HEIGHT room's walls rise through BOTH storeys (run 0021).
+        // The room is open-top already (buildRoomShell draws no ceiling), so
+        // the only thing standing between it and a two-storey space was the
+        // wall height, plus the plate the floor above would otherwise draw over
+        // it — and that plate is gone, because the footprint is a hole up there
+        // (voidCells). The height added is the floor ABOVE's own height, not a
+        // doubling of this one, so a tall lower storey under a normal upper one
+        // comes out right.
+        const above = this.floorAbove(floor);
+        const roomHeight =
+          inst.doubleHeight && above ? height + this.floorHeight(above) : height;
         rebuildRoomWalls(
-          inst.group, inst.def, inst.rotation, height, localWindows, inst.mirrored,
+          inst.group, inst.def, inst.rotation, roomHeight, localWindows, inst.mirrored,
           roomDoors.get(inst.id), // LOCAL door-edge keys for this room (or undefined)
           elastic
             ? cells.map((c) => ({ cx: c.cx - inst.origin.cx, cz: c.cz - inst.origin.cz }))
@@ -887,6 +931,13 @@ export class FloorManager {
           inst.type, { cx: inst.cx, cz: inst.cz }, inst.rotation, inst.mirrored ?? false
         );
         if (!placed) skipped++;
+        // The double-height mark is restored DIRECTLY rather than through
+        // `setDoubleHeight`, because that method checks the floor above and the
+        // floors above this one are still being filled in at this point. The
+        // saved file already represents a state that passed the check when it
+        // was authored, so re-validating mid-load would reject valid projects
+        // purely on loop order.
+        else if (inst.doubleHeight) placed.doubleHeight = true;
       }
       // Entrances + doors are authored data (not in the store); restore them.
       // Doors go on after all this floor's instances (and, by the create-all-
