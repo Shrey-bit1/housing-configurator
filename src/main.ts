@@ -1271,6 +1271,13 @@ if (import.meta.env.DEV) {
      *  the same turn as the read, because the context is created without
      *  `preserveDrawingBuffer`, so anything read a frame later comes back
      *  cleared. */
+    /** Build a `dwelling-unit` export from the CURRENT state, through the real
+     *  exporter. Dev-only, beside `capture`, and for the same reason: it lets a
+     *  check produce the actual artefact rather than describe it. Run 0021 used
+     *  it to re-export every library unit so each carries `openCeilings`. */
+    buildUnit(name: string, color: string) {
+      return buildUnitExport(floors, name, color);
+    },
     capture(name: string): Promise<unknown> {
       renderer.render(scene, camera);
       return fetch(`/__capture?name=${encodeURIComponent(name)}`, {

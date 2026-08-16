@@ -112,6 +112,13 @@ export class Grid {
     return true;
   }
 
+  /** How many cells are currently voided (see {@link holeCells}). Read-only,
+   *  and exposed because "the floor above opened by this much" is a fact worth
+   *  asserting in tests without handing out the mutable set. */
+  get holeCount(): number {
+    return this.holeCells.size;
+  }
+
   /** Replace the set of stairwell-hole cells (see {@link holeCells}). */
   setHoles(cells: Cell[]): void {
     this.holeCells = new Set(cells.map((c) => cellKey(c.cx, c.cz)));

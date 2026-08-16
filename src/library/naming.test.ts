@@ -77,9 +77,19 @@ describe("nextFreeNumber", () => {
     expect(nextFreeNumber([entry("unit-1"), entry("unit-2"), entry("unit-3"), entry("unit-4", "Studio A")])).toBe(5);
   });
 
-  it("agrees with the committed library, which holds Unit 1 to Unit 3", () => {
+  it("agrees with the committed library, whatever it currently holds", () => {
+    // Asserted as a PROPERTY, not as a literal. Run 0019 pinned this at 4,
+    // which was true of the library that day and false the moment a unit was
+    // added; a test that has to be edited every time content lands gets edited
+    // carelessly. What the function actually promises is checked instead: the
+    // number it returns is free, and every smaller one is taken.
     const units = parseUnitLibraryIndex(committedRaw).units;
-    expect(nextFreeNumber(units)).toBe(4);
+    const n = nextFreeNumber(units);
+    const taken = new Set(
+      units.flatMap((u) => [numberFromName(u.id), numberFromName(u.name)]).filter((x) => x !== null)
+    );
+    expect(taken.has(n)).toBe(false);
+    for (let i = 1; i < n; i++) expect(taken.has(i)).toBe(true);
   });
 });
 
