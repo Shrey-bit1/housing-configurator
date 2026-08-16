@@ -285,11 +285,22 @@ Doing all the holes first and all the expansion after, which is what run 0021
 originally did, meant a floor's holes came from the PREVIOUS pass's effective
 footprints and lagged a whole sync behind the growth.
 
+**And the opening is DRAWN cell by cell** (`scene/holeView.ts`). Each opening
+used to be one rectangle spanning its connected component's extent, which is
+exact for a stairwell, whose footprint is always rectangular, and wrong for
+anything else: a room that grew around an obstruction is an L, and the bounding
+box painted the notch as open floor when the floor was really there. The wash
+is now a quad per cell merged into one geometry, and the outline is every cell
+edge whose neighbour is not also open, which traces the true boundary of any
+shape and still reads as a single line around a plain rectangle. Adjacent
+openings merge on their own, so `connectedComponents` is no longer needed here.
+
 Measured on a living room with a 35-cell seed and a 7-cell enclosed strip it
 grows into: it holds 42 cells and voids 42; put a bathroom on the storey above
-covering four of those strip cells and it retracts to 38 and voids 38; remove
-the bathroom and it returns to 42. `src/core/doubleHeight.slow.test.ts` pins all
-three, plus the rule that a single-height room in the same layout keeps all 42.
+covering four of those strip cells and it retracts to 38, voids 38, and paints
+38 (it painted a 42-cell rectangle before); remove the bathroom and it returns
+to 42. `src/core/doubleHeight.slow.test.ts` pins all of it, plus the rule that a
+single-height room in the same layout keeps all 42.
 
 **The control is a TOOL in Structure & Access**, beside Entrance and Doorway
 (`interaction/doubleHeightController.ts`, armed from `ui/palette.ts`). Arm it,

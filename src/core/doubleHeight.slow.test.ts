@@ -172,6 +172,31 @@ describe("growth, and the void that has to follow it", () => {
     expect(grown(f0, living.id) + 12).toBe(f1.grid.holeCount);
   });
 
+  it("DRAWS exactly the open cells, not their bounding box", () => {
+    // The opening used to be one rectangle per connected component, which is
+    // exact for a stairwell and wrong for a room that grew around an
+    // obstruction: this layout's 38-cell L was painted as a 42-cell rectangle,
+    // so four cells with a real floor over them read as open.
+    const { f0, f1, living } = withGrowth();
+    f1.store.place("bathroom_large", { cx: 4, cz: 5 }, 0, false);
+    f0.store.setDoubleHeight(living.id, true);
+
+    let holeCells = 0;
+    for (let x = 0; x < f1.grid.cols; x++)
+      for (let z = 0; z < f1.grid.rows; z++) if (f1.grid.isHole(x, z)) holeCells++;
+
+    // The wash is two triangles per open cell, merged into one geometry.
+    let painted = 0;
+    f1.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      const mat = m.material as THREE.Material & { opacity?: number };
+      if (m.isMesh && mat?.opacity === 0.18 && m.geometry?.attributes?.position)
+        painted += m.geometry.attributes.position.count / 6; // 6 verts per cell
+    });
+    expect(painted).toBe(holeCells);
+    expect(painted).toBe(38 + 12);
+  });
+
   it("a SINGLE-height room is unaffected by what is above it", () => {
     // The constraint is about claiming volume, so it must not leak into
     // ordinary rooms: this one keeps the whole strip.
