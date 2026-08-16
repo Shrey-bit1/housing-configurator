@@ -26,7 +26,12 @@ When I say send, write the file and confirm with one line: the path and the id.
 Nothing else.
 
 **Absolute path:** recorded in `_cowork/CONTEXT.local.md`, which git ignores, so a fresh clone has to write that file by hand.
-**Branch:** the working tree is on `main`. Run 0019 was built on `run/0019`
+**Branch:** the working tree is on `run/0021`, pushed to `origin/run/0021`
+(code HEAD `f9dce15`) and NOT merged. **Two branches are now open and
+unmerged**: `run/0020` (stairs and bathrooms, at `05ab558`) and `run/0021`
+(double-height rooms), both cut from `main`. They both make the stairwell
+opening see-through in `src/scene/holeView.ts`, independently, so whichever
+merges second conflicts on three lines there. Run 0019 was built on `run/0019`
 and merged into `main` on 10 August at merge commit `21d1d10`, pushed;
 `origin/run/0019` still exists as the run's record. Run 0018 was merged the
 same way on 7 August at `9089329`. Both branch records remain on the remote,
@@ -50,7 +55,19 @@ inside itself. Names follow Shrey's convention, a capitalised word and a
 number, one number per design across both kinds, and the dialog opens on the
 next free number read from the library manifest. Library entries can now be
 replaced instead of silently duplicated, and renamed from their card.
-PROJECT_STATE §11 describes it. **The Netlify site is `reconfigure-flat`**, so
+PROJECT_STATE §11 describes it.
+
+Run 0021 (on `run/0021`, unmerged) added DOUBLE-HEIGHT ROOMS. A placed room can
+be marked to take the volume of the storey above its own footprint: the mark
+lives on the room below, the footprint becomes a hole on the floor above
+through the same `FloorManager.voidCells` list stairwells use, the walls rise
+through both storeys, and marking is REFUSED with the obstructing cells named
+when something is already up there. The derived storey height is deliberately
+unchanged. It crosses the bridge as `storeys[i].openCeilings`, a per-cell list
+of the seams that carry no floor, additive and still v1
+(`docs/bridge-format.md`). PROJECT_STATE §2u describes it. A sample export for
+the building repo is committed at
+`_cowork/outbox/0021-double-height-unit.json`. **The Netlify site is `reconfigure-flat`**, so
 a branch deploy is `https://run-NNNN--reconfigure-flat.netlify.app`; it is
 password-protected, so an unauthenticated check gets 401 rather than 200, and
 404 means the build has not finished.
