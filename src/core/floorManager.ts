@@ -155,7 +155,10 @@ export class FloorManager {
     // the obstructing cells rather than a boolean so the refusal can name them.
     floor.store.doubleHeightObstruction = (cells: Cell[]) => {
       const above = this.floorAbove(floor);
-      if (!above) return []; // nothing above to obstruct: allowed, see §2u
+      // No floor above yet is not an obstruction: `syncStairsAndHoles` creates
+      // one the moment the mark commits, exactly as it does for a stair, and a
+      // floor that does not exist cannot be holding anything.
+      if (!above) return [];
       return cells.filter((c) => !above.grid.plateAvailable([c]));
     };
     floor.store.onChange = () => {
@@ -235,9 +238,12 @@ export class FloorManager {
 
     let structureChanged = false;
     const top = this.floors[this.floors.length - 1];
-    if (this.stairCells(top).length > 0) {
-      // Topmost floor has a stair with nowhere to go — give it a floor above,
-      // inheriting the grid size so the projected hole cell is guaranteed.
+    if (this.voidCells(top).length > 0) {
+      // The topmost floor has something opening upward with nowhere to go —
+      // a stair, or a double-height room — so give it a floor above,
+      // inheriting the grid size so the projected hole cells are guaranteed.
+      // Both cases read `voidCells` because both mean the same thing here: the
+      // storey above is claimed, so it had better exist.
       this.createFloor(top.grid.cols, top.grid.rows);
       structureChanged = true;
     }

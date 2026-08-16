@@ -83,6 +83,21 @@ describe("marking a room double height", () => {
     expect(f1.grid.holeCount).toBe(before);
   });
 
+  it("CREATES the floor above when there is none, exactly as a stair does", () => {
+    // The mark claims the storey above, so that storey had better exist. This
+    // is the same `voidCells` branch of `syncStairsAndHoles` a stair takes.
+    const fm = new FloorManager(new THREE.Scene(), 16, 16);
+    fm.attach(stubDeps());
+    const f0 = fm.floors[0];
+    const living = f0.store.place("living", { cx: 1, cz: 1 }, 0, false)!;
+    expect(fm.floors).toHaveLength(1);
+
+    expect(f0.store.setDoubleHeight(living.id, true)).toEqual({ ok: true });
+
+    expect(fm.floors).toHaveLength(2);
+    expect(fm.floors[1].grid.holeCount).toBe(35);
+  });
+
   it("is refused for a connector, which has no coherent single volume", () => {
     const { f0 } = twoStorey();
     const hall = f0.store.place("circulation_single", { cx: 9, cz: 9 }, 0, false)!;

@@ -145,6 +145,14 @@ rather than making its own storey taller, so `maxRoomHeightCells` still reads
 `def.height` and the stack does not move. Measured: the walls rise to 6.0 m
 while the floor spacing stays 3.0 m.
 
+**A mark on the topmost floor CREATES the floor above**, exactly as a stair
+does, because the mark claims a storey and that storey had better exist.
+`syncStairsAndHoles` reads `voidCells(top)` rather than `stairCells(top)` for
+that branch, so both cases take one path. Appending a floor no longer drops
+plan mode either: `onStructureChange` extends `prePlanVisibility` and re-applies
+it rather than exiting, so placing a stair while reading a plan leaves you in
+the plan.
+
 **Geometry.** `rebuildAllShells` passes `height + floorHeight(above)` for a
 marked room, so the walls rise through both storeys. It adds the floor ABOVE's
 own height rather than doubling this one, which stays correct when the two
@@ -161,10 +169,14 @@ room grown to 49 cells with a 35-cell seed reports 35 open ceilings, and the
 other 14 genuinely do have a floor above them, because nothing stopped
 placement there.
 
-**The control.** `#double-height-toggle`, in the selection readout, shown only
-when exactly one non-cluster room is selected, pressed when that room already
-carries the mark. The readout's text moved into `#selection-text` because
-`textContent` on the container would wipe the button.
+**The control is a TOOL in Structure & Access**, beside Entrance and Doorway
+(`interaction/doubleHeightController.ts`, armed from `ui/palette.ts`). Arm it,
+click a room, and the mark toggles; the tool stays armed so several rooms can
+be marked in a row, hovering highlights the room the click would affect through
+the same emissive selection uses, and Escape disarms it through main.ts's
+central arbitrator. It is a tool rather than a button on the selection readout
+because marking a room is the same shape of act as placing an entrance or a
+doorway, and this app already says that with an armed mode and a click.
 
 **Serialization is additive.** `InstanceData.doubleHeight?: boolean` beside
 `mirrored`, defaulted false by `normalizeInstance`, so a pre-0021 project loads

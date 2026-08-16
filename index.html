@@ -129,15 +129,9 @@
             </div>
           </div>
         </div>
-        <!-- The readout gained a control in run 0021, so its text moved into a
-             span: `textContent` on the container would wipe the button. -->
-        <div id="selection-readout">
-          <span id="selection-text"></span>
-          <button id="double-height-toggle" type="button" hidden
-                  title="This room takes the volume of the storey above its own footprint">
-            Double height
-          </button>
-        </div>
+        <!-- Text lives in a span so the container's own class toggle stays
+             independent of its content. -->
+        <div id="selection-readout"><span id="selection-text"></span></div>
         <div id="drop-overlay"><span>Drop project file to import</span></div>
         <div id="toast"></div>
         <!-- ONE save dialog, three outputs (run 0019). The design NUMBER is the

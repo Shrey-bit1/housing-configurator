@@ -1877,6 +1877,15 @@ button.primary:hover {
 .tool-entrance {
   border-color: var(--entry);
 }
+.tool-double-height {
+  border-color: var(--note);
+  color: var(--note);
+}
+.tool-double-height:hover {
+  background: var(--note);
+  color: var(--bg);
+}
+
 .tool-doorway {
   border-color: var(--violet);
 }
