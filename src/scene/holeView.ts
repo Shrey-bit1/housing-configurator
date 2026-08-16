@@ -15,6 +15,10 @@ import { connectedComponents } from "../core/cluster";
  * style as the cluster shells.
  */
 const VOID_COLOR = 0x2a2a2a;
+/** How solid the opening's wash is. Low enough that a flight underneath reads
+ *  straight through it, high enough that the opening still reads as an opening
+ *  when there is nothing below to see. */
+const VOID_OPACITY = 0.18;
 const OUTLINE_COLOR = 0x1a1a1a;
 const DIM_BG = new THREE.Color(0xe9e5dc);
 
@@ -55,8 +59,19 @@ export class HoleView {
       const z0 = this.grid.gridToWorld(0, minZ).z - H;
       const z1 = this.grid.gridToWorld(0, maxZ).z + H;
 
-      // Recessed dark panel (reads as the opening), just below plate level.
-      const panelMat = new THREE.MeshBasicMaterial({ color: VOID_COLOR });
+      // The opening, as a SEE-THROUGH shadow rather than a black hole (run
+      // 0020). This panel used to be an opaque dark plate, which is the one
+      // thing an opening must not be: it hid the stair arriving through it, so
+      // the flight you were connecting to was invisible from the floor it
+      // arrived at. It is now a faint translucent wash that reads as a recess
+      // while letting the flight below show through, and it never writes depth,
+      // so nothing underneath is culled behind it.
+      const panelMat = new THREE.MeshBasicMaterial({
+        color: VOID_COLOR,
+        transparent: true,
+        opacity: VOID_OPACITY,
+        depthWrite: false,
+      });
       panelMat.userData.baseColor = VOID_COLOR;
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), panelMat);
       panel.rotation.x = -Math.PI / 2;

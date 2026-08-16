@@ -35,13 +35,14 @@ work-in-progress research artifact, not a production app.
 | System | Owner file(s) | Notes |
 |---|---|---|
 | Grid + occupancy + coordinate conversion | `src/core/grid.ts` | `Grid` class: dims, occupancy `Map<"cx,cz", instanceId>`, `holeCells` (stairwell voids), `gridToWorld`/`worldToGrid` (grid centred on world origin), `canPlace(cells, exclude?: string \| Set<string>)` (a Set excludes every id in it at once — the group-move self-exclusion primitive, §2h), `plateAvailable`/`occupy`/`free`/`setHoles`/`ownerAt`/`inBounds`/`resize`. `CELL_SIZE = 0.6`. |
-| Room / module / stair definitions + **THE central footprint transform** | `src/core/modules.ts` | `MODULE_DEFS` registry, `ModuleDef` (`category: "module" \| "room" \| "stair"`), `rect()`/`lShape()` footprint helpers, `ROOM_HEIGHT = 4`. **Every room preset is a RECTANGLE** (elastic-rooms batch ①): Living 7×5, Kitchen 4×4, Bedroom-S 5×4, Bedroom-L 6×5, Bathrooms 3×3/4×4, Recreation 5×5, Circulation/Outdoor 1×1/1×2, stair 2×6. `lShape` is currently caller-less (kept + exported as a shared utility; rectangles are the seeds for the coming derived-expansion batch). Transform: `rotateCell`/`mirrorCell`/**`transformCell`**/`rotatedCells`/`occupiedCells` — **mirror THEN rotate**, see §2g. `MODULE_LIST` (furniture), `ROOM_LIST`, `STAIR_LIST`. |
+| Room / module / stair definitions + **THE central footprint transform** | `src/core/modules.ts` | `MODULE_DEFS` registry, `ModuleDef` (`category: "module" \| "room" \| "stair"`), `rect()`/`lShape()` footprint helpers, `ROOM_HEIGHT = 4`. **Every room preset is a RECTANGLE** (elastic-rooms batch ①): Living 7×5, Kitchen 4×4, Bedroom-S 5×4, Bedroom-L 6×5, Bathrooms 3×3/4×4, Recreation 5×5, Circulation/Outdoor 1×1/1×2. Run 0020 added `wc` 2×3, `bathroom_full` 4×4 and `bathroom_full_compact` 3×4 (§2t), and replaced the single 2×6 stair with five stair entries (§2a). `lShape` is currently caller-less (kept + exported as a shared utility; rectangles are the seeds for the coming derived-expansion batch). Transform: `rotateCell`/`mirrorCell`/**`transformCell`**/`rotatedCells`/`occupiedCells` — **mirror THEN rotate**, see §2g. `MODULE_LIST` (furniture), `ROOM_LIST`, `STAIR_LIST`. |
 | Placed-instance store (place/move/rotate/**mirror**/delete, **group ops**) | `src/core/store.ts` | `ModuleStore`: single source mutating occupancy + scene together. `instances: Map<id, ModuleInstance>` (each carries `mirrored: boolean`), `onChange` hook, `extraPlacementCheck?` (cross-floor stair rule, set by FloorManager), `canPlaceInstance(def, cells, excludeId?: string \| Set<string>)`, `place(type,origin,rotation,mirrored)`, `move(id,origin,rotation,mirrored?)` (rebuilds the mesh when rotation OR mirror changes), `rotate(id)`/`mirror(id)` (both pivot on the origin cell, both collision-checked), `reconcileAfterResize`, `maxRoomHeightCells`. **Group ops** (§2h): `moveMany(moves)` (atomic rigid move, all-or-nothing, self-exclusion via a Set, never rebuilds meshes since rotation/mirror are untouched), `removeMany(ids)` (single `onChange`), `placeMany(items)` (atomic batch place — new ids, no exclusion needed — used by group duplicate). |
 | Mesh building: solid cubes, **room shells**, connector tiles, **concave-corner wall logic**, **window panel-kit + glazing** | `src/scene/moduleMesh.ts` | `buildModuleMesh()` routes: `category==="stair"` → `buildStairGroup` (stairMesh.ts); connector → tile; room → `buildRoomShell` (hollow open-top shell, walls built directly at the floor's true height — see §2b); else solid cubes. `buildBoundaryWalls()` is the shared clean-corner wall generator (exported; reused by clusters), and — given a per-edge `windows` map — replaces a windowed edge's solid segment with sill/lintel panels + a glazing pane (see §2d), and — given a `doors` edge-key set — cuts a fixed 0→`DOOR_OPENING_H` opening with a solid header above (see §2i). `rebuildRoomWalls()` rebuilds just a room's wall+glazing meshes in place when height, windows, or doors change. `makeGlassMaterial()`, `setSelected()`, `setHovered(group, hovered, selected)` (subtler emissive intensity 0.15 vs selection's 0.35; no-ops when `selected` or when a rules-violation tint owns the material — §2h). `WALL_T = 0.1`, `FLOOR_H = 0.15`. |
 | **Rule-driven window generator** (derived, per room) | `src/core/windows.ts` | `computeWindows(cells, roomTypeId, floorHeight, occupied, entranceEdgeKeys, northAngle=0) → WindowPlan`. Pure computation (no Three.js). `WINDOW_CONFIG` per-type table (target ratio + variant). Seed runs sorted by SOUTHERNNESS under `northAngle` (§2d, §2k). The plan's `GlazingStat` carries `sectors`/`northLit` (derived orientation). See §2d. |
 | **North / orientation** (compass convention + bearings) | `src/core/orientation.ts` | THE one place the north concept lives: convention (north = world −Z rotated CW-from-above by `northAngle`), `normalBearing`/`sideBearing` (normal→compass bearing), `bearingSector` (8-wind), `southDistance` (south-bias score), `isNorthLit`/`NORTH_SECTOR_HALF_WIDTH` (OR1), `worldNorthDir` (arrow projection). Pure, no Three.js. See §2k. |
 | **Compass dial** (north-setting control) | `src/ui/compassDial.ts` | `createCompassDial({onInput,onCommit})` — draggable SVG dial (top-down frame, N-marked needle); `onInput` live during drag, `onCommit` on release (commit-on-release). `setAngle` syncs display after load/undo. See §2k. |
-| **Stair geometry** (180° dogleg, two floors) | `src/scene/stairMesh.ts` | `buildStairGroup(def, rotation, ghost, mirrored)`. See §2a; mirroring negates the lane x-centres only (winding-safe, §2g). |
+| **Stair proportions** (the arithmetic) | `src/core/stairSpec.ts` | `STAIR_SPECS` (five entries, four types), `planStair`, `spiralPlan`, `riserCountFor`, `splitRisers`. Pure, no three.js. See §2a. |
+| **Stair geometry** (four types, two floors) | `src/scene/stairMesh.ts` | `buildStairGroup(def, rotation, ghost, mirrored, storeyHeightM)` + `rebuildStairRise`. Built at the floor's TRUE height, never scaled. See §2a; mirroring negates x centres only (winding-safe, §2g). |
 | Dynamic dollhouse **cutaway** | `src/scene/cutaway.ts` | Skips meshes tagged `userData.structureHidden` (the Structure fixed-layer view outranks it, §2n) and never sees railings (they carry no `wallNormal`). `updateCutaway()` hides wall meshes whose `userData.wallNormal · viewDir > THRESHOLD (0.12)`; throttled (recompute on camera move or `markCutawayDirty()`). `setCutawayEnabled(on)` toggles the whole pass — OFF shows every wall (solid exterior; the "Cutaway" view control, §2k). Unaffected by the §2b wall-height mechanism (walls are rebuilt, not scaled — `wallNormal` tags are untouched either way) or the top view (a straight-down `viewDir` dots to ~0 against every wall normal, which are always in the XZ plane — every wall stays visible, reading correctly as a plan). |
 | **Multi-floor** support, stacking, **wall/stair height reconciliation**, **window generation**, **floor visibility**, **zoom-to-extent box** | `src/core/floor.ts`, `src/core/floorManager.ts` | See §2b (height), §2d (windows), §5 (visibility/framing). `Floor` = own grid + `ModuleStore` + `GridView` + `HoleView` + `EntranceView` + `entrances[]` + `windowStats` + `clusterGroup`, all under one `group`. `FloorManager`: stack, active floor, vertical stacking offsets, dim inactive floors, stairwell holes, `rebuildAllShells()` (all floors' room walls + windows + DOOR OPENINGS + merged cluster shells), `pruneStaleDoors()` (auto-remove doors a mutation stranded, inside the same undo snapshot), `doorTargets()`/`isDoorValid()` (door placement/validity), floor visibility, content bounding box. `DEFAULT_FLOOR_CELLS = 4`, `CLEARANCE_CELLS = 1`. |
 | Grid dots / floor visual | `src/scene/gridView.ts` | Intersection dots + border; `setDimmed`. |
@@ -79,37 +80,131 @@ meshes by outward normal (±x, ±z), each tagged `userData.wallNormal` for
 cutaway. Unaffected by which height value the caller passes in (§2b) — the
 XZ tracing/corner math is independent of `fullH`.
 
-### 2a. Stair geometry (`stairMesh.ts`)
+### 2a. Stair geometry (`stairSpec.ts` + `stairMesh.ts`)
 
-180° dogleg: two 1-cell-wide flights (lane A / lane B) run side by side in
-opposite directions, joined by a full-width half-landing at the far end.
-Footprint 2×6 cells (1.2 m × 3.6 m). 20 risers @ 150 mm total rise (3.0 m),
-split 10 + 10 by the landing at 1.5 m; 9 goings @ 300 mm per flight (2.7 m
-run). All three pieces (flight 1, flight 2, landing) are solid down to the
-ground (not a thin folded plate), so the upper flight reads as grounded.
-Each piece is an extruded 2D profile (`profileGeometry()`, via
-`THREE.ExtrudeGeometry`) merged into one mesh.
+**FOUR REAL STAIRS since run 0020.** The 13 August supervisor meeting called
+the old one-cell stair illegal: a 0.6 m flight is not a stair. The proportions
+now come from `core/stairSpec.ts`, pure and tested (`stairSpec.test.ts`, 23
+cases), and `scene/stairMesh.ts` draws exactly what that reports.
 
-Built at a fixed `REFERENCE_STAIR_RISE = 3.0 m`; `FloorManager` rescales
-`group.scale.y` per instance to the floor's real height (`updateStairScales()`).
-Unlike walls (§2b, which now build directly at true height), a stair's
-scale-driven rise is semantically intended — a taller floor genuinely means
-taller risers, not a build-height bug — so it deliberately stays a runtime
-rescale. The landing sits at exactly half the reference rise, so uniform
-y-scaling keeps it at true mid-height for any floor height.
+**The rule.** Riser target 170 mm, tread 270 mm, walking rule 2R + T = 610.
+The riser is derived, not chosen: the storey height fixes the total rise, the
+riser count is the one landing nearest 170 mm, and the exact riser is carried
+UNROUNDED. At the default 3.0 m storey that is **18 risers of 166.667 mm**, so
+2R + T = 603.3 mm, 6.7 mm under target. The tread holds at 270 mm and
+compresses only when a footprint would otherwise be overrun (`treadCompressed`
+says so); the suite checks every type across storeys from 2.4 to 4.2 m, because
+occupancy is the contract and geometry must never leave the cells it claims.
 
-**Winding fix (this session):** flight 1's point list traced its profile
-CLOCKWISE while flight 2 and the landing traced theirs COUNTER-CLOCKWISE
-(`ExtrudeGeometry` treats CCW as "outward"), so flight 1's normals came out
-inverted — masked from disappearing only by a `DoubleSide` material hack, but
-lit backwards, which read as a shaded wedge/ramp artifact at the flight-1-to-
-landing seam. Fixed by reversing flight 1's point order (`f1.reverse()`, same
-boundary, opposite traversal) to match the other two pieces; the `DoubleSide`
-workaround was removed (material is now default `FrontSide`). Verified via
-riser-normal sampling (`(0,0,-1)` on flight 1, `(0,0,+1)` on flight 2, both
-physically correct for their climb direction) and a downward-raycast
-watertightness sweep (no culling holes beyond the intentional `STEP_INSET`
-lane gaps).
+| type | cells | metres | flights | risers | run per flight |
+|---|---|---|---|---|---|
+| `stair_straight` | 2×8 | 1.2 × 4.8 | 1 | 18 | 17 × 270 = 4.59 m |
+| `stair_dogleg` (default) | 3×6 | 1.8 × 3.6 | 2 | 9 + 9 | 8 × 270 = 2.16 m |
+| `stair_dogleg_wide` | 4×6 | 2.4 × 3.6 | 2 | 9 + 9 | 2.16 m |
+| `stair_spiral` | 4×4 | 2.4 × 2.4 | 1 turn | 18 | 20° per tread |
+| `stair_c` | 4×6 | 2.4 × 3.6 | 3 | 6 + 6 + 6 | 5 × 270 = 1.35 m |
+
+The dogleg ships TIGHT (two 0.9 m flights) as the default because that is the
+standard domestic dogleg and what a dwelling can spare; the generous 2.4 m
+version is a separate palette entry rather than an option on the same one.
+
+**The spiral is the exception, and says so.** A going on a spiral is an arc, so
+it depends where it is measured. In a 2.4 m square with a 100 mm newel the
+walking line sits at 650 mm, where 18 treads of 20° give a **227 mm** going,
+not 270, so 2R + T comes to 560.2 mm. Reaching 270 mm at that tread angle needs
+a 773 mm walking line, hence a 2.89 m circle and a **5×5** cell square.
+`spiralPlan` returns both numbers so the trade stays visible; the 4×4 was
+built as asked and the miss is reported rather than hidden.
+
+**Built at true height, never scaled.** Until run 0020 a stair was built once at
+a 3.0 m reference rise and stretched by `group.scale.y`, so the risers on screen
+were never the risers the model meant and the proportion drifted with the floor.
+`buildStairGroup(def, rotation, ghost, mirrored, storeyHeightM)` now builds at
+the real floor-to-floor height — the same `wallHeight` the room shells get
+through `ModuleStore.wallHeightProvider` — and `FloorManager.updateStairScales`
+holds `scale.y` at 1, calling `rebuildStairRise` (a no-op unless the height
+actually moved) when a tall room changes the storey. Same in-place, same-material
+pattern as `rebuildRoomWalls`, so selection and violation tints survive.
+
+Each flight is a RAKING SLAB: steps on top, a 180 mm soffit underneath, ends
+closed vertically. They were briefly solid masses down to the ground, which
+made a dogleg a 1.8 × 3.6 × 3.0 m block with steps scratched into the top and
+read as disjoint lumps from most angles; a flight you can see under is what
+makes a stair legible. Landings are 120 mm slabs for the same reason. All four
+are built in the un-rotated local frame and placed
+in a subgroup rotated by −rotation·90°. Mirroring negates x centres and angles,
+NEVER `scale.x = -1` (which would invert winding and normals — the bug class
+behind the old stair-wedge fix). `mergeGeometries` is fed geometries normalized
+to non-indexed first: it returns null on a mixed set, and the spiral's newel is
+an indexed `CylinderGeometry` among non-indexed extrusions.
+
+**The retired stair.** `MODULE_DEFS.stair` (the 2×6 with 0.6 m flights) is out
+of `STAIR_LIST`, so nothing new can be placed, and still in `MODULE_DEFS`, so
+pre-0020 files load with their stair, their stairwell hole and their
+floor-to-floor connection intact. `testflats/flat-1-two-storey.json` still
+carries one, verified loading and still reading its 12-issue baseline.
+
+### 2t. The two bathrooms, and cross-storey visibility (run 0020)
+
+**Three new wet rooms**, from the 13 August user test: the participant wanted a
+small room with only a basin and a WC, and the meeting added that a proper
+bathroom with a bathtub should sit beside it.
+
+| type | cells | metres | fixtures |
+|---|---|---|---|
+| `wc` | 2×3 | 1.2 × 1.8 | WC, basin |
+| `bathroom_full` | 4×4 | 2.4 × 2.4 | bath, basin, WC |
+| `bathroom_full_compact` | 3×4 | 1.8 × 2.4 | bath, basin, WC |
+
+All three join `BATHROOM_TYPES`, which is THE one list `isBathroom`, `isWet`,
+`WET_TYPES` and rules.ts's `ctx.is.bathroom` all read, so they carry the whole
+wet interface with no other edit anywhere.
+
+**The sizes were checked, not assumed.** The props are drawn at true size from
+the voxel data (50 mm per voxel): WC 400 × 700, basin 500 × 400, bathtub
+1700 × 750 — the tub is exactly the 170 × 75 the meeting named.
+`props/bathroomFit.test.ts` (19 cases) measures the clear floor each layout
+leaves against domestic figures (600 mm at a WC, 600 at a basin, 700 at a bath)
+and reads the numbers off the SAME files the app draws:
+- `wc` leaves **600 mm** clear in front of the WC (1800 − 700 − 500) over the
+  full 1.2 m width, and 800 mm clear past the basin. Standard cloakroom, tight
+  and legal.
+- `bathroom_full` leaves **950 mm** between the tub's face and the WC's, with
+  700 mm to spare along the tub wall.
+- `bathroom_full_compact` keeps the same 950 mm, and **the tub is what binds**:
+  1700 mm in an 1800 mm wall leaves 100 mm. One cell narrower does not admit a
+  bath at all, which is why 3×4 is the floor.
+
+**Cross-storey visibility.** Editing an upper storey used to hide the stair you
+were connecting to, for two separate reasons, both fixed:
+- `HoleView`'s opening was an OPAQUE dark plate, drawing a black hole exactly
+  where the arriving flight should show. It is now a translucent wash
+  (`VOID_OPACITY` 0.18) with `depthWrite: false`, so it still reads as a recess
+  over nothing and disappears behind a flight when there is one.
+- An inactive floor was dimmed by lerping colours 0.74 toward the background,
+  which is flat grey and fully opaque. `Floor`'s `fade()` now also drops opacity
+  (`DIM_OPACITY` 0.35) with a gentler `DIM_AMOUNT` 0.62, so a lower storey reads
+  as a ghost of itself. Each material's own `transparent`/`opacity` is recorded
+  in `userData.baseOpacity`/`baseTransparent` on first touch and restored
+  exactly, which is what keeps glazing (already transparent) from being
+  flattened when its floor becomes active again.
+
+**Three follow-on fixes**, from testing the above against a real two-storey flat:
+- **The shadow-catcher was an invisible occluder.** `sceneSetup.ts`'s ground
+  plane is a `ShadowMaterial`, so it is transparent, and it had `depthWrite`
+  ON while the FloorManager parks it at the ACTIVE floor's height. Transparent
+  objects sort back-to-front by centroid, so whether it drew before or after
+  the storey beneath it flipped with the camera angle, and whole stairs and
+  rooms blinked out as the view orbited. This only surfaced once dimmed floors
+  became transparent themselves: while they were opaque they drew in the
+  earlier pass and were safe. It is now `depthWrite: false`, `renderOrder: -1`.
+- **Dimmed floors draw at `renderOrder = -2`**, so an inactive storey can never
+  paint over the one being edited regardless of orbit.
+- **Furniture on an inactive floor is HIDDEN, not faded** (`hideProps`, keyed on
+  the `userData.props` tag `props/place.ts` sets). Voxel props carry
+  `userData.noDim` because their colour lives in an instanceColor buffer that
+  the colour pass cannot reach, so a dimmed storey used to read as a grey shell
+  full of full-strength furniture.
 
 ### 2b. Wall / floor-to-floor height
 

@@ -56,8 +56,11 @@ export function buildModuleMesh(
   mirrored = false
 ): THREE.Group {
   // Stairs are their own stepped geometry (placed and ghost alike), spanning up
-  // to the floor above. No shell, no props, no per-cell cubes.
-  if (def.category === "stair") return buildStairGroup(def, rotation, ghost, mirrored);
+  // to the floor above. No shell, no props, no per-cell cubes. Since run 0020
+  // a stair is built at the floor's TRUE floor-to-floor height — the same
+  // `wallHeight` the room shells use — so its risers are the risers the model
+  // means, rather than a reference flight stretched by `scale.y`.
+  if (def.category === "stair") return buildStairGroup(def, rotation, ghost, mirrored, wallHeight);
 
   const group = new THREE.Group();
   group.userData.moduleType = def.type;

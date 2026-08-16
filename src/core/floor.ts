@@ -15,7 +15,14 @@ import type { SemiExteriorPlan } from "./semiExterior";
  *  the scene background in sceneSetup.ts. */
 const DIM_BG = new THREE.Color(0xe9e5dc);
 /** How far an inactive floor's colours are pulled toward the background. */
-const DIM_AMOUNT = 0.74;
+const DIM_AMOUNT = 0.62;
+/** How far a dimmed floor's opacity drops (run 0020). An inactive storey has to
+ *  stay READABLE while the storey being edited reads through it, so this is a
+ *  ghost rather than a veil. Paired with a gentler {@link DIM_AMOUNT}: the
+ *  colour lerp was carrying the whole "inactive" reading on its own and had to
+ *  go far enough to flatten everything to grey, which is exactly what hid a
+ *  stair below its own opening. */
+const DIM_OPACITY = 0.35;
 /** Edge-outline colour at full strength (matches moduleMesh). */
 const EDGE_COLOR = 0x1a1a1a;
 
@@ -348,8 +355,10 @@ export class Floor {
   setDimmed(dimmed: boolean): void {
     this.dimmed = dimmed; // remembered so rebuilt seed outlines re-apply it
     // Per-instance rooms/modules: fall back to the room colour.
-    for (const inst of this.store.instances.values())
+    for (const inst of this.store.instances.values()) {
       fade(inst.group, dimmed, inst.def.color);
+      hideProps(inst.group, dimmed);
+    }
     // Merged connector-cluster walls: their materials carry their own baseColor.
     fade(this.clusterGroup, dimmed, EDGE_COLOR);
     fade(this.seedOutlines, dimmed, EDGE_COLOR);
@@ -360,9 +369,20 @@ export class Floor {
   }
 }
 
-/** Recolour every material under `root`, fading toward the background if dimmed.
- *  A material's own `userData.baseColor` wins; outlines use the edge colour;
- *  otherwise `fallback` (the room colour). */
+/**
+ * Recolour every material under `root`, fading toward the background if dimmed.
+ * A material's own `userData.baseColor` wins; outlines use the edge colour;
+ * otherwise `fallback` (the room colour).
+ *
+ * A DIMMED FLOOR IS ALSO TRANSLUCENT (run 0020). Colour-fading alone turned an
+ * inactive storey into flat grey, which is opaque, so a stair on the floor
+ * below was hidden behind the plate you were standing on and the flight
+ * underneath could not be read through its own opening. Dimming now drops
+ * opacity as well, so the lower storey reads as a ghost of itself rather than
+ * as a wall. Each material's own transparency is remembered on first touch and
+ * restored exactly when the floor becomes active again, which is what keeps
+ * glazing (already transparent, with its own opacity) from being flattened.
+ */
 function fade(root: THREE.Object3D, dimmed: boolean, fallback: number): void {
   root.traverse((o) => {
     if (o.userData.noDim) return; // e.g. multi-colour voxel props (instanceColor)
@@ -374,6 +394,45 @@ function fade(root: THREE.Object3D, dimmed: boolean, fallback: number): void {
       mat.userData?.baseColor ??
       ((o as THREE.LineSegments).isLineSegments ? EDGE_COLOR : fallback);
     mat.color.set(base);
-    if (dimmed) mat.color.lerp(DIM_BG, DIM_AMOUNT);
+
+    // Remember what this material is when NOT dimmed, once.
+    if (mat.userData.baseOpacity === undefined) {
+      mat.userData.baseOpacity = mat.opacity;
+      mat.userData.baseTransparent = mat.transparent;
+    }
+    if (dimmed) {
+      mat.color.lerp(DIM_BG, DIM_AMOUNT);
+      mat.transparent = true;
+      mat.opacity = (mat.userData.baseOpacity as number) * DIM_OPACITY;
+      mat.depthWrite = false; // so the flight below shows through, not z-fights
+      // Draw dimmed storeys BEFORE the active one among the transparents. A
+      // transparent object's place in the queue is otherwise its centroid
+      // distance, which flips as the camera orbits, so an inactive floor could
+      // paint over the floor being edited from one angle and not the next.
+      o.renderOrder = -2;
+    } else {
+      mat.transparent = mat.userData.baseTransparent as boolean;
+      mat.opacity = mat.userData.baseOpacity as number;
+      mat.depthWrite = !mat.transparent;
+      o.renderOrder = 0;
+    }
+    mat.needsUpdate = true;
+  });
+}
+
+/**
+ * Furniture on an inactive floor is HIDDEN, not faded.
+ *
+ * Voxel props carry `userData.noDim` because their colour lives in an
+ * instanceColor buffer rather than a material, so the colour pass cannot fade
+ * them and they stayed at full strength on a floor that was otherwise a ghost:
+ * a dimmed storey read as a grey shell full of bright furniture. Ghosting them
+ * properly is not worth it either, since the reason to look at a floor you are
+ * not editing is its walls, its stair and its openings. So they simply go
+ * away, and come back when their floor does.
+ */
+function hideProps(root: THREE.Object3D, dimmed: boolean): void {
+  root.traverse((o) => {
+    if (o.userData.props) o.visible = !dimmed;
   });
 }
