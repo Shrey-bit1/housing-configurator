@@ -1,0 +1,1513 @@
+{
+  "format": "dwelling-unit",
+  "version": 1,
+  "name": "Unit 5",
+  "color": "#38d9a9",
+  "cellSize": 0.6,
+  "northAngle": 0,
+  "storeys": [
+    {
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          0
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          0
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          6,
+          0
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          6,
+          4
+        ],
+        [
+          7,
+          0
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          8,
+          3
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          0,
+          7
+        ],
+        [
+          0,
+          8
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ]
+      ],
+      "cellKinds": [
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room"
+      ],
+      "cellRooms": [
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen"
+      ],
+      "openCeilings": [
+        [
+          7,
+          0
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          8,
+          3
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          0
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          0
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          6,
+          0
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          6,
+          4
+        ]
+      ],
+      "edges": [
+        {
+          "cell": [
+            0,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            0
+          ],
+          "side": "W",
+          "class": "entrance"
+        },
+        {
+          "cell": [
+            0,
+            1
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            2
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            3
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            4
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            1,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            2,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            3,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            4,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            4,
+            4
+          ],
+          "side": "S",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            5,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            5,
+            4
+          ],
+          "side": "S",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            6,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            6,
+            4
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            5
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            5
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            0
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            1
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            2
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            3
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            4
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            5
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            5
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            5
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            6
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            7
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            8
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            8
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            1,
+            8
+          ],
+          "side": "S",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            2,
+            8
+          ],
+          "side": "S",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            3,
+            5
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            3,
+            6
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            3,
+            7
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            3,
+            8
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            3,
+            8
+          ],
+          "side": "E",
+          "class": "blank"
+        }
+      ],
+      "height": 3
+    },
+    {
+      "cells": [
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          9
+        ],
+        [
+          7,
+          10
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          8,
+          7
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          8,
+          10
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          10,
+          6
+        ],
+        [
+          10,
+          7
+        ],
+        [
+          10,
+          8
+        ],
+        [
+          10,
+          9
+        ],
+        [
+          10,
+          10
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          11,
+          9
+        ],
+        [
+          11,
+          10
+        ],
+        [
+          12,
+          6
+        ],
+        [
+          12,
+          7
+        ],
+        [
+          12,
+          8
+        ],
+        [
+          12,
+          9
+        ],
+        [
+          12,
+          10
+        ],
+        [
+          7,
+          0
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          8,
+          3
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          8,
+          5
+        ]
+      ],
+      "cellKinds": [
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair"
+      ],
+      "cellRooms": [
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair",
+        "stair"
+      ],
+      "openCeilings": [],
+      "edges": [
+        {
+          "cell": [
+            7,
+            6
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            7
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            8
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            9
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            10
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            10
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            10
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            9,
+            6
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            9,
+            10
+          ],
+          "side": "S",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            10,
+            6
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            10,
+            10
+          ],
+          "side": "S",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            11,
+            6
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            11,
+            10
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            6
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            6
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            7
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            8
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            9
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            10
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            10
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            0
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            1
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            2
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            3
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            4
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            5
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            0
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            1
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            2
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            3
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            4
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            5
+          ],
+          "side": "E",
+          "class": "blank"
+        }
+      ],
+      "height": 3
+    }
+  ],
+  "roomTypes": [
+    {
+      "id": "bedroom_large",
+      "name": "Bedroom — Large",
+      "color": "#274a9e"
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen",
+      "color": "#e8b117"
+    },
+    {
+      "id": "living",
+      "name": "Living Room",
+      "color": "#c13a2e"
+    },
+    {
+      "id": "stair",
+      "name": "Stair (dogleg)",
+      "color": "#8a8a8a"
+    }
+  ],
+  "sourceProject": {
+    "format": "flat-configurator-project",
+    "version": 1,
+    "northAngle": 0,
+    "orientationPreference": {},
+    "floors": [
+      {
+        "cols": 16,
+        "rows": 16,
+        "instances": [
+          {
+            "type": "living",
+            "cx": 1,
+            "cz": 1,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": true
+          },
+          {
+            "type": "stair",
+            "cx": 8,
+            "cz": 1,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "kitchen",
+            "cx": 1,
+            "cz": 6,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          }
+        ],
+        "entrances": [
+          {
+            "cx": 1,
+            "cz": 1,
+            "side": "west"
+          }
+        ],
+        "doors": []
+      },
+      {
+        "cols": 16,
+        "rows": 16,
+        "instances": [
+          {
+            "type": "bedroom_large",
+            "cx": 8,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          }
+        ],
+        "entrances": [],
+        "doors": []
+      }
+    ]
+  }
+}

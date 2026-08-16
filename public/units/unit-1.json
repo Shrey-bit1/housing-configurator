@@ -829,6 +829,7 @@
         "outdoor_double",
         "outdoor_double"
       ],
+      "openCeilings": [],
       "edges": [
         {
           "cell": [
@@ -1286,168 +1287,192 @@
             "cx": 18,
             "cz": 7,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "bathroom_large",
             "cx": 7,
             "cz": 7,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "living",
             "cx": 11,
             "cz": 10,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "kitchen",
             "cx": 7,
             "cz": 11,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 11,
             "cz": 7,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 11,
             "cz": 8,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 11,
             "cz": 9,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 13,
             "cz": 9,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 13,
             "cz": 8,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 13,
             "cz": 7,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 15,
             "cz": 9,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 15,
             "cz": 8,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 15,
             "cz": 7,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_double",
             "cx": 17,
             "cz": 8,
             "rotation": 1,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "circulation_single",
             "cx": 17,
             "cz": 7,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "outdoor_double",
             "cx": 18,
             "cz": 12,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "outdoor_double",
             "cx": 20,
             "cz": 12,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "outdoor_double",
             "cx": 22,
             "cz": 12,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "outdoor_double",
             "cx": 22,
             "cz": 13,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "outdoor_double",
             "cx": 20,
             "cz": 13,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "outdoor_double",
             "cx": 18,
             "cz": 13,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "outdoor_double",
             "cx": 22,
             "cz": 14,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "outdoor_double",
             "cx": 20,
             "cz": 14,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           },
           {
             "type": "outdoor_double",
             "cx": 18,
             "cz": 14,
             "rotation": 0,
-            "mirrored": false
+            "mirrored": false,
+            "doubleHeight": false
           }
         ],
         "entrances": [
