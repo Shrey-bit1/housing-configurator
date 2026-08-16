@@ -32,6 +32,7 @@ bottom-up-design (`bridgeImport.ts`). The JSON file is the *entire* interface
       "cells": [[x, z], …],        // occupied cells, normalized (see Normalization)
       "cellKinds": ["room"|"outdoor"|"circulation"|"stair", …],  // OPTIONAL — coarse, see below
       "cellRooms": ["living"|"bathroom_large"|"outdoor_single"|…, …],  // OPTIONAL — fine, see below
+      "openCeilings": [[x, z], …],  // OPTIONAL — cells with no floor above, see below
       "edges": [                   // EVERY exterior boundary edge of this storey, classified
         { "cell": [x, z], "side": "N|S|E|W", "class": "entrance|glazed|open|blank" }
       ],
@@ -266,3 +267,75 @@ with it.
 ignore fields it doesn't know and default fields that are absent (the same
 tolerant stance as `flat-configurator-project`). Any **breaking** change to an
 existing field's meaning or shape bumps `version`.
+
+
+## `openCeilings` — which seams carry no floor (added run 0021, still v1)
+
+**The question this answers.** For every cell of every storey, does the floor
+above that cell exist? The building app needs that per cell, to know where to
+draw a slab between two stacked storeys of the same flat.
+
+`storeys[i].openCeilings` is the list of cells **of storey i** over which no
+floor is drawn between storey i and storey i+1. Cells are `[x, z]` in the same
+normalized unit-local space as `cells`, and every entry also appears in that
+storey's `cells`. The **topmost storey never lists any**: what is above it is
+the roof, which this format says nothing about.
+
+**Two causes, one list.** A cell appears here when a **double-height room**
+below claims the volume above it, or when a **stairwell** opens through. Those
+are different intentions in the editor and the same fact for the reader, so
+they are reported together and the reader never has to learn the cause. The
+editor derives both from one place (`FloorManager.voidCells`).
+
+**Why per cell rather than a room-level flag.** A room-level "this room is
+double height" property would match how the editor thinks, and it would make
+the building app re-derive which cells that room covers and which storey it
+sits on before it could answer anything. That is precisely the relationship
+that gets lost across a bridge. The per-cell list is a direct answer to the
+consumer's own question, it needs no inference, and it stays correct as the
+editor grows further ways to open a ceiling.
+
+**Version stays 1, and must.** The field is optional and purely additive.
+**Absent or empty means every seam is floored**, which is exactly what every
+file written before run 0021 meant, so an importer that ignores `openCeilings`
+behaves the way it always did rather than the way it would if the default were
+reversed. That is the same additive rule `cellKinds` and `cellRooms` were added
+under.
+
+### Worked example
+
+A two-storey flat whose ground-floor living room is double height. The living
+room covers four cells at the north-west corner; the storey above has no floor
+over exactly those four.
+
+```jsonc
+{
+  "format": "dwelling-unit",
+  "version": 1,
+  "name": "Unit 7",
+  "storeys": [
+    {
+      // Ground storey. Its living room is marked double height in the editor,
+      // so the four cells it covers carry no ceiling.
+      "cells": [[0,0],[1,0],[0,1],[1,1],[2,0],[2,1]],
+      "cellRooms": ["living","living","living","living","kitchen","kitchen"],
+      "openCeilings": [[0,0],[1,0],[0,1],[1,1]],
+      "edges": [ /* … */ ],
+      "height": 3.0
+    },
+    {
+      // Upper storey. The void is part of its footprint (you can look down into
+      // it) but nothing stands there, and it lists no open ceilings of its own
+      // because it is the top storey.
+      "cells": [[0,0],[1,0],[0,1],[1,1],[2,0],[2,1]],
+      "cellRooms": ["living","living","living","living","bedroom_small","bedroom_small"],
+      "openCeilings": [],
+      "edges": [ /* … */ ],
+      "height": 3.0
+    }
+  ]
+}
+```
+
+Reading it: for a cell `[x, z]` on storey `i`, the floor above exists unless
+`storeys[i].openCeilings` contains `[x, z]`. One lookup, no inference.

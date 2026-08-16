@@ -90,6 +90,27 @@ export interface UnitStorey {
    *  deliberately does not cross the bridge. Absent ⇒ the building knows only
    *  the coarse kinds, which is what it knew before this field existed. */
   cellRooms?: string[];
+  /**
+   * OPTIONAL, purely ADDITIVE (run 0021): the cells of THIS storey over which
+   * no floor is drawn between this storey and the one above. Absent or empty
+   * means every seam is floored, which is what every file written before run
+   * 0021 meant, so a reader that ignores this field behaves exactly as it did.
+   *
+   * WHY PER CELL rather than a room-level "this room is double height" flag.
+   * The consumer's question is per cell: for every cell of every storey, does
+   * the floor above that cell exist. A per-cell list answers it by lookup with
+   * no inference, where a room-level property would make the building app
+   * re-derive which cells a room covers and which storey it sits on, which is
+   * exactly the relationship-loss this bridge exists to avoid. It also stays
+   * correct as the editor grows more ways to open a ceiling: a stairwell opens
+   * one today and reports here for the same reason a double-height room does,
+   * so the reader never has to learn a new cause.
+   *
+   * Cells are in the same normalized unit-local space as {@link cells}, and
+   * every one of them also appears in `cells`. The TOP storey never lists any:
+   * there is no floor above it to be missing.
+   */
+  openCeilings?: [number, number][];
   edges: UnitEdge[];
   /** This storey's floor-to-floor height, meters. */
   height: number;
@@ -182,6 +203,10 @@ export function buildUnitExport(
     // cells IN PLACE keeps all three aligned — never reorder one alone.
     s.cells = s.cells.map(([x, z]) => [x - minX, z - minZ]);
     s.edges = s.edges.map((e) => ({ ...e, cell: [e.cell[0] - minX, e.cell[1] - minZ] }));
+    // `openCeilings` is in the same absolute grid space as `cells`, so it takes
+    // the same single translation. Missing this would ship a list that points
+    // at the wrong cells, which is worse than shipping no list at all.
+    s.openCeilings = s.openCeilings?.map(([x, z]) => [x - minX, z - minZ]);
   }
 
   // The coarse layer (`cellKinds`) and the fine one (`cellRooms`) come from ONE
@@ -320,5 +345,26 @@ function buildStorey(
     return { cell: [e.cx, e.cz], side: SIDE_LETTER[e.side], class: cls };
   });
 
-  return { cells: cells.map((c) => [c.cx, c.cz]), cellKinds, cellRooms, edges, height };
+  // OPEN CEILINGS (run 0021): the cells of this storey with no floor above
+  // them. `voidCells` is the FloorManager's single answer to that question —
+  // stairwells and double-height rooms both land in it — and it is filtered to
+  // cells this storey actually occupies, so the list can never point outside
+  // its own footprint. The topmost storey gets none, because the thing above
+  // it is the roof and the bridge says nothing about roofs.
+  const isTop = fi === fm.floors.length - 1;
+  const openCeilings: [number, number][] = isTop
+    ? []
+    : fm
+        .voidCells(floor)
+        .filter((c) => occupied.has(cellKey(c.cx, c.cz)))
+        .map((c) => [c.cx, c.cz] as [number, number]);
+
+  return {
+    cells: cells.map((c) => [c.cx, c.cz]),
+    cellKinds,
+    cellRooms,
+    openCeilings,
+    edges,
+    height,
+  };
 }
