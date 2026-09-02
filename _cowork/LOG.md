@@ -30,3 +30,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0019 | 2026-08-10 | One save, and say what you are saving | complete | 0019-one-save.report.md |
 | 0020 | 2026-08-13 | Stairs you can climb, and bathrooms in two sizes | complete | 0020-stairs-and-bathrooms.report.md |
 | 0021 | 2026-08-16 | A room that is two storeys tall | complete | 0021-a-room-that-is-two-storeys-tall.report.md |
+| 0022 | 2026-09-02 | The store | partial | 0022-the-store.report.md |
