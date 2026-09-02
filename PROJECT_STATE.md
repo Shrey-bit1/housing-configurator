@@ -3559,7 +3559,7 @@ fresh session per run, publishes `public/units/flat-2-single-storey.json`
 Ben, republishes flat-2 (version 2), sets counts/share/ballot (Ben in two
 partial bodies), reads the state and checks the summaries (194 / 168 cells,
 bbox `0,0,15,14` / `0,0,14,12`), reads both flats back byte-identical, writes
-a run and checks `changed` cleared, preflight 204. 24 checks; exit 1 on any
+a run and checks `changed` cleared, preflight 204. 22 checks; exit 1 on any
 failure. Passed against `npx netlify dev --port 8888` (Blobs sandbox mode) in
 run 0022. The deployed branch (`run-0022--reconfigure-flat.netlify.app`) sits
 behind the site password, which answers 401 to every path including

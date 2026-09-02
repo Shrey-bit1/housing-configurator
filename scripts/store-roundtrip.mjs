@@ -91,10 +91,10 @@ check(flats["flat-2"]?.version === 2 && flats["flat-2"]?.resident === "Ana" && f
 check(flats["flat-3"]?.version === 1 && flats["flat-3"]?.resident === "Ben", "flat-3 summary: version 1, Ben");
 check(flats["flat-2"]?.floors === 1 && flats["flat-2"]?.areaCells === 194 && String(flats["flat-2"]?.bbox) === "0,0,15,14", "flat-2 measures 1 storey, 194 cells, bbox 0,0,15,14");
 check(flats["flat-3"]?.floors === 1 && flats["flat-3"]?.areaCells === 168 && String(flats["flat-3"]?.bbox) === "0,0,14,12", "flat-3 measures 1 storey, 168 cells, bbox 0,0,14,12");
-check(Object.values(flats).every((f) => f.changed === true), "both flats are marked changed");
+check(Object.keys(flats).length === 2 && Object.values(flats).every((f) => f.changed === true), "both flats are marked changed");
 check(state.json?.residents?.length === 2, "session lists two residents");
 check(state.json?.building === null, "no building run yet");
-check(!state.text.includes('"storeys"'), "no flat body in the polling call");
+check(state.status === 200 && !state.text.includes('"storeys"'), "no flat body in the polling call");
 console.log(`  polling call for two fixtures: ${state.bytes} bytes`);
 
 // 5. Each flat back, byte for byte.
@@ -108,7 +108,7 @@ for (const f of fixtures) {
 const run = await call("PUT", "/building", JSON.stringify({ genome: [3, 1, 4, 1, 5], summary: { flats: 2, fitness: 0.71 }, by: "Ben" }));
 check(run.status === 200 && typeof run.json?.at === "string" && run.json?.by === "Ben", "building run stored with a timestamp");
 const after = await call("GET", "");
-check((after.json?.flats ?? []).every((f) => f.changed === false), "changed cleared on both flats");
+check(after.json?.flats?.length === 2 && after.json.flats.every((f) => f.changed === false), "changed cleared on both flats");
 check(after.json?.building?.genome?.length === 5, "building run appears in the session state");
 const building = await call("GET", "/building");
 check(building.text === JSON.stringify(after.json?.building), "GET building matches the session's copy");
