@@ -81,7 +81,7 @@ const CORS = {
   "access-control-allow-headers": "content-type",
 };
 
-const ROUTE = /^\/api\/session\/([^/]+)(?:\/(flats|residents)\/([^/]+)|\/(building))?\/?$/;
+const ROUTE = /^\/api\/session\/([^/]+)(?:\/(flats|residents)\/([^/]+)|\/(building|export))?\/?$/;
 /** Session codes and flat ids: short and URL-safe. Codes are lowercased first. */
 const CODE = /^[a-z0-9_-]{1,32}$/;
 const ID = /^[a-z0-9_-]{1,64}$/i;
@@ -180,6 +180,18 @@ async function route(req: Request, kv: KV): Promise<Response> {
       index.residents[who] = record;
     });
     return json({ name: who, ...record });
+  }
+
+  if (kind === "export") {
+    // The whole session as one file (run 0023): the state the poll returns
+    // plus every flat body, carried as a STRING so its bytes survive the
+    // document around it. This is the thesis record of a room at the end of
+    // a test, so it is deliberately the only call that reads every blob.
+    if (req.method !== "GET") return fail(405, "GET only");
+    const index = await readIndex(kv, indexKey);
+    const bodies: Record<string, string | null> = {};
+    for (const id of Object.keys(index.flats)) bodies[id] = await kv.get(`${code}/flats/${id}`);
+    return json({ ...sessionView(code, index), bodies, exportedAt: new Date().toISOString() });
   }
 
   // kind === "building"
