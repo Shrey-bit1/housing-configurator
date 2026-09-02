@@ -3511,14 +3511,14 @@ was NOT added (the entry needs no types from it). There is still no
 `netlify.toml`: Netlify finds `netlify/functions/` by default and `netlify dev`
 detects Vite on its own.
 
-**The `KV` seam** (`store.ts:31-38`): `get(key)`, `getWithMetadata(key) →
+**The `KV` seam** (`store.ts:30-38`): `get(key)`, `getWithMetadata(key) →
 {data, etag?}`, `set(key, text, {onlyIfMatch?|onlyIfNew?}) → {modified}`.
 A Netlify `Store` satisfies it structurally (method-parameter bivariance),
 so the entry passes the store straight in and `store.test.ts` passes a
 `MemoryKV` over a `Map`. This is the one seam that lets the routes be tested
 without Netlify.
 
-**Routes** (`ROUTE` regex, `store.ts:82`; codes lowercased, `CODE`
+**Routes** (`ROUTE` regex, `store.ts:84`; codes lowercased, `CODE`
 `/^[a-z0-9_-]{1,32}$/`, flat ids `ID` `/^[a-z0-9_-]{1,64}$/i`):
 
 | Method | Path | Does |
@@ -3538,7 +3538,7 @@ Record<name, Resident>, building: BuildingRun|null}`); `{code}/flats/{id}` is
 the published file's text. Chosen against the polling call: the poll reads one
 small blob (555 bytes for two fixtures, 655 with a run), a publish writes the
 flat once and touches only a summary in the index, and a flat body is read
-only by the one-flat call. `updateIndex` (`store.ts:195-205`) is a
+only by the one-flat call. `updateIndex` (`store.ts:223-233`) is a
 read-modify-write under the blob's ETag (`onlyIfMatch`, `onlyIfNew` for a
 first write), `INDEX_ATTEMPTS = 4`, then 409 — so two residents publishing at
 once cannot clobber each other's summary. Store is global to the site
