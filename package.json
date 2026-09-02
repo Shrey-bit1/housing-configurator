@@ -11,6 +11,7 @@
     "test:slow": "vitest run --config vitest.slow.config.ts"
   },
   "dependencies": {
+    "@netlify/blobs": "^11.0.3",
     "three": "^0.169.0"
   },
   "devDependencies": {
