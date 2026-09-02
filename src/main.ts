@@ -60,6 +60,14 @@ import {
   unitFileName,
 } from "./core/saveFiles";
 import { createUnitBrowser } from "./library/unitBrowser";
+import {
+  readSession,
+  writeSession,
+  normalizeCode,
+  whyPublishDisabled,
+  sessionLine,
+  type SessionSettings,
+} from "./session/session";
 
 const DEFAULT_COLS = 16;
 const DEFAULT_ROWS = 16;
@@ -855,6 +863,50 @@ const saveWhatInputs: Record<OutputKind, HTMLInputElement> = {
   unit: document.getElementById("save-what-unit") as HTMLInputElement,
   library: document.getElementById("save-what-library") as HTMLInputElement,
 };
+
+// ---- The session: who, and which room (src/session/session.ts) -------------
+// Two fields at the top of the save dialog, remembered in localStorage under
+// one key and shown in the top bar. A `?session=` in the URL wins over the
+// stored code and is stored. Neither is ever written into a project file.
+const saveResidentInput = document.getElementById("save-resident") as HTMLInputElement;
+const saveCodeInput = document.getElementById("save-session") as HTMLInputElement;
+const savePublishInput = document.getElementById("save-what-publish") as HTMLInputElement;
+const savePublishNote = document.getElementById("save-publish-note") as HTMLElement;
+const tbSession = document.getElementById("tb-session") as HTMLElement;
+const PUBLISH_NOTE = savePublishNote.textContent ?? "";
+
+/** localStorage, or null where the browser refuses it (a sandboxed frame). */
+const sessionStorageArea = (() => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+})();
+let session: SessionSettings = readSession(sessionStorageArea, location.search);
+
+/** The top-bar line and the Publish checkbox follow the two fields: while
+ *  either is empty the checkbox is off, disabled, and its note says why. */
+function syncSessionUI(): void {
+  tbSession.textContent = sessionLine(session);
+  tbSession.classList.toggle("set", session.code.length > 0);
+  const why = whyPublishDisabled(session);
+  savePublishInput.disabled = why !== null;
+  if (why !== null) savePublishInput.checked = false;
+  savePublishNote.textContent = why ?? PUBLISH_NOTE;
+}
+
+function onSessionInput(): void {
+  session = { resident: saveResidentInput.value, code: normalizeCode(saveCodeInput.value) };
+  if (saveCodeInput.value !== session.code) saveCodeInput.value = session.code;
+  writeSession(sessionStorageArea, session);
+  syncSessionUI();
+}
+saveResidentInput.addEventListener("input", onSessionInput);
+saveCodeInput.addEventListener("input", onSessionInput);
+saveResidentInput.value = session.resident;
+saveCodeInput.value = session.code;
+syncSessionUI();
 
 /** REMEMBERED FOR THE SESSION (never serialized — this is how you save, not
  *  part of the design). All three default to on, because all three are what
