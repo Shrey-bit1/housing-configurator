@@ -82,7 +82,21 @@ export for the building repo is committed at
 a branch deploy is `https://run-NNNN--reconfigure-flat.netlify.app`; it is
 password-protected, so an unauthenticated check gets 401 rather than 200, and
 404 means the build has not finished.
-**Last updated:** 2026-08-16
+Run 0022 built THE SESSION STORE and nothing visible: a Netlify Function at
+`netlify/functions/session.mts` whose whole handler is `src/session/store.ts`,
+routed under `/api/session/{code}` (whole session as summaries, one flat
+verbatim, publish a flat, a resident's counts/share/ballot with partial merge,
+the last building run whose write clears `changed`), backed by Netlify Blobs
+(store `sessions`, one index blob per session plus one blob per flat, index
+writes under the blob's ETag). `@netlify/blobs` is the one new dependency;
+`tsconfig.json` now includes `netlify/`. `scripts/store-roundtrip.mjs
+<base-url>` proves it from the shell (22 checks) and passed against `npx
+netlify dev --port 8888`. `docs/store.md` is the contract. PROJECT_STATE §12.
+**The deployed store is unreachable while the site password is on**: the
+`reconfigure-flat` gate answers 401 to `/api/session/*` and even to an OPTIONS
+preflight, so run 0023 and the building side cannot call it until that changes.
+
+**Last updated:** 2026-09-02
 
 ## What this project is
 
@@ -129,6 +143,11 @@ rules engine and the export format are the mature parts, the UI is not.
   against. Both are SOURCE and both are committed; `ds-bundle/` is generated from
   them and is gitignored. Added by A0001, committed in run 0015. This is where the
   values in `src/style.css`'s new `--ink` / `--dur-*` / `--ease-*` tokens come from.
+- `netlify/functions/` — the one Netlify Function, `session.mts`, the entry of
+  the session store (run 0022). Netlify finds the folder by default; there is
+  still no `netlify.toml`. `.netlify/` (created by `netlify dev`) is gitignored.
+- `scripts/` — shell-run scripts, so far only `store-roundtrip.mjs`, which
+  drives the session store against a base URL and exits 1 on any failed check.
 - `_cowork/` — the bridge traffic. Tracked in git on purpose.
 
 ## Entry points
@@ -151,7 +170,8 @@ rules engine and the export format are the mature parts, the UI is not.
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 126 cases in ten files as of run 0021 (84 in eight before run
+  a second over 134 cases in eleven files as of run 0022 (126 in ten as of run 0021,
+  plus `src/session/store.test.ts` 8, the session store through an in-memory KV) (84 in eight before run
   0020,
   plus `src/core/stairSpec.test.ts` 23, the stair proportions and the spiral's
   miss, and `src/scene/props/bathroomFit.test.ts` 19, the bathroom fixture fit).

@@ -37,3 +37,6 @@ _cowork/CONTEXT.local.md
 
 # design-sync generated bundle (rebuild from design/)
 ds-bundle/
+
+# Local Netlify folder
+.netlify

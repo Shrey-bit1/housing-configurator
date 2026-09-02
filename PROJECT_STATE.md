@@ -69,6 +69,7 @@ work-in-progress research artifact, not a production app.
 | Interaction | `src/interaction/picker.ts`, `dragDrop.ts`, `selection.ts` | Raycast picking (`cellAt`/`groupAt`/`groundPoint`, scoped to the ACTIVE floor's store — this is also why floor visibility needs no picker-side filtering, see §5), palette→canvas placement, select/**multi-select**/move/**group-move**/rotate/**mirror**/delete/**group-delete**/**Shift+D-duplicate** (any count) of modules, plus entrance AND door select/delete (two `MarkerSelectionAdapter`s — mutually exclusive singletons, excluded from multi-select). `R`/`M` work on the palette ghost, the move ghost, the duplicate ghost, and a SINGLE selected instance — no-op on 2+ (§2h). `dragDrop.cancelPlacement()`/`selection.cancelDuplicate()`/`entranceController.cancel()` are public, no-argument, and NOT wired to their own Escape listeners — Escape is arbitrated centrally by main.ts (§2h). `dragDrop`/`selection` take an `onAfterAction` callback (fires after a committed mutation → undo snapshot, see §2f); `selection` also takes `onSelectionChange`/`onNoopHint` callbacks and an `EntranceSelectionAdapter`. |
 | **Group-move ghost** | `src/scene/groupGhostPreview.ts` | `GroupGhostPreview`: one translucent ghost mesh per selected member, positioned by its cell offset from the grabbed member's target origin, tinted green/red as ONE unit (mirrors `GhostPreview`'s shape/API). See §2h. |
 | Wiring / render loop / view-mode orchestration, **dev-only `?project=` loader + `window.__app` capture handle** | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
+| **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. See §12. |
 
 **Concave-corner wall logic** (part of `buildBoundaryWalls`): walls are inset to
 the INTERIOR side of their boundary line (no protrusion). N/S walls (run in x)
@@ -3487,3 +3488,88 @@ controls to the top bar.
 the survives-a-failed-unit rule directly. main.ts is thin wiring over it.
 Suite counts as of run 0019: fast 84 passed in 8 files (was 47 in 5), slow 6
 passed + the standing french-window `it.fails`.
+
+---
+
+## 12. The session store (`netlify/functions/session.mts` + `src/session/store.ts`)
+
+**Contract source of truth: `docs/store.md`.** Added in run 0022. A small
+shared HTTP store both apps can reach, so five residents in one room can
+publish flats into one building without passing files by hand. The flat
+configurator will publish to it (run 0023); the building configurator will
+poll it (bottom-up 0042). **Nothing in the app's UI uses it yet** — run 0022
+built the store and proved it from the shell only.
+
+**Where it runs.** One Netlify Function (v2 style, `export default (req:
+Request) => Response`, `export const config = { path: "/api/session/*" }`)
+at `netlify/functions/session.mts` (11 lines): it names the Blobs store
+(`getStore({ name: "sessions", consistency: "strong" })`) and hands the
+request to `handleSession` in `src/session/store.ts` (311 lines), which is the
+whole handler. `tsconfig.json` `include` gained `"netlify"` so `tsc` checks the
+entry. `@netlify/blobs` 11.0.3 is the one new dependency; `@netlify/functions`
+was NOT added (the entry needs no types from it). There is still no
+`netlify.toml`: Netlify finds `netlify/functions/` by default and `netlify dev`
+detects Vite on its own.
+
+**The `KV` seam** (`store.ts:30-38`): `get(key)`, `getWithMetadata(key) →
+{data, etag?}`, `set(key, text, {onlyIfMatch?|onlyIfNew?}) → {modified}`.
+A Netlify `Store` satisfies it structurally (method-parameter bivariance),
+so the entry passes the store straight in and `store.test.ts` passes a
+`MemoryKV` over a `Map`. This is the one seam that lets the routes be tested
+without Netlify.
+
+**Routes** (`ROUTE` regex, `store.ts:84`; codes lowercased, `CODE`
+`/^[a-z0-9_-]{1,32}$/`, flat ids `ID` `/^[a-z0-9_-]{1,64}$/i`):
+
+| Method | Path | Does |
+|---|---|---|
+| `GET` | `/api/session/{code}` | `sessionView`: `{code, flats: FlatSummary[], residents: (Resident & {name})[], building}` — lists on the wire, maps in storage, never a flat body. Unknown code → empty session, 200. |
+| `GET` | `…/flats/{id}` | the stored text, byte for byte, `content-type: application/json`; 404 if absent. |
+| `PUT` | `…/flats/{id}?resident=…&label=…` | body = the `dwelling-unit` JSON as Export writes it. `parseUnit` checks only `format`, `storeys[].cells` as `[int,int]`; `measure` derives `bbox [minX,minZ,maxX,maxZ]`, `floors`, `areaCells`. Existing id → version+1, `changed: true`, 200; new → version 1, 201. `label` falls back to the unit's `name`. |
+| `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[]); each present key replaced whole. Returns `{name, …record}`. |
+| `GET`/`PUT` | `…/building` | PUT stores `{genome, summary, by, at: now}` and sets `changed = false` on every flat; GET returns it or `null`. |
+| `OPTIONS` | anything | 204, `access-control-allow-origin: *`, methods `GET, PUT, OPTIONS`, headers `content-type`. Every other response carries the same CORS headers, errors included. |
+
+Errors: `HttpError` → `{error}` JSON with 400/404/405/409; anything else 500.
+
+**Storage layout** (Netlify Blobs store `sessions`): `{code}/index` is one
+JSON document (`SessionIndex = {flats: Record<id, FlatSummary>, residents:
+Record<name, Resident>, building: BuildingRun|null}`); `{code}/flats/{id}` is
+the published file's text. Chosen against the polling call: the poll reads one
+small blob (555 bytes for two fixtures, 655 with a run), a publish writes the
+flat once and touches only a summary in the index, and a flat body is read
+only by the one-flat call. `updateIndex` (`store.ts:223-233`) is a
+read-modify-write under the blob's ETag (`onlyIfMatch`, `onlyIfNew` for a
+first write), `INDEX_ATTEMPTS = 4`, then 409 — so two residents publishing at
+once cannot clobber each other's summary. Store is global to the site
+(`getStore`, not `getDeployStore`), so branch deploys and production share
+sessions.
+
+**Verbatim, by construction.** The flat's bytes go into their blob untouched
+and come back untouched; the store parses them once to measure. The
+byte-equality check in `scripts/store-roundtrip.mjs` compares the GET body
+against the file that was sent with `Buffer.compare`.
+
+**No auth.** Anyone with the code can read and overwrite everything in the
+session. Written down as the limit in `docs/store.md`.
+
+**Proof.** `scripts/store-roundtrip.mjs <base-url>` (plain Node, no deps):
+fresh session per run, publishes `public/units/flat-2-single-storey.json`
+(37484 bytes) as Ana and `public/units/flat-3-terrace.json` (33388 bytes) as
+Ben, republishes flat-2 (version 2), sets counts/share/ballot (Ben in two
+partial bodies), reads the state and checks the summaries (194 / 168 cells,
+bbox `0,0,15,14` / `0,0,14,12`), reads both flats back byte-identical, writes
+a run and checks `changed` cleared, preflight 204. 22 checks; exit 1 on any
+failure. Passed against `npx netlify dev --port 8888` (Blobs sandbox mode) in
+run 0022. The deployed branch (`run-0022--reconfigure-flat.netlify.app`) sits
+behind the site password, which answers 401 to every path including
+`/api/session/*` and even to an `OPTIONS` preflight, so the deployed round trip
+and any cross-origin call are blocked until that password is lifted for the
+API path or the whole site.
+
+**Tests.** `src/session/store.test.ts` — 8 cases, fast suite (no three.js):
+routing/CORS, empty session, rejections, create-vs-replace with bytes kept and
+no `storeys` in the poll, resident partial merge + validation, building write
+clears `changed` and the next publish sets it again, and a `RacingKV` whose
+first ETag write loses so the retry is exercised. Suite counts as of run 0022:
+**fast 134 passed in 11 files** (was 126 in 10), slow unchanged.

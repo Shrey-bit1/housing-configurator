@@ -1,0 +1,311 @@
+/**
+ * The session store — the shared place a flat is PUBLISHED to and a building
+ * is READ from, so five residents in one room can work on one building
+ * without passing files by hand. `docs/store.md` is the contract; this file is
+ * the whole handler, and `netlify/functions/session.mts` is the eight-line
+ * Netlify entry that gives it a Blobs store and a URL.
+ *
+ * The handler is written against the small `KV` interface below rather than
+ * against `@netlify/blobs` directly, because that is the one seam that lets
+ * `store.test.ts` drive every route through an in-memory map with no Netlify
+ * running. A Netlify `Store` satisfies `KV` structurally, so the entry passes
+ * it straight in.
+ *
+ * Storage layout, per session code:
+ *   `{code}/index`       one JSON blob: flat SUMMARIES, residents, last run
+ *   `{code}/flats/{id}`  the published `dwelling-unit` text, byte for byte
+ *
+ * The index is what the building polls, so it never holds a flat body; a flat
+ * body is written once at publish time and read only by the one-flat call.
+ * Every change to the index is a read-modify-write under the blob's ETag,
+ * retried a few times, so two residents publishing at once cannot overwrite
+ * each other's summary.
+ *
+ * There is no login. Anyone who knows the session code can read and write
+ * everything in it. That is accepted for a five-person test and written down
+ * in docs/store.md as the limit.
+ */
+
+/** The three calls the handler makes on storage; `@netlify/blobs`' `Store` has this shape. */
+export interface KV {
+  get(key: string): Promise<string | null>;
+  getWithMetadata(key: string): Promise<{ data: string; etag?: string } | null>;
+  set(
+    key: string,
+    value: string,
+    options?: { onlyIfMatch?: string; onlyIfNew?: boolean },
+  ): Promise<{ modified: boolean }>;
+}
+
+/** What the polling call says about one flat. Never the flat itself. */
+export interface FlatSummary {
+  id: string;
+  resident: string;
+  label: string;
+  version: number;
+  /** True since the last publish, false once a building run has read it. */
+  changed: boolean;
+  /** `[minX, minZ, maxX, maxZ]` in cells over the union of every storey. */
+  bbox: [number, number, number, number];
+  floors: number;
+  areaCells: number;
+  publishedAt: string;
+}
+
+export interface Resident {
+  /** Flat id → how many of it this resident wants. Replaced whole when sent. */
+  counts: Record<string, number>;
+  /** Wished share of shared space, 0..1, or null when never set. */
+  share: number | null;
+  /** Ordered ballot of shared-space type names, first is most wanted. */
+  ballot: string[];
+}
+
+export interface BuildingRun {
+  genome: unknown;
+  summary: unknown;
+  by: string;
+  at: string;
+}
+
+/** The index blob. Maps here, lists on the wire (see `sessionView`). */
+interface SessionIndex {
+  flats: Record<string, FlatSummary>;
+  residents: Record<string, Resident>;
+  building: BuildingRun | null;
+}
+
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, PUT, OPTIONS",
+  "access-control-allow-headers": "content-type",
+};
+
+const ROUTE = /^\/api\/session\/([^/]+)(?:\/(flats|residents)\/([^/]+)|\/(building))?\/?$/;
+/** Session codes and flat ids: short and URL-safe. Codes are lowercased first. */
+const CODE = /^[a-z0-9_-]{1,32}$/;
+const ID = /^[a-z0-9_-]{1,64}$/i;
+const INDEX_ATTEMPTS = 4;
+
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+const fail = (status: number, message: string): never => {
+  throw new HttpError(status, message);
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "content-type": "application/json; charset=utf-8" },
+  });
+}
+
+/** Route one request. Every response, errors included, carries the CORS headers. */
+export async function handleSession(req: Request, kv: KV): Promise<Response> {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  try {
+    return await route(req, kv);
+  } catch (e) {
+    if (e instanceof HttpError) return json({ error: e.message }, e.status);
+    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+  }
+}
+
+async function route(req: Request, kv: KV): Promise<Response> {
+  const url = new URL(req.url);
+  const m = ROUTE.exec(url.pathname);
+  if (!m) return fail(404, "no such route; see docs/store.md");
+  const code = decodeSegment(m[1]).toLowerCase();
+  if (!CODE.test(code)) return fail(400, "session code must be 1-32 of a-z, 0-9, - and _");
+  const kind = m[2] ?? m[4];
+  const name = m[3] === undefined ? undefined : decodeSegment(m[3]);
+  const indexKey = `${code}/index`;
+
+  if (kind === undefined) {
+    if (req.method !== "GET") return fail(405, "GET only");
+    return json(sessionView(code, await readIndex(kv, indexKey)));
+  }
+
+  if (kind === "flats") {
+    const id = name!;
+    if (!ID.test(id)) return fail(400, "flat id must be 1-64 of a-z, 0-9, - and _");
+    const flatKey = `${code}/flats/${id}`;
+    if (req.method === "GET") {
+      const text = await kv.get(flatKey);
+      if (text === null) return fail(404, `no flat "${id}" in session "${code}"`);
+      return new Response(text, {
+        headers: { ...CORS, "content-type": "application/json; charset=utf-8" },
+      });
+    }
+    if (req.method !== "PUT") return fail(405, "GET or PUT only");
+    const resident = (url.searchParams.get("resident") ?? "").trim();
+    if (!resident) return fail(400, "?resident= is required: who is publishing");
+    const text = await req.text();
+    const unit = parseUnit(text);
+    const label = (url.searchParams.get("label") ?? "").trim() || unit.name;
+    // The body is stored byte for byte; the summary is the only thing derived from it.
+    await kv.set(flatKey, text);
+    let summary!: FlatSummary;
+    let created = false;
+    await updateIndex(kv, indexKey, (index) => {
+      const prev = index.flats[id];
+      created = prev === undefined;
+      summary = {
+        id,
+        resident,
+        label,
+        version: prev ? prev.version + 1 : 1,
+        changed: true,
+        ...measure(unit),
+        publishedAt: new Date().toISOString(),
+      };
+      index.flats[id] = summary;
+    });
+    return json(summary, created ? 201 : 200);
+  }
+
+  if (kind === "residents") {
+    if (req.method !== "PUT") return fail(405, "PUT only");
+    const who = name!.trim();
+    if (who.length === 0 || who.length > 64 || /[\p{C}]/u.test(who)) {
+      return fail(400, "resident name must be 1-64 printable characters");
+    }
+    const patch = parseResidentPatch(await req.json().catch(() => fail(400, "body must be JSON")));
+    let record!: Resident;
+    await updateIndex(kv, indexKey, (index) => {
+      record = { ...(index.residents[who] ?? { counts: {}, share: null, ballot: [] }), ...patch };
+      index.residents[who] = record;
+    });
+    return json({ name: who, ...record });
+  }
+
+  // kind === "building"
+  if (req.method === "GET") return json((await readIndex(kv, indexKey)).building);
+  if (req.method !== "PUT") return fail(405, "GET or PUT only");
+  const body = await req.json().catch(() => fail(400, "body must be JSON"));
+  if (!isRecord(body)) return fail(400, "body must be a JSON object");
+  const run: BuildingRun = {
+    genome: body.genome ?? null,
+    summary: body.summary ?? null,
+    by: typeof body.by === "string" ? body.by : "",
+    at: new Date().toISOString(),
+  };
+  await updateIndex(kv, indexKey, (index) => {
+    index.building = run;
+    for (const flat of Object.values(index.flats)) flat.changed = false;
+  });
+  return json(run);
+}
+
+function decodeSegment(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return fail(400, "malformed URL segment");
+  }
+}
+
+const emptyIndex = (): SessionIndex => ({ flats: {}, residents: {}, building: null });
+
+async function readIndex(kv: KV, key: string): Promise<SessionIndex> {
+  const text = await kv.get(key);
+  return text === null ? emptyIndex() : (JSON.parse(text) as SessionIndex);
+}
+
+/**
+ * Read-modify-write under the blob's ETag. A write that lost a race returns
+ * `modified: false` and the loop reads again; an unknown session is created
+ * with `onlyIfNew`, so two first arrivals cannot both create it.
+ */
+async function updateIndex(kv: KV, key: string, mutate: (index: SessionIndex) => void): Promise<void> {
+  for (let attempt = 0; attempt < INDEX_ATTEMPTS; attempt++) {
+    const cur = await kv.getWithMetadata(key);
+    const index = cur ? (JSON.parse(cur.data) as SessionIndex) : emptyIndex();
+    mutate(index);
+    const res = await kv.set(key, JSON.stringify(index), cur ? { onlyIfMatch: cur.etag } : { onlyIfNew: true });
+    if (res.modified) return;
+  }
+  fail(409, `the session changed under this write ${INDEX_ATTEMPTS} times; try again`);
+}
+
+/** The wire shape of a whole session: lists rather than maps, never a flat body. */
+function sessionView(code: string, index: SessionIndex) {
+  return {
+    code,
+    flats: Object.values(index.flats),
+    residents: Object.entries(index.residents).map(([name, r]) => ({ name, ...r })),
+    building: index.building,
+  };
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+interface UnitShape {
+  name: string;
+  storeys: { cells: [number, number][] }[];
+}
+
+/** The least the store needs to believe a body is a `dwelling-unit` file. */
+function parseUnit(text: string): UnitShape {
+  let u: unknown;
+  try {
+    u = JSON.parse(text);
+  } catch {
+    return fail(400, "body must be the dwelling-unit JSON");
+  }
+  if (!isRecord(u) || u.format !== "dwelling-unit" || !Array.isArray(u.storeys)) {
+    return fail(400, 'body must be a "dwelling-unit" file with a storeys array');
+  }
+  for (const s of u.storeys) {
+    if (!isRecord(s) || !Array.isArray(s.cells)) return fail(400, "every storey needs a cells array");
+    for (const c of s.cells) {
+      if (!Array.isArray(c) || c.length !== 2 || !c.every((n) => Number.isInteger(n))) {
+        return fail(400, "every cell must be [x, z] integers");
+      }
+    }
+  }
+  return { name: typeof u.name === "string" ? u.name : "", storeys: u.storeys as UnitShape["storeys"] };
+}
+
+/** Bounding box, storey count and cell count over the union of every storey. */
+function measure(unit: UnitShape): Pick<FlatSummary, "bbox" | "floors" | "areaCells"> {
+  let areaCells = 0;
+  const bbox: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const s of unit.storeys) {
+    for (const [x, z] of s.cells) {
+      areaCells++;
+      bbox[0] = Math.min(bbox[0], x);
+      bbox[1] = Math.min(bbox[1], z);
+      bbox[2] = Math.max(bbox[2], x);
+      bbox[3] = Math.max(bbox[3], z);
+    }
+  }
+  return { bbox: areaCells ? bbox : [0, 0, 0, 0], floors: unit.storeys.length, areaCells };
+}
+
+/** Only the keys present are merged; each one is checked whole. */
+function parseResidentPatch(body: unknown): Partial<Resident> {
+  if (!isRecord(body)) return fail(400, "body must be a JSON object");
+  const patch: Partial<Resident> = {};
+  if ("counts" in body) {
+    const c = body.counts;
+    if (!isRecord(c) || !Object.values(c).every((n) => Number.isInteger(n) && (n as number) >= 0)) {
+      return fail(400, "counts must map flat ids to whole numbers ≥ 0");
+    }
+    patch.counts = c as Record<string, number>;
+  }
+  if ("share" in body) {
+    const s = body.share;
+    if (s !== null && !(typeof s === "number" && s >= 0 && s <= 1)) return fail(400, "share must be a number 0..1 or null");
+    patch.share = s as number | null;
+  }
+  if ("ballot" in body) {
+    const b = body.ballot;
+    if (!Array.isArray(b) || !b.every((t) => typeof t === "string")) return fail(400, "ballot must be a list of strings");
+    patch.ballot = b as string[];
+  }
+  return patch;
+}
