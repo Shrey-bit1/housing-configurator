@@ -252,12 +252,13 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
   close.addEventListener("click", () => api.close());
   header.append(title, count, close);
 
-  // Two groups in one scrolling column: the library, and (when the host gives
-  // a session source) the flats published in this session. Each group has its
-  // own grid so one failing to load leaves the other readable.
+  // Two groups in one scrolling column: (when the host gives a session source)
+  // the flats published in this session, then the library. The session comes
+  // first because the library already holds eight cards, which would push the
+  // neighbours' flats below the fold every time. Each group has its own grid
+  // so one failing to load leaves the other readable.
   const body = document.createElement("div");
   body.className = "ulb-body";
-  const libGrid = group(body, "Library");
   let sessionGrid: HTMLElement | null = null;
   let sessionCode: HTMLElement | null = null;
   let refreshBtn: HTMLButtonElement | null = null;
@@ -271,6 +272,7 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
     refreshBtn.addEventListener("click", () => void refreshSession());
     sessionGrid = group(body, "In this session", sessionCode, refreshBtn);
   }
+  const libGrid = group(body, "Library");
   el.append(header, body);
   mount.appendChild(el);
 
