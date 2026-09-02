@@ -66,6 +66,7 @@ import {
   normalizeCode,
   whyPublishDisabled,
   sessionLine,
+  publishUnit,
   type SessionSettings,
 } from "./session/session";
 
@@ -862,7 +863,19 @@ const saveWhatInputs: Record<OutputKind, HTMLInputElement> = {
   project: document.getElementById("save-what-project") as HTMLInputElement,
   unit: document.getElementById("save-what-unit") as HTMLInputElement,
   library: document.getElementById("save-what-library") as HTMLInputElement,
+  publish: document.getElementById("save-what-publish") as HTMLInputElement,
 };
+
+/** REMEMBERED FOR THE SESSION (never serialized — this is how you save, not
+ *  part of the design). All four default to on: the three retired menu items
+ *  were being used together, and publishing is what the session is for; after
+ *  the first save the second unit costs one click. Reset on reload, like every
+ *  other view-state default. Publish is only EFFECTIVE while the session
+ *  fields are filled — `readSaveSelection` reads a disabled box as off. */
+let saveSelection: SaveSelection = { project: true, unit: true, library: true, publish: true };
+/** Once the colour is touched by hand it stops following the name hash, for
+ *  the rest of the session. */
+let saveColorTouched = false;
 
 // ---- The session: who, and which room (src/session/session.ts) -------------
 // Two fields at the top of the save dialog, remembered in localStorage under
@@ -870,7 +883,6 @@ const saveWhatInputs: Record<OutputKind, HTMLInputElement> = {
 // stored code and is stored. Neither is ever written into a project file.
 const saveResidentInput = document.getElementById("save-resident") as HTMLInputElement;
 const saveCodeInput = document.getElementById("save-session") as HTMLInputElement;
-const savePublishInput = document.getElementById("save-what-publish") as HTMLInputElement;
 const savePublishNote = document.getElementById("save-publish-note") as HTMLElement;
 const tbSession = document.getElementById("tb-session") as HTMLElement;
 const PUBLISH_NOTE = savePublishNote.textContent ?? "";
@@ -886,13 +898,16 @@ const sessionStorageArea = (() => {
 let session: SessionSettings = readSession(sessionStorageArea, location.search);
 
 /** The top-bar line and the Publish checkbox follow the two fields: while
- *  either is empty the checkbox is off, disabled, and its note says why. */
+ *  either is empty the checkbox is off, disabled, and its note says why; the
+ *  moment both are filled it comes back with the remembered choice. */
 function syncSessionUI(): void {
   tbSession.textContent = sessionLine(session);
   tbSession.classList.toggle("set", session.code.length > 0);
   const why = whyPublishDisabled(session);
-  savePublishInput.disabled = why !== null;
-  if (why !== null) savePublishInput.checked = false;
+  const input = saveWhatInputs.publish;
+  const wasDisabled = input.disabled;
+  input.disabled = why !== null;
+  input.checked = why !== null ? false : wasDisabled ? saveSelection.publish : input.checked;
   savePublishNote.textContent = why ?? PUBLISH_NOTE;
 }
 
@@ -901,6 +916,7 @@ function onSessionInput(): void {
   if (saveCodeInput.value !== session.code) saveCodeInput.value = session.code;
   writeSession(sessionStorageArea, session);
   syncSessionUI();
+  syncSaveDialog();
 }
 saveResidentInput.addEventListener("input", onSessionInput);
 saveCodeInput.addEventListener("input", onSessionInput);
@@ -908,21 +924,13 @@ saveResidentInput.value = session.resident;
 saveCodeInput.value = session.code;
 syncSessionUI();
 
-/** REMEMBERED FOR THE SESSION (never serialized — this is how you save, not
- *  part of the design). All three default to on, because all three are what
- *  the three retired menu items were being used for together; after the first
- *  save the second unit costs one click. Reset on reload, like every other
- *  view-state default. */
-let saveSelection: SaveSelection = { project: true, unit: true, library: true };
-/** Once the colour is touched by hand it stops following the name hash, for
- *  the rest of the session. */
-let saveColorTouched = false;
-
+/** The EFFECTIVE selection: a disabled Publish box (no name or code yet) reads as off. */
 function readSaveSelection(): SaveSelection {
   return {
     project: saveWhatInputs.project.checked,
     unit: saveWhatInputs.unit.checked,
     library: saveWhatInputs.library.checked,
+    publish: saveWhatInputs.publish.checked && !saveWhatInputs.publish.disabled,
   };
 }
 
@@ -937,15 +945,17 @@ function saveDesignNumber(): number {
  *  re-derived from the two inputs. Nothing ticked is not a save. */
 function syncSaveDialog(): void {
   const n = saveDesignNumber();
-  saveSelection = readSaveSelection();
+  const sel = readSaveSelection();
+  // A disabled Publish box keeps the remembered choice rather than forgetting it.
+  saveSelection = { ...sel, publish: saveWhatInputs.publish.disabled ? saveSelection.publish : sel.publish };
   const parts: string[] = [];
-  if (saveSelection.project) parts.push(projectNameFor(n));
-  if (saveSelection.unit || saveSelection.library) parts.push(unitNameFor(n));
+  if (sel.project) parts.push(projectNameFor(n));
+  if (needsUnitBuild(sel)) parts.push(unitNameFor(n));
   saveNamesLine.textContent = parts.length
     ? `Writes ${parts.join(" and ")}`
     : "Nothing selected";
   if (!saveColorTouched) saveColorInput.value = defaultUnitColor(unitNameFor(n));
-  saveGoBtn.disabled = isEmptySelection(saveSelection);
+  saveGoBtn.disabled = isEmptySelection(sel);
 }
 
 /** The library manifest, or an empty one when it cannot be read. The dialog
@@ -966,8 +976,9 @@ async function readManifestEntries(): Promise<UnitManifestEntry[]> {
  *  moment ago is already counted. */
 async function openSaveDialog(): Promise<void> {
   saveResultsEl.replaceChildren();
-  for (const kind of ["project", "unit", "library"] as OutputKind[])
+  for (const kind of ["project", "unit", "library", "publish"] as OutputKind[])
     saveWhatInputs[kind].checked = saveSelection[kind];
+  syncSessionUI(); // and off again if the session fields are still empty
   syncSaveDialog();
   saveDialog.showModal();
   const entries = await readManifestEntries();
@@ -1053,6 +1064,7 @@ async function runSave(): Promise<void> {
         const why = "not written — you chose not to continue past the layout check";
         if (sel.unit) setSaveResult("unit", "skipped", why);
         if (sel.library) setSaveResult("library", "skipped", why);
+        if (sel.publish) setSaveResult("publish", "skipped", why);
       }
     }
   }
@@ -1084,6 +1096,27 @@ async function runSave(): Promise<void> {
 
   // 3. The library entry.
   if (sel.library && unitFile) await saveLibraryEntry(unitName, color, unitFile);
+
+  // 4. Publish to the session: the unit download's EXACT bytes, PUT to the
+  //    store on this origin as `unit-<n>` (docs/store.md). The files above are
+  //    already written, so a failure of any kind is one red line and nothing
+  //    else; `publishUnit` never throws.
+  if (sel.publish && unitFile) {
+    const r = await publishUnit(
+      (url, init) => fetch(url, init),
+      "",
+      session,
+      slugifyUnitName(unitName),
+      unitName,
+      unitFileText(unitFile)
+    );
+    if (r.ok) {
+      setSaveResult("publish", "written", `Published as ${r.label} to ${session.code}, version ${r.version}`);
+      void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
+    } else {
+      setSaveResult("publish", "failed", `not published — ${r.status ? `${r.status} ` : ""}${r.reason}`);
+    }
+  }
 
   saveGoBtn.disabled = isEmptySelection(readSaveSelection());
 }

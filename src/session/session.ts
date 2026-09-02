@@ -86,3 +86,58 @@ export function sessionLine(s: SessionSettings): string {
   if (!s.code) return resident ? `No session · ${resident}` : "No session";
   return resident ? `Session ${s.code} · ${resident}` : `Session ${s.code}`;
 }
+
+export type PublishResult =
+  | { ok: true; id: string; label: string; version: number; changed: boolean }
+  | { ok: false; status: number; reason: string };
+
+/** The minimum of `fetch` this module calls, so a test can hand in a stub. */
+export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<Response>;
+
+/**
+ * PUT the unit download's exact bytes to
+ * `{base}/api/session/{code}/flats/{id}?resident=…&label=…` (docs/store.md).
+ * Never throws: a network failure is `status: 0`, a refusal carries the
+ * store's own `error` line, so the caller can print one honest result and
+ * leave the files it already wrote alone.
+ */
+export async function publishUnit(
+  fetchFn: FetchLike,
+  base: string,
+  s: SessionSettings,
+  id: string,
+  label: string,
+  text: string,
+): Promise<PublishResult> {
+  const query = new URLSearchParams({ resident: s.resident.trim(), label });
+  const url = `${base}/api/session/${encodeURIComponent(s.code)}/flats/${encodeURIComponent(id)}?${query}`;
+  let res: Response;
+  try {
+    res = await fetchFn(url, { method: "PUT", headers: { "content-type": "application/json" }, body: text });
+  } catch (err) {
+    return { ok: false, status: 0, reason: err instanceof Error ? err.message : String(err) };
+  }
+  const body = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    parsed = undefined;
+  }
+  const record = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : null;
+  if (!res.ok) {
+    const reason =
+      typeof record?.error === "string" ? record.error : body.trim().slice(0, 120) || res.statusText || "no reason given";
+    return { ok: false, status: res.status, reason };
+  }
+  if (typeof record?.version !== "number") {
+    return { ok: false, status: res.status, reason: "the store answered without a version" };
+  }
+  return {
+    ok: true,
+    id: typeof record.id === "string" ? record.id : id,
+    label: typeof record.label === "string" ? record.label : label,
+    version: record.version,
+    changed: record.changed === true,
+  };
+}
