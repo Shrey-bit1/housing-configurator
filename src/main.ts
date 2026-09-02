@@ -1323,6 +1323,12 @@ document.body.appendChild(fileInput);
 const unitBrowser = createUnitBrowser({
   manifestUrl: UNITS_MANIFEST_URL,
   mount: viewport,
+  // The neighbours' flats (run 0023): the store's poll and one-flat calls on
+  // this origin, for whatever session code is set at refresh time.
+  session: {
+    stateUrl: () => (session.code ? `/api/session/${encodeURIComponent(session.code)}` : null),
+    flatUrl: (id) => `/api/session/${encodeURIComponent(session.code)}/flats/${encodeURIComponent(id)}`,
+  },
   // Rename is DEV-ONLY for the same reason saving is: the manifest lives on
   // disk beside the units and only the dev server can write it. Omitting the
   // callback in a production build leaves the cards read-only, which is what
