@@ -1474,6 +1474,7 @@ const unitBrowser = createUnitBrowser({
     stateUrl: () => (session.code ? `/api/session/${encodeURIComponent(session.code)}` : null),
     flatUrl: (id) => `/api/session/${encodeURIComponent(session.code)}/flats/${encodeURIComponent(id)}`,
     previewUrl: (id) => `/api/session/${encodeURIComponent(session.code)}/flats/${encodeURIComponent(id)}/preview`,
+    residentName: () => session.resident.trim(),
   },
   // Rename is DEV-ONLY for the same reason saving is: the manifest lives on
   // disk beside the units and only the dev server can write it. Omitting the
