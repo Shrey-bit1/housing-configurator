@@ -148,6 +148,15 @@ in the first place.
 
 ## Evidence
 
+Every live check in this report ran against `netlify dev` on
+`http://localhost:8888`, the only address reachable from this machine. The
+branch, once pushed, should build a Netlify deploy at
+`https://run-0026--reconfigure-flat.netlify.app`, following the pattern
+`docs/store.md` and every prior run's report record for this site; it
+answered "Site not found" both times it was checked shortly after the
+push, which most likely means the build had not finished yet rather than
+anything wrong with the branch, but that is not confirmed.
+
 Store, plot field, a session with a building run and a real plot, driven
 through `netlify dev` at `http://localhost:8888`:
 
