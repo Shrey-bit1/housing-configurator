@@ -87,6 +87,18 @@ export function sessionLine(s: SessionSettings): string {
   return resident ? `Session ${s.code} · ${resident}` : `Session ${s.code}`;
 }
 
+/**
+ * The confirm shown before Replace takes another resident's flat over (run
+ * 0025), matching the library's own replace-or-new prompt. Pure, so a test
+ * pins the wording directly instead of driving `window.confirm` — the same
+ * automation trap run 0010 found: under scripting it returns `false` without
+ * ever displaying, so a test that called the real dialog would only prove
+ * the decline path.
+ */
+export function takeoverConfirmText(owner: string): string {
+  return `This flat belongs to ${owner}. Take it over?`;
+}
+
 export type PublishResult =
   | { ok: true; id: string; label: string; version: number; changed: boolean }
   // `ownerResident` is set on a 409: whoever the store says already owns this

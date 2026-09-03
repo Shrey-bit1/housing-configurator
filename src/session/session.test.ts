@@ -9,6 +9,7 @@ import {
   sessionLine,
   publishUnit,
   publishPreview,
+  takeoverConfirmText,
   type KeyValue,
 } from "./session";
 
@@ -204,5 +205,12 @@ describe("publishPreview — the call that sends a flat's picture", () => {
     };
     const r = await publishPreview(fetchFn, "", "room-42", "unit-4", jpeg);
     expect(r).toEqual({ ok: false, reason: "Failed to fetch" });
+  });
+});
+
+describe("takeoverConfirmText — the wording Save asks before a takeover", () => {
+  it("names the owner", () => {
+    expect(takeoverConfirmText("Ana")).toBe("This flat belongs to Ana. Take it over?");
+    expect(takeoverConfirmText("Ben")).toBe("This flat belongs to Ben. Take it over?");
   });
 });
