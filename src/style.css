@@ -4,25 +4,49 @@
      on off-white and is now ink on paper throughout
    - the red marks the active and the failing, never decoration
    - flat solid fills, sharp edges, no gradients or border-radius
+
+   Run 0026 repoints the same tokens at `_cowork/design/DESIGN-BRIEF-
+   3sep.md`'s exact values (approved 3 September) and adds the two
+   colours and three type families that brief introduces. The editor's
+   3D canvas keeps its own colour (`--canvas-bg`, `sceneSetup.ts`,
+   untouched) — everything else the resident sees reads these tokens.
    ============================================================ */
 :root {
   /* --- The design system, by its own names ------------------------- */
-  --bg: #ece8e0; /* ground / paper */
-  --ink: #141317; /* text, rules, filled controls */
-  --panel: #141317; /* dark panel fill */
+  --bg: #ece6d8; /* ground / paper */
+  --card: #f4f0e6; /* card fill: a touch lighter than the ground */
+  --ink: #161616; /* text, rules, filled controls */
+  --panel: #161616; /* dark panel fill */
   --panel-ink: #edece8; /* text on dark */
   --line-paper: #c9c5bb; /* hairlines on paper */
   --line-dark: #2a2830; /* hairlines on dark */
-  --meta: #6d6a62; /* captions, counts */
+  --meta: #6b665c; /* captions, counts — "muted ink" */
+  --dim: #a39c8d; /* what is off */
   --plate: #d8d4cb; /* module plate / chips */
   --plate2: #c9c5bb;
   --tint: #a9bcd0;
 
-  --accent: #d2232e; /* active and failing only — never decorative */
+  --accent: #d6341c; /* red: the one primary action, the resident's own */
+  --blue: #1d4fa3; /* the group's average, annotations */
+  --yellow: #f2b41c; /* shared spaces */
   --entry: #e91e63; /* entrance */
   --violet: #7c5ce6; /* door arcs and EVERY focus ring */
   --soft: #b98a2f; /* worth a look */
   --note: #4e7a5a; /* note / passing */
+
+  /* Big Shoulders Display: headings, step names, buttons, big numbers.
+     Jost: sentences, labels, small print — the base body font. JetBrains
+     Mono: codes and timestamps only. Loaded via one Google Fonts link in
+     index.html; every family stack ends in a real fallback. */
+  --font-display: "Big Shoulders Display", "Archivo Narrow", Impact, sans-serif;
+  --font-body: Jost, "Futura", "Century Gothic", sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, monospace;
+
+  /* A faint SVG feTurbulence grain, tiled 180px (the brief's exact
+     filter), for the paper GROUND only — cards sit on top of it solid,
+     matching the wireframe (`.root:before` grains the ground, `.card`
+     does not). */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.2  0 0 0 0 0.17  0 0 0 0 0.12  0 0 0 0.16 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
 
   --dur-tap: 150ms; /* press, hover, ghost snap, validity flips */
   --dur-panel: 260ms; /* sheets, grid emphasis, the drop settle */
@@ -39,15 +63,16 @@
      New rules should use the design names above; these stay until the
      last old rule is gone.
      ------------------------------------------------------------------ */
-  --black: #ece8e0; /* was #141414 — panel fill, now paper */
-  --black-2: #e4e0d6; /* was #1e1e1e — raised panel fill */
+  --black: #ece6d8; /* was #141414 — panel fill, now paper */
+  --black-2: #e4e0d3; /* was #1e1e1e — raised panel fill */
   --line: #c9c5bb; /* was #000000 — hairline */
   --line-soft: #c9c5bb; /* was #34322d — hairline */
-  --paper: #141317; /* was #ede7da — INVERTED: this was the light on dark */
+  --paper: #161616; /* was #ede7da — INVERTED: this was the light on dark */
   --paper-2: #d8d4cb;
-  --text: #141317; /* was #f4f1ea — body text, now ink */
-  --text-dim: #6d6a62; /* was #a8a399 — captions */
-  --canvas-bg: #e9e5dc; /* the viewport, a touch under the panel paper */
+  --text: #161616; /* was #f4f1ea — body text, now ink */
+  --text-dim: #6b665c; /* was #a8a399 — captions */
+  --canvas-bg: #e9e5dc; /* the viewport, a touch under the panel paper —
+    the editor's own colour (sceneSetup.ts), untouched by run 0026 */
 }
 
 * {
@@ -60,10 +85,16 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: var(--font-body);
   background: var(--black);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Buttons opt out of the platform default and read the same body font as
+   everything else, unless a rule below asks for the display face instead. */
+button {
+  font-family: var(--font-body);
 }
 
 /* The shell is now a column: the top bar, then the sidebar+viewport row. */
@@ -119,7 +150,10 @@ body {
   /* Design default 296px, resizable 248-480 (see #palette-resize). */
   width: 296px;
   flex: 0 0 296px;
-  background: var(--black);
+  background-color: var(--black);
+  background-image: var(--grain);
+  background-repeat: repeat;
+  background-size: 180px 180px;
   border-right: 2px solid var(--line);
   padding: 20px 18px;
   display: flex;
@@ -129,10 +163,11 @@ body {
 }
 
 .panel-title {
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text);
   margin: 0 0 12px;
   padding-bottom: 6px;
@@ -219,10 +254,10 @@ button.secondary {
   color: var(--text);
   border: 2px solid var(--line-soft);
   border-radius: 0;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background 0.1s, color 0.1s, border-color 0.1s;
@@ -405,10 +440,10 @@ button.primary {
   color: var(--black);
   border: 2px solid var(--paper);
   border-radius: 0;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background 0.1s, color 0.1s;
@@ -417,6 +452,54 @@ button.primary {
 button.primary:hover {
   background: transparent;
   color: var(--paper);
+}
+
+/* The ONE primary action on a screen (the brief): a red block, display
+   type, an arrow at the right edge that nudges. `button.primary` above
+   stays the app's plain ink-filled affirmative button (used elsewhere,
+   e.g. the sidebar's Grid size "Apply" — an editor TOOL, not the screen's
+   one primary action, so it keeps the old look); `.btn-send` is this one
+   red button, the save column's "Send it to your group" (run 0026). */
+.btn-send {
+  margin-top: 0;
+  width: 100%;
+  padding: 0 18px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--accent);
+  color: var(--bg);
+  border: 2px solid var(--accent);
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.btn-send span:last-child {
+  font-family: var(--font-body);
+  animation: btn-nudge 1.6s ease-in-out infinite;
+}
+@keyframes btn-nudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(6px); }
+}
+.btn-send:hover {
+  background: transparent;
+  color: var(--accent);
+}
+.btn-send:disabled {
+  background: var(--dim);
+  border-color: var(--dim);
+  color: var(--bg);
+  cursor: not-allowed;
+}
+.btn-send:disabled span:last-child {
+  animation: none;
 }
 
 .hint-text {
@@ -897,9 +980,10 @@ button.primary:hover {
 }
 
 .vp-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -1319,21 +1403,62 @@ button.primary:hover {
    The design number is the only text input; the checkboxes say what to write;
    the result block below them reports one line per output and is why the
    dialog stays open after Save. */
-#save-dialog {
-  background: var(--black-2);
+/* ============================================================
+   The save column (run 0026): the brief's "always visible" right-hand
+   column, replacing the old `<dialog>` — the same underlying save
+   (src/core/savePlan.ts, unchanged) in the brief's order and skin: the
+   flat's name and three numbers with the check line, the group, one red
+   button, a folded More. Positioned absolutely over the viewport's right
+   edge (like the Units panel, `unitBrowser.ts`) rather than a flex
+   sibling of the canvas, so no resize/camera-aspect code changes.
+   ============================================================ */
+#save-column {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  /* Stops clear of #view-controls (bottom:16px/right:16px too, the Display
+     card + compass — an editor tool, left untouched): 230px covers its
+     tallest state (four toggle buttons open) plus the compass row and a
+     margin, so the two never fight for the same corner. */
+  bottom: 230px;
+  width: 320px;
+  z-index: 20; /* under the Units panel's 45, over the 3D view */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+#save-column label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+#save-column input[type="number"],
+#save-column input[type="text"] {
+  background: transparent;
   color: var(--text);
-  border: 2px solid var(--line);
-  padding: 16px;
-  min-width: 380px;
-  max-width: 460px;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  border-radius: 0;
+  padding: 5px 2px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  caret-color: var(--accent);
 }
-
-#save-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.45);
+#save-column input[type="number"] {
+  width: 76px;
 }
-
-#save-dialog .vp-title {
-  margin: 0 0 12px;
+#save-column input[type="color"] {
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  background: var(--black);
+  cursor: pointer;
 }
 
 .save-fields {
@@ -1342,29 +1467,82 @@ button.primary:hover {
   align-items: flex-end;
 }
 
-#save-dialog label {
+/* "Your flat": name, three numbers, the check line. */
+.flat-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 30px;
+  line-height: 0.95;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+.flat-numbers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.flat-numbers .num {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
-  color: var(--text-dim);
 }
-
-#save-dialog input[type="number"] {
-  background: var(--black);
-  color: var(--text);
-  border: 1px solid var(--line-soft);
-  padding: 5px 7px;
-  font-family: inherit;
+.flat-numbers .v {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 26px;
+  line-height: 1;
+}
+.flat-numbers .v small {
   font-size: 13px;
-  width: 92px;
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+.flat-numbers .l {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 9px;
+  color: var(--meta);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+/* The area count-up (the brief, `.cnt`): an integer CSS counter animated
+   via `@property --n`, restarted from JS by toggling this class so it
+   counts from the OLD value to the new one, "when the flat changes". */
+@property --n {
+  syntax: "<integer>";
+  initial-value: 0;
+  inherits: false;
+}
+.cnt {
+  counter-reset: n var(--n);
+  animation: flat-count 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.cnt::after {
+  content: counter(n);
+}
+@keyframes flat-count {
+  to { --n: var(--to); }
+}
+.flat-check {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.flat-check .s {
+  font-size: 12px;
+  color: var(--meta);
+}
+.flat-check a {
+  color: var(--accent);
+  cursor: pointer;
+  border-bottom: 1px solid var(--accent);
 }
 
-/* The two session fields (run 0023), above the design number. */
+/* "Your group": the fold, and the one red button. */
 .save-session-fields {
   display: flex;
   gap: 16px;
-  margin-bottom: 12px;
 }
 
 /* The folded one-line summary (run 0025, UX pass — "reveal complexity
@@ -1373,8 +1551,8 @@ button.primary:hover {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin: 0 0 12px;
-  font-size: 12px;
+  font-size: 13px;
+  font-family: var(--font-mono);
   color: var(--text);
 }
 .save-session-change {
@@ -1382,7 +1560,7 @@ button.primary:hover {
   border: 0;
   padding: 0;
   color: var(--meta);
-  font-family: inherit;
+  font-family: var(--font-body);
   font-size: 11px;
   text-decoration: underline;
   cursor: pointer;
@@ -1397,22 +1575,56 @@ button.primary:hover {
 .save-session-fields[hidden] {
   display: none;
 }
+.group-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--meta);
+}
 
-#save-dialog input[type="text"] {
-  background: var(--black);
-  color: var(--text);
-  border: 1px solid var(--line-soft);
-  padding: 5px 7px;
-  font-family: inherit;
-  font-size: 13px;
-  width: 150px;
+/* "More": folded by default (a dashed rule, not the solid card-top),
+   holding the design number, colour and the five checkboxes below. */
+.more-card {
+  border-top: none;
+  border: 1.5px dashed var(--line-soft);
+  box-shadow: none;
+  background: transparent;
+}
+.more-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: 0;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.more-head .plus {
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: var(--meta);
+}
+.more-body[hidden] {
+  display: none;
+}
+.more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
 }
 
 #save-what input[type="checkbox"]:disabled + .sw-name {
   color: var(--meta);
 }
 
-/* Replace (run 0024): a rarer, secondary action below the four outputs. */
+/* Replace (run 0024): a rarer, secondary action below the outputs. */
 .save-replace-row {
   padding-top: 6px;
   border-top: 1px solid var(--line-soft);
@@ -1422,7 +1634,8 @@ button.primary:hover {
   color: var(--meta);
 }
 
-/* Files vs. session (run 0025, UX pass): "group related information". */
+/* Files vs. group (run 0025 as "Session"; reworded run 0026): "group
+   related information". */
 .sw-group {
   display: flex;
   flex-direction: column;
@@ -1441,27 +1654,17 @@ button.primary:hover {
   color: var(--meta);
 }
 
-#save-dialog input[type="color"] {
-  width: 44px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid var(--line-soft);
-  background: var(--black);
-  cursor: pointer;
-}
-
-/* What the number resolves to, restated in the dialog so the two names are
-   never a guess. */
+/* What the number resolves to, restated so the two names are never a guess. */
 .save-names {
-  margin: 10px 0 14px;
+  margin: 0;
   font-size: 12px;
   font-weight: 600;
   color: var(--ink);
 }
 
 #save-what {
-  border: 1px solid var(--line-soft);
-  padding: 10px 12px 12px;
+  border: 0;
+  padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -1469,11 +1672,7 @@ button.primary:hover {
 }
 
 #save-what legend {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--meta);
-  padding: 0 5px;
+  display: none; /* the card's own label already says what this is */
 }
 
 #save-what label {
@@ -1507,7 +1706,7 @@ button.primary:hover {
 /* One line per output. The status colours are the app's existing three: the
    accent marks the failing, the note green the written. */
 #save-results:not(:empty) {
-  margin-top: 12px;
+  margin-top: 4px;
   border-top: 1px solid var(--line-soft);
   padding-top: 10px;
   display: flex;
@@ -1544,13 +1743,6 @@ button.primary:hover {
 
 .sr-skipped .sr-label {
   color: var(--soft);
-}
-
-#save-dialog .dialog-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 14px;
 }
 
 /* ============================================================
@@ -1644,8 +1836,14 @@ button.primary:hover {
   align-items: center;
   gap: 16px;
   padding: 0 16px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line-paper);
+  background-color: var(--bg);
+  /* The paper ground's grain (run 0026, the brief): the top bar and the
+     left sidebar (#sidebar, below) are the two large flat panels that ARE
+     the ground — cards sit on top of it solid, matching the wireframe. */
+  background-image: var(--grain);
+  background-repeat: repeat;
+  background-size: 180px 180px;
+  border-bottom: 3px solid var(--ink);
 }
 
 .tb-left {
@@ -1677,11 +1875,20 @@ button.primary:hover {
   gap: 1px;
   min-width: 0;
 }
+/* The brand (the brief): "(Re)" plain, "Configure" red, " / Flat" plain —
+   Big Shoulders Display, matching the wireframe's `.brand`/`.brand b`. */
 .tb-name {
-  font-size: 13px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   color: var(--ink);
   line-height: 1.1;
+}
+.tb-name b {
+  color: var(--accent);
+  font-weight: 900;
 }
 .tb-meta {
   font-size: 10px;
@@ -1692,10 +1899,71 @@ button.primary:hover {
   text-overflow: ellipsis;
 }
 
-/* Which session this resident is in (run 0023). Muted until a code is set. */
+/* The two steps (the brief): done = a filled ink disc, current = a red
+   disc that breathes. A read of where a resident stands, alongside the
+   existing view/tool controls rather than replacing them (run 0026) —
+   the wireframe's bar has room for nothing else because it is a
+   wireframe; this app's Units/Check Layout/Save stay exactly as they
+   were, only re-skinned. */
+.tb-steps {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.tb-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.tb-step .n {
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  border: 2px solid var(--dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+.tb-step.done {
+  color: var(--ink);
+}
+.tb-step.done .n {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.tb-step.now {
+  color: var(--ink);
+}
+.tb-step.now .n {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  animation: tb-breathe 2.4s ease-in-out infinite;
+}
+@keyframes tb-breathe {
+  50% { transform: scale(1.18); }
+}
+
+/* Which group this resident is in (run 0023; wording, run 0026). Muted
+   until a code is set; the code itself reads mono, matching the
+   wireframe's treatment of a code like "review-0023". */
 .tb-session {
+  font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--meta);
   border: 1px solid var(--line-paper);
@@ -2181,4 +2449,90 @@ button.primary:hover {
 
 #viewport.sheet-open #selection-readout {
   bottom: 312px;
+}
+
+/* ============================================================
+   The brief's type (run 0026): headings, step names and buttons read
+   Big Shoulders Display, never the body's Jost. One override, placed
+   last so it wins over every `font-family: inherit;` above without
+   editing a dozen separate rules one at a time. Inputs, kbd, and the
+   compass dial's own SVG text stay on `inherit` (Jost) on purpose —
+   only button-like controls move. */
+.floor-tab,
+#view-toggle,
+#top-view-toggle,
+#graph-relayout,
+#cutaway-toggle,
+#seeds-toggle,
+#structure-toggle,
+#interface-toggle,
+#double-height-toggle,
+#view-segments button,
+.tb-right > button,
+.tb-menu > button,
+#saveopen-menu button,
+.palette-tool,
+#display-header,
+#display-body button {
+  font-family: var(--font-display);
+}
+
+/* ============================================================
+   A card, the brief's way: the paper-adjacent fill, a 3px rule on top
+   and nothing else — no side borders, no radius, one hairline shadow
+   underneath. Used by the save column (run 0026) and restated (not
+   imported — src/library/ is self-contained) by the units panel's own
+   injected stylesheet, unitBrowser.ts.
+   ============================================================ */
+.card {
+  background: var(--card);
+  border-top: 3px solid var(--ink);
+  box-shadow: 0 1px 0 var(--line-paper);
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-label {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+.card-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 30px;
+  line-height: 0.95;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+/* An outlined pill (the brief's chip), black when on, red outline for a
+   warning — the save column's check line uses the warning variant. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.chip-ok {
+  border-color: var(--note);
+  color: var(--note);
+}
+.chip-acc {
+  border-color: var(--accent);
+  color: var(--accent);
 }
