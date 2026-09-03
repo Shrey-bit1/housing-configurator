@@ -162,12 +162,41 @@ content-type: application/json
   "label": "Flat 2",
   "version": 1,
   "changed": true,
+  "preview": false,
   "bbox": [0, 0, 15, 14],
   "floors": 1,
   "areaCells": 194,
   "publishedAt": "2026-09-02T11:02:04.643Z"
 }
 ```
+
+`preview` is true once a picture has been stored for this id (see the preview
+calls below), and stays true across a republish until a new picture overwrites
+it.
+
+**A flat belongs to whoever last published it under a resident name.** A `PUT`
+whose `?resident=` differs from the flat's current owner is refused, unless
+the request also carries `?replace=1`:
+
+```
+PUT /api/session/room-42/flats/flat-2?resident=Ben
+content-type: application/json
+
+{ "format": "dwelling-unit", "version": 1, … }
+```
+
+```json
+409 Conflict
+{ "error": "\"flat-2\" was published by Ana; add ?replace=1 to take it over", "resident": "Ana" }
+```
+
+`resident` in this error is the current owner's name, so a client can show
+who to ask before offering to replace. `PUT …flats/flat-2?resident=Ben&replace=1`
+with the same body succeeds, and Ben owns the flat from then on: a further
+`PUT` from anyone but Ben is refused in turn, on the same terms. The SAME
+resident republishing their own flat never needs `?replace=1`, exactly as
+before this rule existed. A new id has no owner yet, so any resident may
+create it.
 
 ### `PUT /api/session/{code}/residents/{name}` — a resident's wishes
 
