@@ -44,6 +44,10 @@ function call(kv: KV, method: string, path: string, body?: string) {
 }
 const put = (kv: KV, path: string, body: unknown) =>
   call(kv, "PUT", path, typeof body === "string" ? body : JSON.stringify(body));
+/** A binary call, for the preview endpoint: `call` is string-bodied only. */
+function callBinary(kv: KV, method: string, path: string, body?: Uint8Array) {
+  return handleSession(new Request(`http://store.test${path}`, { method, body: body as BodyInit }), kv);
+}
 
 describe("routing", () => {
   it("answers OPTIONS with open CORS and nothing else", async () => {
@@ -119,6 +123,54 @@ describe("publishing a flat", () => {
     expect((await put(kv, "/api/session/abc/flats/bad%20id?resident=Ana", UNIT_TEXT)).status).toBe(400);
     expect((await call(kv, "GET", "/api/session/abc")).status).toBe(200);
     expect((await (await call(kv, "GET", "/api/session/abc")).json()).flats).toEqual([]);
+  });
+
+  it("new flat: preview defaults false", async () => {
+    const res = await put(new MemoryKV(), "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+    expect((await res.json()).preview).toBe(false);
+  });
+});
+
+describe("a flat belongs to whoever published it", () => {
+  it("refuses a different resident's PUT with 409 and the owner's name", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+    const res = await put(kv, "/api/session/abc/flats/u9?resident=Ben", UNIT_TEXT);
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.resident).toBe("Ana");
+    expect(body.error).toMatch(/published by Ana/);
+    expect(body.error).toMatch(/\?replace=1/);
+    // The refusal must not have touched the flat: still Ana's, still version 1.
+    const state = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(state.flats).toEqual([expect.objectContaining({ id: "u9", resident: "Ana", version: 1 })]);
+  });
+
+  it("the SAME resident republishes without needing replace, as before", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+    const res = await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+    expect(res.status).toBe(200);
+    expect((await res.json()).version).toBe(2);
+  });
+
+  it("?replace=1 lets a different resident take a flat over", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+    const res = await put(kv, "/api/session/abc/flats/u9?resident=Ben&replace=1", UNIT_TEXT);
+    expect(res.status).toBe(200);
+    const s = await res.json();
+    expect(s.resident).toBe("Ben");
+    expect(s.version).toBe(2);
+    // Ben owns it now: a THIRD resident is refused in turn without their own replace.
+    const third = await put(kv, "/api/session/abc/flats/u9?resident=Cy", UNIT_TEXT);
+    expect(third.status).toBe(409);
+    expect((await third.json()).resident).toBe("Ben");
+  });
+
+  it("a new id has no owner to conflict with", async () => {
+    const res = await put(new MemoryKV(), "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+    expect(res.status).toBe(201);
   });
 });
 
@@ -199,6 +251,52 @@ describe("a session leaves as one file", () => {
     expect((await call(kv, "PUT", "/api/session/abc/export", "{}")).status).toBe(405);
     const empty = await (await call(kv, "GET", "/api/session/nobody/export")).json();
     expect(empty).toMatchObject({ code: "nobody", flats: [], residents: [], building: null, bodies: {} });
+  });
+});
+
+describe("a flat has a picture", () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+  it("refuses a preview for a flat that has never been published", async () => {
+    const res = await callBinary(new MemoryKV(), "PUT", "/api/session/abc/flats/u9/preview", jpeg);
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toMatch(/no flat "u9"/);
+  });
+
+  it("stores the preview, marks the flat, and returns the same bytes on GET", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+
+    const put1 = await callBinary(kv, "PUT", "/api/session/abc/flats/u9/preview", jpeg);
+    expect(put1.status).toBe(200);
+    expect(await put1.json()).toEqual({ ok: true, bytes: jpeg.length });
+
+    const state = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(state.flats[0].preview).toBe(true);
+
+    const got = await callBinary(kv, "GET", "/api/session/abc/flats/u9/preview");
+    expect(got.status).toBe(200);
+    expect(got.headers.get("content-type")).toBe("image/jpeg");
+    expect(got.headers.get("access-control-allow-origin")).toBe("*");
+    expect(new Uint8Array(await got.arrayBuffer())).toEqual(jpeg);
+  });
+
+  it("404s a preview nobody sent, refuses an empty body and the wrong method", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+    expect((await callBinary(kv, "GET", "/api/session/abc/flats/u9/preview")).status).toBe(404);
+    expect((await callBinary(kv, "PUT", "/api/session/abc/flats/u9/preview", new Uint8Array())).status).toBe(400);
+    expect((await callBinary(kv, "POST", "/api/session/abc/flats/u9/preview", jpeg)).status).toBe(405);
+    expect((await call(kv, "GET", "/api/session/abc/flats/u9/preview/extra")).status).toBe(404);
+  });
+
+  it("survives a republish: the OLD preview stays flagged until a new one lands", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+    await callBinary(kv, "PUT", "/api/session/abc/flats/u9/preview", jpeg);
+    await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT); // version 2
+    const state = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(state.flats[0]).toMatchObject({ version: 2, preview: true });
   });
 });
 

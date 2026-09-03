@@ -109,7 +109,27 @@ plus every flat body as a string. **The site password is off since 2 September
 2026** and the deployed round trip passes 26/26. PROJECT_STATE §10, §11, §12.
 Dev needs `netlify dev` (port 8888) for the store; plain `vite` has no function.
 
-**Last updated:** 2026-09-02
+Run 0024 fixed the DESIGN NUMBER for a room and gave every flat ONE PICTURE.
+With a session set, the save dialog proposes the lowest number free in BOTH
+the library manifest and the session's own flats (nextFreeNumber now takes
+any number of lists), so two residents in the same room are no longer both
+offered the same number. Publishing over a flat another resident owns now
+answers 409 with their name; the dialog shows it on the Session result line
+and offers a Replace checkbox, off by default, that sends ?replace=1. Every
+flat, published or saved to the library, gets the SAME axonometric
+(captureFlatPreview in main.ts, framed by the pure axoFrame in
+src/core/previewFrame.ts): every floor visible and un-dimmed, cutaway and
+the view overlays off, a fixed 800x600, camera and view state restored
+exactly after. GET/PUT /api/session/{code}/flats/{id}/preview carries the
+JPEG; a flat's summary gains preview: true. The picture travels as a
+SIBLING of the flat's own storage key, never a child of it — the first key
+shape hung every write under netlify dev, since Netlify Blobs' local
+sandbox maps keys onto a real filesystem path and the flat's key was
+already a file where the child shape needed it to be a directory. All
+seven committed library JPEGs were re-rendered through the same function.
+PROJECT_STATE §10, §11, §12.
+
+**Last updated:** 2026-09-03
 
 ## What this project is
 
@@ -183,11 +203,14 @@ rules engine and the export format are the mature parts, the UI is not.
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 153 cases in twelve files as of run 0023 (134 in eleven as of run 0022,
-  plus `src/session/session.test.ts` 15, the session settings and the publish call;
-  126 in ten as of run 0021, plus `src/session/store.test.ts` 9, the session store
-  through an in-memory KV) (84 in eight before run
-  0020,
+  a second over 177 cases in thirteen files as of run 0024 (153 in twelve as of
+  run 0023, plus 4 in naming.test.ts for a second list, 9 in store.test.ts for
+  the ownership refusal and the preview round trip, 6 in session.test.ts for
+  ownerResident and publishPreview, and the new previewFrame.test.ts at 5;
+  134 in eleven as of run 0022, plus `src/session/session.test.ts` 15, the
+  session settings and the publish call; 126 in ten as of run 0021, plus
+  `src/session/store.test.ts` 9, the session store through an in-memory KV)
+  (84 in eight before run 0020,
   plus `src/core/stairSpec.test.ts` 23, the stair proportions and the spiral's
   miss, and `src/scene/props/bathroomFit.test.ts` 19, the bathroom fixture fit).
   The eight older files are:

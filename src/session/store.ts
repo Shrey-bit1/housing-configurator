@@ -12,18 +12,24 @@
  * it straight in.
  *
  * Storage layout, per session code:
- *   `{code}/index`       one JSON blob: flat SUMMARIES, residents, last run
- *   `{code}/flats/{id}`  the published `dwelling-unit` text, byte for byte
+ *   `{code}/index`           one JSON blob: flat SUMMARIES, residents, last run
+ *   `{code}/flats/{id}`      the published `dwelling-unit` text, byte for byte
+ *   `{code}/flats/{id}.preview`  the flat's JPEG preview, base64 (run 0024) —
+ *     a SIBLING key, not a child of `{id}`; see `routePreview`'s comment.
  *
- * The index is what the building polls, so it never holds a flat body; a flat
- * body is written once at publish time and read only by the one-flat call.
- * Every change to the index is a read-modify-write under the blob's ETag,
- * retried a few times, so two residents publishing at once cannot overwrite
- * each other's summary.
+ * The index is what the building polls, so it never holds a flat body or a
+ * preview; both are written once (at publish time, and right after) and read
+ * only by their own one-flat calls. Every change to the index is a
+ * read-modify-write under the blob's ETag, retried a few times, so two
+ * residents publishing at once cannot overwrite each other's summary.
  *
  * There is no login. Anyone who knows the session code can read and write
  * everything in it. That is accepted for a five-person test and written down
- * in docs/store.md as the limit.
+ * in docs/store.md as the limit. One check narrows it since run 0024: a flat
+ * id belongs to whoever last published it under a NEW resident name, and a
+ * different resident's publish is refused (409) unless the request carries
+ * `?replace=1` — so taking over somebody else's flat is a deliberate act, not
+ * an accident of two residents proposing the same design number.
  */
 
 /** The three calls the handler makes on storage; `@netlify/blobs`' `Store` has this shape. */
@@ -50,6 +56,9 @@ export interface FlatSummary {
   floors: number;
   areaCells: number;
   publishedAt: string;
+  /** True once a preview has been stored for this id; carried across a
+   *  republish until a new preview overwrites it (run 0024). */
+  preview: boolean;
 }
 
 export interface Resident {
@@ -81,7 +90,6 @@ const CORS = {
   "access-control-allow-headers": "content-type",
 };
 
-const ROUTE = /^\/api\/session\/([^/]+)(?:\/(flats|residents)\/([^/]+)|\/(building|export))?\/?$/;
 /** Session codes and flat ids: short and URL-safe. Codes are lowercased first. */
 const CODE = /^[a-z0-9_-]{1,32}$/;
 const ID = /^[a-z0-9_-]{1,64}$/i;
@@ -114,25 +122,38 @@ export async function handleSession(req: Request, kv: KV): Promise<Response> {
   }
 }
 
+/**
+ * Path parsing is a plain segment split rather than one regex: run 0024 added
+ * a fourth shape (`flats/{id}/preview`) alongside the three from run 0022/23
+ * (bare, `flats/{id}`, `residents/{name}`, `building`, `export`), and a
+ * regex with two nested optional groups was already at the edge of readable.
+ */
 async function route(req: Request, kv: KV): Promise<Response> {
   const url = new URL(req.url);
-  const m = ROUTE.exec(url.pathname);
-  if (!m) return fail(404, "no such route; see docs/store.md");
-  const code = decodeSegment(m[1]).toLowerCase();
+  const segs = url.pathname.split("/").filter(Boolean);
+  if (segs[0] !== "api" || segs[1] !== "session" || segs[2] === undefined) {
+    return fail(404, "no such route; see docs/store.md");
+  }
+  const code = decodeSegment(segs[2]).toLowerCase();
   if (!CODE.test(code)) return fail(400, "session code must be 1-32 of a-z, 0-9, - and _");
-  const kind = m[2] ?? m[4];
-  const name = m[3] === undefined ? undefined : decodeSegment(m[3]);
+  const rest = segs.slice(3);
   const indexKey = `${code}/index`;
 
-  if (kind === undefined) {
+  if (rest.length === 0) {
     if (req.method !== "GET") return fail(405, "GET only");
     return json(sessionView(code, await readIndex(kv, indexKey)));
   }
 
-  if (kind === "flats") {
-    const id = name!;
+  if (rest[0] === "flats" && rest.length >= 2 && rest.length <= 3) {
+    const id = decodeSegment(rest[1]);
     if (!ID.test(id)) return fail(400, "flat id must be 1-64 of a-z, 0-9, - and _");
     const flatKey = `${code}/flats/${id}`;
+
+    if (rest.length === 3) {
+      if (rest[2] !== "preview") return fail(404, "no such route; see docs/store.md");
+      return routePreview(req, kv, code, id, indexKey);
+    }
+
     if (req.method === "GET") {
       const text = await kv.get(flatKey);
       if (text === null) return fail(404, `no flat "${id}" in session "${code}"`);
@@ -143,9 +164,30 @@ async function route(req: Request, kv: KV): Promise<Response> {
     if (req.method !== "PUT") return fail(405, "GET or PUT only");
     const resident = (url.searchParams.get("resident") ?? "").trim();
     if (!resident) return fail(400, "?resident= is required: who is publishing");
+    const replace = url.searchParams.get("replace") === "1";
     const text = await req.text();
     const unit = parseUnit(text);
     const label = (url.searchParams.get("label") ?? "").trim() || unit.name;
+
+    // A flat belongs to whoever last published it under a resident name
+    // (run 0024): a different resident's PUT is refused unless ?replace=1,
+    // so two residents proposing the same design number cannot silently
+    // overwrite one another. ponytail: this check and the write below are two
+    // separate reads of the index, so a publish landing in the gap between
+    // them is not caught; closing that needs the ownership check moved inside
+    // updateIndex's own retry, which is the upgrade path if it ever matters at
+    // this scale (a five-person room, human-speed saves).
+    const existing = (await readIndex(kv, indexKey)).flats[id];
+    if (existing && existing.resident !== resident && !replace) {
+      return json(
+        {
+          error: `"${id}" was published by ${existing.resident}; add ?replace=1 to take it over`,
+          resident: existing.resident,
+        },
+        409
+      );
+    }
+
     // The body is stored byte for byte; the summary is the only thing derived from it.
     await kv.set(flatKey, text);
     let summary!: FlatSummary;
@@ -159,6 +201,7 @@ async function route(req: Request, kv: KV): Promise<Response> {
         label,
         version: prev ? prev.version + 1 : 1,
         changed: true,
+        preview: prev?.preview ?? false,
         ...measure(unit),
         publishedAt: new Date().toISOString(),
       };
@@ -167,9 +210,9 @@ async function route(req: Request, kv: KV): Promise<Response> {
     return json(summary, created ? 201 : 200);
   }
 
-  if (kind === "residents") {
+  if (rest[0] === "residents") {
     if (req.method !== "PUT") return fail(405, "PUT only");
-    const who = name!.trim();
+    const who = decodeSegment(rest[1] ?? "").trim();
     if (who.length === 0 || who.length > 64 || /[\p{C}]/u.test(who)) {
       return fail(400, "resident name must be 1-64 printable characters");
     }
@@ -182,7 +225,7 @@ async function route(req: Request, kv: KV): Promise<Response> {
     return json({ name: who, ...record });
   }
 
-  if (kind === "export") {
+  if (rest.length === 1 && rest[0] === "export") {
     // The whole session as one file (run 0023): the state the poll returns
     // plus every flat body, carried as a STRING so its bytes survive the
     // document around it. This is the thesis record of a room at the end of
@@ -194,7 +237,7 @@ async function route(req: Request, kv: KV): Promise<Response> {
     return json({ ...sessionView(code, index), bodies, exportedAt: new Date().toISOString() });
   }
 
-  // kind === "building"
+  if (rest.length !== 1 || rest[0] !== "building") return fail(404, "no such route; see docs/store.md");
   if (req.method === "GET") return json((await readIndex(kv, indexKey)).building);
   if (req.method !== "PUT") return fail(405, "GET or PUT only");
   const body = await req.json().catch(() => fail(400, "body must be JSON"));
@@ -210,6 +253,57 @@ async function route(req: Request, kv: KV): Promise<Response> {
     for (const flat of Object.values(index.flats)) flat.changed = false;
   });
   return json(run);
+}
+
+/**
+ * `GET`/`PUT` of `flats/{id}/preview` (run 0024). The JPEG travels as the
+ * request body and is kept base64-encoded under its own key, through the same
+ * string-only `KV` the rest of the store uses — one interface, one seam for
+ * `store.test.ts` to drive without a real Blobs store, at the cost of the
+ * ~33% base64 overhead on top of a JPEG that is already small.
+ */
+async function routePreview(req: Request, kv: KV, code: string, id: string, indexKey: string): Promise<Response> {
+  // A SIBLING of the flat's own key (`{code}/flats/{id}`), never a child of
+  // it: Netlify Blobs' local sandbox maps keys onto a real filesystem path,
+  // so `{code}/flats/{id}/preview` would need `{id}` to be a directory when
+  // it is already a file holding the flat itself — a collision that hung
+  // every write under `netlify dev`, discovered live in this run. Production
+  // Blobs may not share that failure mode, but the key is wrong regardless
+  // of backend: two objects should not need one to be the other's folder.
+  const previewKey = `${code}/flats/${id}.preview`;
+  if (req.method === "GET") {
+    const b64 = await kv.get(previewKey);
+    if (b64 === null) return fail(404, `no preview for "${id}" in session "${code}"`);
+    return new Response(base64ToBytes(b64).buffer as ArrayBuffer, {
+      headers: { ...CORS, "content-type": "image/jpeg" },
+    });
+  }
+  if (req.method !== "PUT") return fail(405, "GET or PUT only");
+  const bytes = new Uint8Array(await req.arrayBuffer());
+  if (bytes.length === 0) return fail(400, "empty preview body");
+  const index = await readIndex(kv, indexKey);
+  if (!index.flats[id]) return fail(404, `no flat "${id}" in session "${code}"; publish it before its preview`);
+  await kv.set(previewKey, bytesToBase64(bytes));
+  await updateIndex(kv, indexKey, (idx) => {
+    const summary = idx.flats[id];
+    if (summary) summary.preview = true;
+  });
+  return json({ ok: true, bytes: bytes.length });
+}
+
+/** Base64 through the platform's own `atob`/`btoa` (DOM lib, no `Buffer`,
+ *  no dependency) rather than Node's Buffer — this file runs under a Netlify
+ *  Function and under plain Node via Vitest alike, and both have these. */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 function decodeSegment(s: string): string {

@@ -191,6 +191,14 @@
               <span class="sw-name">Publish to session</span>
               <span class="sw-note" id="save-publish-note">the unit file, sent to the session for the building and the neighbours</span>
             </label>
+            <!-- Off by default: a flat belongs to whoever published it
+                 (docs/store.md), so replacing someone else's is a deliberate
+                 tick, not the normal republish path. -->
+            <label class="save-replace-row">
+              <input type="checkbox" id="save-replace" />
+              <span class="sw-name">Replace</span>
+              <span class="sw-note">take over a flat someone else published under this number</span>
+            </label>
           </fieldset>
           <div id="save-results" role="status" aria-live="polite"></div>
           <div class="dialog-actions">

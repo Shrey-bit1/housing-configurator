@@ -32,3 +32,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0021 | 2026-08-16 | A room that is two storeys tall | complete | 0021-a-room-that-is-two-storeys-tall.report.md |
 | 0022 | 2026-09-02 | The store | partial | 0022-the-store.report.md |
 | 0023 | 2026-09-02 | Publish | complete | 0023-publish.report.md |
+| 0024 | 2026-09-03 | Numbers in a room, and one view for every flat | complete | 0024-numbers-and-previews.report.md |

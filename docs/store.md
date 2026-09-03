@@ -55,7 +55,9 @@ There are four things in a session: **flats**, **residents**, the last
 |---|---|---|---|
 | `GET` | `/api/session/{code}` | none | the session state: flat summaries, residents, last run |
 | `GET` | `/api/session/{code}/flats/{id}` | none | one flat's `dwelling-unit` JSON, byte for byte |
-| `PUT` | `/api/session/{code}/flats/{id}?resident=…&label=…` | the `dwelling-unit` JSON | the flat's summary; `201` created, `200` replaced |
+| `PUT` | `/api/session/{code}/flats/{id}?resident=…&label=…` | the `dwelling-unit` JSON | the flat's summary; `201` created, `200` replaced, `409` refused |
+| `GET` | `/api/session/{code}/flats/{id}/preview` | none | the flat's JPEG picture |
+| `PUT` | `/api/session/{code}/flats/{id}/preview` | the JPEG bytes | `{ ok, bytes }` |
 | `PUT` | `/api/session/{code}/residents/{name}` | any of `counts`, `share`, `ballot` | that resident's whole record after the merge |
 | `GET` | `/api/session/{code}/building` | none | the last run, or `null` |
 | `PUT` | `/api/session/{code}/building` | `genome`, `summary`, `by` | the stored run with its `at` timestamp |
@@ -162,12 +164,41 @@ content-type: application/json
   "label": "Flat 2",
   "version": 1,
   "changed": true,
+  "preview": false,
   "bbox": [0, 0, 15, 14],
   "floors": 1,
   "areaCells": 194,
   "publishedAt": "2026-09-02T11:02:04.643Z"
 }
 ```
+
+`preview` is true once a picture has been stored for this id (see the preview
+calls below), and stays true across a republish until a new picture overwrites
+it.
+
+**A flat belongs to whoever last published it under a resident name.** A `PUT`
+whose `?resident=` differs from the flat's current owner is refused, unless
+the request also carries `?replace=1`:
+
+```
+PUT /api/session/room-42/flats/flat-2?resident=Ben
+content-type: application/json
+
+{ "format": "dwelling-unit", "version": 1, … }
+```
+
+```json
+409 Conflict
+{ "error": "\"flat-2\" was published by Ana; add ?replace=1 to take it over", "resident": "Ana" }
+```
+
+`resident` in this error is the current owner's name, so a client can show
+who to ask before offering to replace. `PUT …flats/flat-2?resident=Ben&replace=1`
+with the same body succeeds, and Ben owns the flat from then on: a further
+`PUT` from anyone but Ben is refused in turn, on the same terms. The SAME
+resident republishing their own flat never needs `?replace=1`, exactly as
+before this rule existed. A new id has no owner yet, so any resident may
+create it.
 
 ### `PUT /api/session/{code}/residents/{name}` — a resident's wishes
 
@@ -223,6 +254,40 @@ content-type: application/json
 `GET` on the same path returns the same object, or `null` when no run has
 been written.
 
+### `GET`/`PUT /api/session/{code}/flats/{id}/preview` — a flat's picture
+
+Added in run 0024, alongside the axonometric every flat gets when it is
+published (`src/core/previewFrame.ts`, `src/main.ts`'s `captureFlatPreview`).
+The picture is a **separate object from the flat**, never inside the
+`dwelling-unit` JSON: `PUT` takes the JPEG as the raw request body (`content-
+type: image/jpeg`, no envelope), and `GET` returns the same bytes back with
+that content type. `PUT` requires the flat to already exist — a preview
+belongs to a published flat, so `404` is the answer for an id nobody has
+published yet.
+
+```
+PUT /api/session/room-42/flats/flat-2/preview
+content-type: image/jpeg
+
+<JPEG bytes>
+```
+
+```json
+200 OK
+{ "ok": true, "bytes": 24705 }
+```
+
+A flat's summary in the session state gains `preview: true` once one has
+been stored, and it stays true across a republish of the same flat until a
+new preview overwrites it — the summary never says which version the
+picture is of, only that one exists. The store keeps the JPEG base64-encoded
+under a key that is a **sibling** of the flat's own key, never a child of
+it: an earlier shape nested the preview one path segment under the flat
+(`{code}/flats/{id}/preview`), which collided with the flat's own key
+(`{code}/flats/{id}`) in Netlify Blobs' local sandbox, since that store maps
+keys onto a real filesystem path and the flat's key was already a file where
+the preview's key needed a directory. See "Storage" below.
+
 ### `GET /api/session/{code}/export` — a session as one file
 
 Added in run 0023 so the state of a room at the end of a user test can be
@@ -260,8 +325,21 @@ names every flat the state names.
 One Netlify Blobs store named `sessions`, read with strong consistency so a
 poll issued right after a publish sees it. Per session code there is one
 **index** blob at `{code}/index`, holding the flat summaries, the residents
-and the last run as one JSON document, and one blob per published flat at
-`{code}/flats/{id}`, holding the file's bytes.
+and the last run as one JSON document, one blob per published flat at
+`{code}/flats/{id}`, holding the file's bytes, and (run 0024) one blob per
+preview at `{code}/flats/{id}.preview`, base64-encoded, holding the JPEG.
+
+The preview's key is a **sibling** of the flat's key, in the same
+`{code}/flats/` "directory," never a path segment under it. Netlify Blobs'
+local development store maps a key onto a real filesystem path, one path
+component per `/`, so a key of `{code}/flats/{id}/preview` needs `{id}` to
+be a directory — but `{id}` is already the flat's OWN key, a file. Every
+write to that shape hung indefinitely under `netlify dev` until the key
+changed to `{code}/flats/{id}.preview`, a plain filename next to the
+flat's, which cannot collide with anything. Whether the production Blobs
+backend shares this exact failure mode was not tested, and does not matter:
+the key was wrong on its own terms, since one object should never need
+another object's own name to double as its folder.
 
 The layout was chosen against the polling call. One blob for the whole
 session would have put every flat body on the path of every poll and every

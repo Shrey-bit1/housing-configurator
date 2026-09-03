@@ -89,14 +89,20 @@ export function sessionLine(s: SessionSettings): string {
 
 export type PublishResult =
   | { ok: true; id: string; label: string; version: number; changed: boolean }
-  | { ok: false; status: number; reason: string };
+  // `ownerResident` is set on a 409: whoever the store says already owns this
+  // flat id, so the caller can name them and offer Replace (run 0024).
+  | { ok: false; status: number; reason: string; ownerResident?: string };
 
-/** The minimum of `fetch` this module calls, so a test can hand in a stub. */
-export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<Response>;
+/** The minimum of `fetch` this module calls, so a test can hand in a stub.
+ *  `body` is `BodyInit` (not just `string`) since run 0024's preview PUT
+ *  sends a `Blob`; `publishUnit`'s string body is a `BodyInit` too. */
+export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body: BodyInit }) => Promise<Response>;
 
 /**
  * PUT the unit download's exact bytes to
  * `{base}/api/session/{code}/flats/{id}?resident=…&label=…` (docs/store.md).
+ * `replace: true` adds `&replace=1`, the one thing that lets this PUT take
+ * over a flat another resident published (run 0024; `docs/store.md`'s 409).
  * Never throws: a network failure is `status: 0`, a refusal carries the
  * store's own `error` line, so the caller can print one honest result and
  * leave the files it already wrote alone.
@@ -108,8 +114,10 @@ export async function publishUnit(
   id: string,
   label: string,
   text: string,
+  replace = false,
 ): Promise<PublishResult> {
   const query = new URLSearchParams({ resident: s.resident.trim(), label });
+  if (replace) query.set("replace", "1");
   const url = `${base}/api/session/${encodeURIComponent(s.code)}/flats/${encodeURIComponent(id)}?${query}`;
   let res: Response;
   try {
@@ -128,7 +136,12 @@ export async function publishUnit(
   if (!res.ok) {
     const reason =
       typeof record?.error === "string" ? record.error : body.trim().slice(0, 120) || res.statusText || "no reason given";
-    return { ok: false, status: res.status, reason };
+    return {
+      ok: false,
+      status: res.status,
+      reason,
+      ownerResident: res.status === 409 && typeof record?.resident === "string" ? record.resident : undefined,
+    };
   }
   if (typeof record?.version !== "number") {
     return { ok: false, status: res.status, reason: "the store answered without a version" };
@@ -140,4 +153,42 @@ export async function publishUnit(
     version: record.version,
     changed: record.changed === true,
   };
+}
+
+export type PreviewPublishResult = { ok: true } | { ok: false; reason: string };
+
+/**
+ * PUT a flat's preview JPEG to `{base}/api/session/{code}/flats/{id}/preview`
+ * (docs/store.md). Called right after `publishUnit` succeeds, with the SAME
+ * id; never throws, on the same terms as `publishUnit`, so a failed preview
+ * never undoes a successful flat publish.
+ */
+export async function publishPreview(
+  fetchFn: FetchLike,
+  base: string,
+  code: string,
+  id: string,
+  jpeg: Blob,
+): Promise<PreviewPublishResult> {
+  const url = `${base}/api/session/${encodeURIComponent(code)}/flats/${encodeURIComponent(id)}/preview`;
+  let res: Response;
+  try {
+    res = await fetchFn(url, { method: "PUT", headers: { "content-type": "image/jpeg" }, body: jpeg });
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      parsed = undefined;
+    }
+    const record = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : null;
+    const reason =
+      typeof record?.error === "string" ? record.error : body.trim().slice(0, 120) || res.statusText || `status ${res.status}`;
+    return { ok: false, reason };
+  }
+  return { ok: true };
 }

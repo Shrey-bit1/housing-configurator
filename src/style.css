@@ -1381,6 +1381,16 @@ button.primary:hover {
   color: var(--meta);
 }
 
+/* Replace (run 0024): a rarer, secondary action below the four outputs. */
+.save-replace-row {
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+.save-replace-row .sw-name,
+.save-replace-row .sw-note {
+  color: var(--meta);
+}
+
 #save-dialog input[type="color"] {
   width: 44px;
   height: 26px;

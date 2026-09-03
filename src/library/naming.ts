@@ -41,23 +41,33 @@ export function numberFromName(name: string): number | null {
 }
 
 /**
- * The LOWEST positive integer no library entry is using, counting both ids and
- * names so a renamed entry still holds its number (rename changes the display
- * name and leaves the id, see docs/library-format.md).
+ * The LOWEST positive integer none of the given lists is using, counting both
+ * ids and names so a renamed entry still holds its number (rename changes the
+ * display name and leaves the id, see docs/library-format.md).
  *
  * Lowest-free rather than highest-plus-one, so a gap left by a deleted entry
  * is offered again rather than stranded: with `unit-1`, `unit-2` and `unit-4`
  * present the next save proposes 3. Re-proposing a number that is genuinely
  * still in use cannot happen, and the replace-or-new prompt covers the case
  * where the author deliberately types one back.
+ *
+ * Takes any number of lists so the number can be free across MORE than one
+ * record of what has been saved (run 0024): with a session set, the save
+ * dialog counts the library manifest AND the session's own published flats,
+ * because a design number is also the flat's id in the session, and every
+ * resident reading the same manifest would otherwise be offered the SAME
+ * number. `nextFreeNumber(libraryEntries)` — one list — is the pre-0024 call
+ * and behaves exactly as before.
  */
-export function nextFreeNumber(entries: readonly { id: string; name: string }[]): number {
+export function nextFreeNumber(...lists: readonly (readonly { id: string; name: string }[])[]): number {
   const taken = new Set<number>();
-  for (const e of entries) {
-    const fromId = numberFromName(e.id);
-    if (fromId !== null) taken.add(fromId);
-    const fromName = numberFromName(e.name);
-    if (fromName !== null) taken.add(fromName);
+  for (const entries of lists) {
+    for (const e of entries) {
+      const fromId = numberFromName(e.id);
+      if (fromId !== null) taken.add(fromId);
+      const fromName = numberFromName(e.name);
+      if (fromName !== null) taken.add(fromName);
+    }
   }
   for (let n = 1; ; n++) if (!taken.has(n)) return n;
 }

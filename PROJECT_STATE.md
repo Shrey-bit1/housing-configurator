@@ -70,6 +70,7 @@ work-in-progress research artifact, not a production app.
 | **Group-move ghost** | `src/scene/groupGhostPreview.ts` | `GroupGhostPreview`: one translucent ghost mesh per selected member, positioned by its cell offset from the grabbed member's target origin, tinted green/red as ONE unit (mirrors `GhostPreview`'s shape/API). See §2h. |
 | Wiring / render loop / view-mode orchestration, **dev-only `?project=` loader + `window.__app` capture handle** | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
 | **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. See §12. |
+| **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
 | **The session settings + the publish call** (who, which room, and the fourth output, run 0023) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, and `publishUnit(fetchLike, base, settings, id, label, text)` which PUTs the unit bytes and never throws. Pure; `session.test.ts` drives it with a Map and a stub. See §11, §12. |
 
 **Concave-corner wall logic** (part of `buildBoundaryWalls`): walls are inset to
@@ -3420,6 +3421,52 @@ the SAME `onOpen(file, source)` the library cards use, with `source` now
 `/api/session/<code>` on the same origin from the session settings
 (`main.ts:1328-1331`). Library cards, rename and the manifest are untouched.
 
+**One axonometric for every flat, through one function (run 0024).**
+`captureFlatPreview` (`main.ts:774`) is what both `saveLibraryEntry` and a
+session publish call for their picture, replacing the old behaviour of
+rendering whatever angle the live camera happened to be at. It borrows the
+live scene for one frame: forces every floor VISIBLE and un-DIMMED
+(`Floor.setDimmed(false)`, since a floor other than the active one normally
+renders translucent — `FloorManager.applyDim`, `floorManager.ts:847` — which
+without this showed as a ghostly double exposure over a two-storey flat's
+ground floor the first time this was tried), cutaway and the Seeds/Structure/
+Interface overlays off, the renderer's pixel ratio set to 1 and its canvas
+resized to a fixed 800×600 so the picture is never stretched or cropped to
+whatever the live window's aspect happens to be, frames the result with
+`axoFrame` (`src/core/previewFrame.ts`) over `floors.contentBox()`, renders
+one frame, and reads `canvas.toDataURL("image/jpeg", 0.9)`. Every piece of
+state it touches — camera position/up/zoom/`viewSize`, `controls.target`,
+per-floor visibility, the dim state, the renderer's pixel ratio and the
+canvas's CSS size — is read before and restored exactly after, proven live
+by mutating the camera to an arbitrary pose, capturing, and reading the
+state back byte-identical to JSON. `axoFrame` restates (never imports)
+`sceneSetup.ts`'s `ISO_ELEVATION`/`ISO_AZIMUTH`/`FRAME_MARGIN`, so `src/core/`
+stays free of the scene layer; `previewFrame.test.ts` pins its direction
+(the closed form `(1/√3, 1/√3, 1/√3)`), centre and `viewSize` against a known
+box, no THREE or DOM involved.
+
+**Every committed library JPEG was re-rendered through it once**, via a
+DEV-ONLY pair added for the job:
+`window.__app.loadAndCapturePreview(sourceProject)` loads a project and
+captures its preview in one call (no confirm,
+no toast — a batch tool, not a user import), and `POST /__library/preview`
+(`vite.config.ts`, beside `/__library/save`/`/__library/rename`) overwrites
+an existing entry's JPEG in place by id, touching nothing else in its
+manifest row. Run once over the seven committed entries
+(`flat-2-single-storey`, `flat-3-terrace`, `unit-1` through `unit-5`); all
+seven succeeded and `index.json` is unchanged beyond what was already
+pending before the run.
+
+**The session card shows it too (run 0024).** `SessionFlat` gained a
+`preview: boolean` (`unitBrowser.ts:27`, mirroring the store's `FlatSummary`);
+`SessionSource` gained `previewUrl(id)` (`:45`); `sessionCard` renders an
+`<img class="ulb-preview">` — the SAME class a library card's image uses,
+so the two read as one system — only when `flat.preview` is true, and adds
+`ulb-no-preview` to the card otherwise so the CSS padding compensation
+(`:170`) applies only to the cardless case. A flat published before this run
+still shows no picture at all, which is honest: no preview was ever sent for
+it.
+
 **Seeds** — `flat-2-single-storey` (69.84 m², pink) and `flat-3-terrace`
 (60.48 m², blue), converted through the REAL path (loaded via `?project=`,
 saved through the dialog action against the live canvas). The rule fixtures
@@ -3435,7 +3482,8 @@ through the same parser, cross-checked against the unit files — loaded via
 `sourceProject` through a real FloorManager (stubDeps, §9's harness) and
 re-exported: storeys, edges, roomTypes, northAngle AND sourceProject reproduce
 exactly. Suite counts as of run 0018: fast 47 passed (was 33), slow 6 passed +
-the standing french-window `it.fails`.
+the standing french-window `it.fails`. As of run 0024: fast 18 in
+`naming.test.ts` (was 14), `ids.test.ts` and `manifest.test.ts` unchanged.
 
 ---
 
@@ -3531,6 +3579,31 @@ function, so publish answers "not published — 404 …"; `netlify dev` (port
 8888, `.claude/netlify.cmd`, which clears `PORT` so Vite does not take 8888)
 serves the app and the store on one origin.
 
+**Numbers count the room too (run 0024).** `nextFreeNumber` (`src/library/
+naming.ts:62`) now takes any number of lists, not one — a rest parameter, so
+`nextFreeNumber(entries)` (the pre-0024 call) is unchanged and
+`nextFreeNumber(entries, sessionFlats)` counts both. With a session set,
+`openSaveDialog` also fetches `GET /api/session/{code}` (`readSessionFlat
+Names`, one more request) and proposes the lowest number free in BOTH the
+library manifest and the session's own published flats, because a design
+number is also a flat's id in the session and every resident reading the
+same manifest would otherwise be offered the identical number. The names
+line grows one clause when it does: "Writes Flat 6 and Unit 6 — next free
+in the library and room-42".
+
+**A flat belongs to whoever published it, and Replace (run 0024).** The
+store refuses a different resident's publish over an existing flat id with
+409 unless the request carries `?replace=1` (`docs/store.md`, `store.ts:180`).
+The dialog surfaces this as the Session result line — "not published — Ana
+already owns Unit 6 in room-42; tick Replace to take it over"
+(`publishUnit`'s `ownerResident` field, `session.ts:90-157`, set only on a
+409) — and a fifth control in the fieldset, **Replace** (`#save-replace`,
+`index.html:197-201`), off by default, sent as `&replace=1` when ticked and
+reset to unticked after any successful publish (`main.ts:988`, `:1255`) so a
+takeover is a deliberate act each time, never a standing default. The SAME
+resident republishing their own flat never needs it, exactly as before this
+rule existed.
+
 **What was retired** — the `Export project` and `Export unit` menu items and
 the old dialog's `Save to library` action, all three subsumed. `Open project`
 survives: it is the import, not a save. Three DEAD callbacks
@@ -3583,7 +3656,8 @@ without Netlify.
 |---|---|---|
 | `GET` | `/api/session/{code}` | `sessionView`: `{code, flats: FlatSummary[], residents: (Resident & {name})[], building}` — lists on the wire, maps in storage, never a flat body. Unknown code → empty session, 200. |
 | `GET` | `…/flats/{id}` | the stored text, byte for byte, `content-type: application/json`; 404 if absent. |
-| `PUT` | `…/flats/{id}?resident=…&label=…` | body = the `dwelling-unit` JSON as Export writes it. `parseUnit` checks only `format`, `storeys[].cells` as `[int,int]`; `measure` derives `bbox [minX,minZ,maxX,maxZ]`, `floors`, `areaCells`. Existing id → version+1, `changed: true`, 200; new → version 1, 201. `label` falls back to the unit's `name`. |
+| `PUT` | `…/flats/{id}?resident=…&label=…` | body = the `dwelling-unit` JSON as Export writes it. `parseUnit` checks only `format`, `storeys[].cells` as `[int,int]`; `measure` derives `bbox [minX,minZ,maxX,maxZ]`, `floors`, `areaCells`, `preview` (carried across a republish). Existing id, same resident → version+1, `changed: true`, 200; existing id, DIFFERENT resident → 409 unless `?replace=1` (run 0024, `store.ts:180`, body `{error, resident: <owner>}`); new → version 1, 201. `label` falls back to the unit's `name`. |
+| `GET`/`PUT` | `…/flats/{id}/preview` | Run 0024. GET returns the flat's JPEG (`content-type: image/jpeg`); PUT takes the JPEG as the raw body, 404 if the flat itself does not exist yet. Base64 under a key that is a SIBLING of the flat's own (`{code}/flats/{id}.preview`, not a child of it — see Storage layout). Sets `preview: true` on the flat's summary. |
 | `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[]); each present key replaced whole. Returns `{name, …record}`. |
 | `GET`/`PUT` | `…/building` | PUT stores `{genome, summary, by, at: now}` and sets `changed = false` on every flat; GET returns it or `null`. |
 | `GET` | `…/export` | Run 0023 (`store.ts:185-195`). The session state plus `bodies: {id: <flat text>}` (every flat blob, as a STRING so the bytes survive; `null` if a blob is missing) and `exportedAt`. The only call that reads every blob; for the end of a session, never for polling. |
@@ -3594,7 +3668,15 @@ Errors: `HttpError` → `{error}` JSON with 400/404/405/409; anything else 500.
 **Storage layout** (Netlify Blobs store `sessions`): `{code}/index` is one
 JSON document (`SessionIndex = {flats: Record<id, FlatSummary>, residents:
 Record<name, Resident>, building: BuildingRun|null}`); `{code}/flats/{id}` is
-the published file's text. Chosen against the polling call: the poll reads one
+the published file's text; `{code}/flats/{id}.preview` (run 0024) is the
+base64 JPEG. The preview key is a SIBLING of the flat's key, never a child
+of it (`{code}/flats/{id}/preview` would be): Netlify Blobs' local sandbox
+maps a key onto a real filesystem path, and `{id}` is already a FILE there
+(the flat's own body), so a key needing `{id}` to be a directory hung every
+write, reproduced on a fully clean process tree and root-caused by reading
+`.netlify/blobs-serve/entries/` directly (`routePreview`, `store.ts:265-296`).
+
+Chosen against the polling call: the poll reads one
 small blob (555 bytes for two fixtures, 655 with a run), a publish writes the
 flat once and touches only a summary in the index, and a flat body is read
 only by the one-flat call. `updateIndex` (`store.ts:223-233`) is a
@@ -3628,12 +3710,19 @@ byte-identical and the summaries equal to the state (run 0023), preflight 204.
 gate answering 401 to every path and to OPTIONS preflights; if it comes back,
 the store is unreachable from the app and from the other origin alike.
 
-**Tests.** `src/session/store.test.ts` — 9 cases (the ninth, run 0023, is the
-export carrying every body verbatim), fast suite (no three.js):
+**Tests.** `src/session/store.test.ts` — 18 cases (9 through run 0023; run
+0024 added 4 for the ownership refusal and `?replace=1`, 1 for a new flat's
+`preview` defaulting false, and 4 for the preview GET/PUT round trip),
+fast suite (no three.js):
 routing/CORS, empty session, rejections, create-vs-replace with bytes kept and
 no `storeys` in the poll, resident partial merge + validation, building write
 clears `changed` and the next publish sets it again, and a `RacingKV` whose
 first ETag write loses so the retry is exercised. Suite counts as of run 0022:
 **fast 134 passed in 11 files** (was 126 in 10), slow unchanged. As of run 0023:
 **fast 153 passed in 12 files** (`store.test.ts` 9, `session.test.ts` 15,
-`savePlan.test.ts` 17), slow 26 passed + 1 expected fail.
+`savePlan.test.ts` 17), slow 26 passed + 1 expected fail. As of run 0024:
+**fast 177 passed in 13 files** (`store.test.ts` 18, `session.test.ts` 21 —
+6 new, for `ownerResident` on a 409, `?replace=1`, and `publishPreview` — plus
+the new `previewFrame.test.ts` at 5; `savePlan.test.ts` 17 and `manifest.test.ts`/
+`ids.test.ts` unchanged), slow 26 passed + 1 expected fail, `tsc`/`npm run build`
+clean, both fixture baselines still 12 and 7.

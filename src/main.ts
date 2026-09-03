@@ -12,6 +12,7 @@ import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
 import { SelectionController, type MarkerSelectionAdapter } from "./interaction/selection";
 import { updateCutaway, setCutawayEnabled } from "./scene/cutaway";
+import { axoFrame } from "./core/previewFrame";
 import { setHovered } from "./scene/moduleMesh";
 import { createCompassDial } from "./ui/compassDial";
 import { computeDwellingGraph } from "./core/adjacencyGraph";
@@ -67,6 +68,7 @@ import {
   whyPublishDisabled,
   sessionLine,
   publishUnit,
+  publishPreview,
   type SessionSettings,
 } from "./session/session";
 
@@ -755,6 +757,101 @@ interfaceToggle.addEventListener("click", () => {
   syncViewToggles();
 });
 
+// ---- One axonometric for every flat (run 0024) ------------------------------
+// The library preview and the session preview are the SAME picture: the
+// flat's own axonometric, framed to its bounding box (src/core/previewFrame.ts,
+// the app's own "zoom to extent" pose), on the paper ground, every floor
+// visible, the Cutaway/Seeds/Structure/Interface overlays off, at one fixed
+// size — never whatever view the author happened to be in when they saved.
+//
+// It borrows the LIVE scene for one frame: every piece of view state it
+// touches is read before and put back exactly after, so a resident mid-orbit
+// never sees their camera jump. Nothing here is DEV-gated — a production
+// build has no capture sink, but the render itself needs no server.
+const PREVIEW_W = 800;
+const PREVIEW_H = 600;
+
+function captureFlatPreview(): { dataUrl: string; bytes: number } {
+  const savedFloorVisible = floors.floors.map((_, i) => floors.isFloorVisible(i));
+  const savedStructure = floors.structureViewOn;
+  const savedInterface = floors.interfaceViewOn;
+  const savedPos = camera.position.clone();
+  const savedUp = camera.up.clone();
+  const savedZoom = camera.zoom;
+  const savedViewSize = (camera as unknown as { viewSize: number }).viewSize;
+  const savedTarget = controls.target.clone();
+  const savedPixelRatio = renderer.getPixelRatio();
+  const savedStyleW = canvas.style.width;
+  const savedStyleH = canvas.style.height;
+
+  try {
+    floors.floors.forEach((_, i) => floors.setFloorVisible(i, true));
+    // Every floor RENDERS solid too, not just visible: a floor other than the
+    // active one is normally dimmed translucent (FloorManager.applyDim), which
+    // read as a ghostly double-exposure over the storey below it the first
+    // time this was tried on a two-storey flat. `setDimmed` has no getter to
+    // save, but the dim state is entirely a function of the active index
+    // (`i !== activeIndexValue`), so restoring means recomputing that, not
+    // remembering it.
+    floors.floors.forEach((f) => f.setDimmed(false));
+    setCutawayEnabled(false);
+    floors.setSeedOutlinesVisible(false);
+    if (floors.structureViewOn) floors.setStructureView(false);
+    if (floors.interfaceViewOn) floors.setInterfaceView(false);
+
+    // A fixed backing resolution, pixel ratio 1 so it comes out exactly
+    // PREVIEW_W×PREVIEW_H, and the CSS size matched too so frameBox's own
+    // aspect read (canvas.clientWidth/clientHeight) agrees with the buffer —
+    // otherwise the frustum would be cut for the on-screen aspect and the
+    // fixed-size buffer would show it stretched.
+    renderer.setPixelRatio(1);
+    canvas.style.width = `${PREVIEW_W}px`;
+    canvas.style.height = `${PREVIEW_H}px`;
+    renderer.setSize(PREVIEW_W, PREVIEW_H, false);
+
+    const box = floors.contentBox();
+    const frame = axoFrame(
+      { min: { x: box.min.x, y: box.min.y, z: box.min.z }, max: { x: box.max.x, y: box.max.y, z: box.max.z } },
+      PREVIEW_W / PREVIEW_H
+    );
+    camera.up.set(frame.up.x, frame.up.y, frame.up.z);
+    (camera as unknown as { viewSize: number }).viewSize = frame.viewSize;
+    camera.zoom = 1;
+    const center = new THREE.Vector3(frame.center.x, frame.center.y, frame.center.z);
+    const dir = new THREE.Vector3(frame.direction.x, frame.direction.y, frame.direction.z);
+    camera.position.copy(center).addScaledVector(dir, 100);
+    controls.target.copy(center);
+    camera.lookAt(center);
+    ctx.handleResize();
+    controls.update();
+
+    renderer.render(scene, camera);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    const bytes = Math.max(0, Math.floor(((dataUrl.length - dataUrl.indexOf(",") - 1) * 3) / 4));
+    return { dataUrl, bytes };
+  } finally {
+    savedFloorVisible.forEach((v, i) => floors.setFloorVisible(i, v));
+    floors.floors.forEach((f, i) => f.setDimmed(i !== floors.activeIndexValue));
+    setCutawayEnabled(cutawayOn);
+    floors.setSeedOutlinesVisible(seedsOn);
+    // Mutually exclusive in FloorManager, so only the one that was actually
+    // on needs restoring; the other is already off from the block above.
+    if (savedStructure) floors.setStructureView(true);
+    if (savedInterface) floors.setInterfaceView(true);
+    renderer.setPixelRatio(savedPixelRatio);
+    canvas.style.width = savedStyleW;
+    canvas.style.height = savedStyleH;
+    camera.position.copy(savedPos);
+    camera.up.copy(savedUp);
+    camera.zoom = savedZoom;
+    (camera as unknown as { viewSize: number }).viewSize = savedViewSize;
+    controls.target.copy(savedTarget);
+    camera.lookAt(savedTarget);
+    ctx.handleResize();
+    controls.update();
+  }
+}
+
 // Initial view: frame whatever's on the (likely empty) starting floor instead
 // of a hardcoded camera position, so this stays correct however the default
 // grid size changes.
@@ -884,6 +981,11 @@ let saveColorTouched = false;
 const saveResidentInput = document.getElementById("save-resident") as HTMLInputElement;
 const saveCodeInput = document.getElementById("save-session") as HTMLInputElement;
 const savePublishNote = document.getElementById("save-publish-note") as HTMLElement;
+/** Off by default (docs/store.md): a flat belongs to whoever published it,
+ *  so taking over someone else's is one deliberate tick, not the standing
+ *  choice `saveSelection`'s four checkboxes get. Reset to off after every
+ *  successful publish (run 0024). */
+const saveReplaceInput = document.getElementById("save-replace") as HTMLInputElement;
 const tbSession = document.getElementById("tb-session") as HTMLElement;
 const PUBLISH_NOTE = savePublishNote.textContent ?? "";
 
@@ -952,7 +1054,7 @@ function syncSaveDialog(): void {
   if (sel.project) parts.push(projectNameFor(n));
   if (needsUnitBuild(sel)) parts.push(unitNameFor(n));
   saveNamesLine.textContent = parts.length
-    ? `Writes ${parts.join(" and ")}`
+    ? `Writes ${parts.join(" and ")}` + (numberCountsSession ? ` — next free in the library and ${session.code}` : "")
     : "Nothing selected";
   if (!saveColorTouched) saveColorInput.value = defaultUnitColor(unitNameFor(n));
   saveGoBtn.disabled = isEmptySelection(sel);
@@ -971,9 +1073,32 @@ async function readManifestEntries(): Promise<UnitManifestEntry[]> {
   }
 }
 
-/** Open on the NEXT FREE NUMBER: the lowest positive integer no library entry
- *  holds (src/library/naming.ts), re-read on every open so a save made a
- *  moment ago is already counted. */
+/** The session's own published flats, as `{id, name}` for `nextFreeNumber` —
+ *  `label` stands in for `name` since a flat has no separate display name.
+ *  Empty when no session is set or the poll fails; the dialog must still open
+ *  either way (run 0024, mirrors `readManifestEntries`). */
+async function readSessionFlatNames(): Promise<{ id: string; name: string }[]> {
+  if (!session.code) return [];
+  try {
+    const res = await fetch(`/api/session/${encodeURIComponent(session.code)}`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const state = (await res.json()) as { flats?: { id: string; label: string }[] };
+    return (state.flats ?? []).map((f) => ({ id: f.id, name: f.label }));
+  } catch {
+    return [];
+  }
+}
+
+/** Whether the number just proposed came from the library alone or from the
+ *  library and the session together — read by `syncSaveDialog` to add one
+ *  clause to the names line, so a resident in a room knows the room's other
+ *  flats were counted too (run 0024). */
+let numberCountsSession = false;
+
+/** Open on the NEXT FREE NUMBER: the lowest positive integer neither the
+ *  library manifest nor (with a session set) the session's own flats hold
+ *  (src/library/naming.ts), re-read on every open so a save made a moment ago
+ *  is already counted. */
 async function openSaveDialog(): Promise<void> {
   saveResultsEl.replaceChildren();
   for (const kind of ["project", "unit", "library", "publish"] as OutputKind[])
@@ -982,7 +1107,9 @@ async function openSaveDialog(): Promise<void> {
   syncSaveDialog();
   saveDialog.showModal();
   const entries = await readManifestEntries();
-  saveNumberInput.value = String(nextFreeNumber(entries));
+  const sessionFlats = await readSessionFlatNames();
+  numberCountsSession = session.code.length > 0;
+  saveNumberInput.value = String(nextFreeNumber(entries, sessionFlats));
   syncSaveDialog();
 }
 
@@ -1100,21 +1227,39 @@ async function runSave(): Promise<void> {
   // 4. Publish to the session: the unit download's EXACT bytes, PUT to the
   //    store on this origin as `unit-<n>` (docs/store.md). The files above are
   //    already written, so a failure of any kind is one red line and nothing
-  //    else; `publishUnit` never throws.
+  //    else; `publishUnit` never throws. Right after, its axonometric follows
+  //    to the SAME id — a failed preview is noted on the same line and never
+  //    undoes the flat publish.
   if (sel.publish && unitFile) {
+    const id = slugifyUnitName(unitName);
     const r = await publishUnit(
       (url, init) => fetch(url, init),
       "",
       session,
-      slugifyUnitName(unitName),
+      id,
       unitName,
-      unitFileText(unitFile)
+      unitFileText(unitFile),
+      saveReplaceInput.checked
     );
     if (r.ok) {
-      setSaveResult("publish", "written", `Published as ${r.label} to ${session.code}, version ${r.version}`);
+      let line = `Published as ${r.label} to ${session.code}, version ${r.version}`;
+      const preview = captureFlatPreview();
+      if (preview.dataUrl.startsWith("data:image/jpeg") && preview.bytes >= 1000) {
+        const jpeg = await fetch(preview.dataUrl).then((res) => res.blob());
+        const pr = await publishPreview((url, init) => fetch(url, init), "", session.code, r.id, jpeg);
+        if (!pr.ok) line += ` (preview not sent — ${pr.reason})`;
+      } else {
+        line += ` (preview not sent — read back ${preview.bytes} bytes)`;
+      }
+      setSaveResult("publish", "written", line);
+      saveReplaceInput.checked = false; // one deliberate tick per takeover, not a standing default
       void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
     } else {
-      setSaveResult("publish", "failed", `not published — ${r.status ? `${r.status} ` : ""}${r.reason}`);
+      const detail =
+        r.ownerResident !== undefined
+          ? `not published — ${r.ownerResident} already owns ${unitName} in ${session.code}; tick Replace to take it over`
+          : `not published — ${r.status ? `${r.status} ` : ""}${r.reason}`;
+      setSaveResult("publish", "failed", detail);
     }
   }
 
@@ -1137,13 +1282,13 @@ async function saveLibraryEntry(
   color: string,
   unitFile: DwellingUnitFile
 ): Promise<void> {
-  // The preview: render and read back in the same turn (the context has no
-  // preserveDrawingBuffer), then BYTE-CHECK — a hidden canvas "succeeds" with
-  // an empty image, and an empty preview in the library is worse than a
+  // The SAME axonometric a session publish sends (run 0024): every library
+  // entry and every published flat's picture come from captureFlatPreview,
+  // never from whatever angle the author happened to be viewing. It already
+  // reads back and BYTE-CHECKS in the same turn — a hidden canvas "succeeds"
+  // with an empty image, and an empty preview in the library is worse than a
   // refused save.
-  renderer.render(scene, camera);
-  const preview = canvas.toDataURL("image/jpeg", 0.9);
-  const previewBytes = Math.max(0, Math.floor(((preview.length - preview.indexOf(",") - 1) * 3) / 4));
+  const { dataUrl: preview, bytes: previewBytes } = captureFlatPreview();
   if (!preview.startsWith("data:image/jpeg") || previewBytes < 1000) {
     setSaveResult(
       "library",
@@ -1328,6 +1473,7 @@ const unitBrowser = createUnitBrowser({
   session: {
     stateUrl: () => (session.code ? `/api/session/${encodeURIComponent(session.code)}` : null),
     flatUrl: (id) => `/api/session/${encodeURIComponent(session.code)}/flats/${encodeURIComponent(id)}`,
+    previewUrl: (id) => `/api/session/${encodeURIComponent(session.code)}/flats/${encodeURIComponent(id)}/preview`,
   },
   // Rename is DEV-ONLY for the same reason saving is: the manifest lives on
   // disk beside the units and only the dev server can write it. Omitting the
@@ -1406,6 +1552,25 @@ if (import.meta.env.DEV) {
         method: "POST",
         body: canvas.toDataURL("image/png"),
       }).then((r) => r.json());
+    },
+    /** The one axonometric every flat gets (run 0024), through the exact
+     *  function `saveLibraryEntry` and Publish call. Dev-only handle so a
+     *  check can drive it directly and read the camera/controls before and
+     *  after, to prove it leaves the live view untouched. */
+    capturePreview(): { dataUrl: string; bytes: number } {
+      return captureFlatPreview();
+    },
+    /** Load a project (a library entry's `sourceProject`, typically) and
+     *  capture its preview in one call, for a batch re-render driven from
+     *  outside the app. No confirm, no toast: this is a dev tool operating
+     *  on state nobody is looking at, not a user-facing import. Run 0024
+     *  used it once to put every committed library unit through the same
+     *  function a session publish now uses. */
+    loadAndCapturePreview(sourceProject: unknown): { dataUrl: string; bytes: number } {
+      floors.loadProject(sourceProject as ProjectFile);
+      renderSidebar();
+      syncNorthUI();
+      return captureFlatPreview();
     },
   };
   const wanted = new URLSearchParams(location.search).get("project");

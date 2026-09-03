@@ -35,15 +35,21 @@ export interface SessionFlat {
   floors: number;
   areaCells: number;
   publishedAt: string;
+  /** True once a preview has been published for this flat (run 0024). */
+  preview: boolean;
 }
 
-/** Where the "In this session" group reads from (run 0023). The host owns the
- *  session code, so both URLs are asked for on every refresh. */
+/** Where the "In this session" group reads from (run 0023, `previewUrl` run
+ *  0024). The host owns the session code, so every URL is asked for fresh on
+ *  each refresh. */
 export interface SessionSource {
   /** `GET /api/session/{code}` for the current session, or null when none is set. */
   stateUrl(): string | null;
   /** `GET /api/session/{code}/flats/{id}`: one flat's file, byte for byte. */
   flatUrl(id: string): string;
+  /** `GET /api/session/{code}/flats/{id}/preview`: the flat's JPEG. Only
+   *  fetched when the flat's summary says `preview: true`. */
+  previewUrl(id: string): string;
 }
 
 export interface UnitBrowserOptions {
@@ -161,7 +167,11 @@ const CSS = `
   padding: 16px;
   align-content: start;
 }
-.ulb-session-card .ulb-name { padding-top: 11px; flex-wrap: wrap; }
+/* No preview image (run 0024): the name row takes the padding an image's
+   border would otherwise give it. A card WITH a preview needs none of this —
+   it already looks exactly like a library card. */
+.ulb-session-card.ulb-no-preview .ulb-name { padding-top: 11px; }
+.ulb-session-card .ulb-name { flex-wrap: wrap; }
 .ulb-session-card .ulb-meta { padding-left: 10px; }
 .ulb-tag {
   font-size: 9px;
@@ -380,6 +390,20 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
   function sessionCard(flat: SessionFlat): HTMLElement {
     const c = document.createElement("article");
     c.className = "ulb-card ulb-session-card";
+
+    // The flat's own axonometric (run 0024), sized like a library card's —
+    // same `.ulb-preview` class — only when the summary says one exists;
+    // no picture at all for an older flat that predates the preview call.
+    if (flat.preview) {
+      const img = document.createElement("img");
+      img.className = "ulb-preview";
+      img.src = opts.session!.previewUrl(flat.id);
+      img.alt = flat.label;
+      img.loading = "lazy";
+      c.appendChild(img);
+    } else {
+      c.classList.add("ulb-no-preview");
+    }
 
     const nameRow = document.createElement("div");
     nameRow.className = "ulb-name";
