@@ -70,6 +70,7 @@ import {
   publishUnit,
   publishPreview,
   takeoverConfirmText,
+  decideTakeover,
   type FetchLike,
   type SessionSettings,
 } from "./session/session";
@@ -1273,11 +1274,13 @@ async function runSave(): Promise<void> {
     let r = await publishUnit(doFetch, "", session, id, unitName, text, false);
     let declined = false;
     if (!r.ok && r.status === 409 && r.ownerResident !== undefined && saveReplaceInput.checked) {
-      if (window.confirm(takeoverConfirmText(r.ownerResident))) {
+      const confirmed = window.confirm(takeoverConfirmText(r.ownerResident));
+      const decision = decideTakeover(r, saveReplaceInput.checked, confirmed);
+      if (decision.action === "retry") {
         r = await publishUnit(doFetch, "", session, id, unitName, text, true);
-      } else {
+      } else if (decision.action === "declined") {
         declined = true;
-        setSaveResult("publish", "skipped", `not published — you chose not to take over ${r.ownerResident}'s flat`);
+        setSaveResult("publish", "skipped", decision.detail);
       }
     }
     if (!declined) {
