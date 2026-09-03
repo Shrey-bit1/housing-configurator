@@ -14,7 +14,8 @@
  * Storage layout, per session code:
  *   `{code}/index`           one JSON blob: flat SUMMARIES, residents, last run
  *   `{code}/flats/{id}`      the published `dwelling-unit` text, byte for byte
- *   `{code}/flats/{id}/preview`  the flat's JPEG preview, base64 (run 0024)
+ *   `{code}/flats/{id}.preview`  the flat's JPEG preview, base64 (run 0024) —
+ *     a SIBLING key, not a child of `{id}`; see `routePreview`'s comment.
  *
  * The index is what the building polls, so it never holds a flat body or a
  * preview; both are written once (at publish time, and right after) and read
@@ -262,7 +263,14 @@ async function route(req: Request, kv: KV): Promise<Response> {
  * ~33% base64 overhead on top of a JPEG that is already small.
  */
 async function routePreview(req: Request, kv: KV, code: string, id: string, indexKey: string): Promise<Response> {
-  const previewKey = `${code}/flats/${id}/preview`;
+  // A SIBLING of the flat's own key (`{code}/flats/{id}`), never a child of
+  // it: Netlify Blobs' local sandbox maps keys onto a real filesystem path,
+  // so `{code}/flats/{id}/preview` would need `{id}` to be a directory when
+  // it is already a file holding the flat itself — a collision that hung
+  // every write under `netlify dev`, discovered live in this run. Production
+  // Blobs may not share that failure mode, but the key is wrong regardless
+  // of backend: two objects should not need one to be the other's folder.
+  const previewKey = `${code}/flats/${id}.preview`;
   if (req.method === "GET") {
     const b64 = await kv.get(previewKey);
     if (b64 === null) return fail(404, `no preview for "${id}" in session "${code}"`);
