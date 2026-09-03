@@ -3716,16 +3716,24 @@ Three cards, in the brief's order:
   `floors.onLayoutChange`: the latter is wired to the room STORE alone and
   never fires for an entrance or a door, where `commitHistory` is the one
   point CLAUDE.md's own convention already routes every mutating action
-  through. The area number counts up (the brief's `.cnt`/`@property --n`
-  technique, copied from the wireframe's own CSS): `animateCount`
-  (`main.ts`) sets `--to` and toggles the `.cnt` class off and on to force
-  a restart, and because `@keyframes flat-count { to { --n: var(--to); } }`
-  has no explicit `from`, it counts from wherever `--n` last landed rather
-  than always from zero — "the numbers count up when the flat changes",
-  verified live (a fixture's area animates from a previous flat's value to
-  its own, `store-roundtrip`-style, in the browser pane). Storeys and
-  glazing are plain text, matching the wireframe (only its area number
-  carries the `.cnt` class).
+  through. The area number counts up: `animateCount` (`main.ts`) is a plain
+  `requestAnimationFrame` tween tracking each element's currently-shown
+  value in a `WeakMap`, so it retargets from wherever the number actually
+  is rather than always from zero, and a second edit landing mid-tween
+  retargets smoothly instead of restarting. The FIRST version tried the
+  brief's own CSS technique (`@property --n`, a `.cnt` class carrying the
+  animation, toggled off and on to restart it) and shipped that way; a
+  user testing it live found the number restarting from zero on every
+  edit, with a visible stutter on rapid ones. The cause: `--n`'s value
+  lived ONLY while `.cnt` was applied, so removing that class to restart
+  the animation reset `--n` to its registered `initial-value`, zero,
+  before the class came back — the CSS never actually remembered a
+  "last landed" value at all, which the closed-form keyframe
+  (`@keyframes flat-count { to { --n: var(--to); } }`, no explicit `from`)
+  had been assumed to provide. The plain JS tween replaced it entirely;
+  see the run's own commit, `ui: fix the save column's live feedback`.
+  Storeys and glazing are plain text, matching the wireframe (only its
+  area number animates).
 - **"Your group"** (`#group-card`): the same fold as run 0025
   (`save-session-summary`/`-fields`, `syncSessionFold`, unchanged), then the
   ONE red button, `.btn-send` (`#save-go`, relabeled from "Save"): "Send it
@@ -3748,6 +3756,23 @@ Three cards, in the brief's order:
   `openSaveDialog()`, so the proposed number is never stale. The "Save…"
   menu item (`#menu-save`) now opens "More" instead of a dialog that no
   longer exists.
+
+**Three more bugs, found the same way** (a user running the column live,
+not by reading the CSS): the column had no minimum-width guard, and
+`#save-column input[type="text"]` plus `.save-session-fields`'s two
+side-by-side labels had no explicit width between them, so their combined
+browser-default intrinsic size ran wider than the column's own 320px and
+forced a horizontal scrollbar; both now take `width: 100%`/`flex: 1` with
+`min-width: 0`, and `#save-column` itself gains `overflow-x: hidden` as a
+backstop. The column also had no way to get out of a resident's way once
+open; `#save-column-toggle`/`#save-column-body` (new) fold the three cards
+behind one small "Save" tab docked at the column's own top-right corner,
+mirroring `#display-header`'s existing header/body pattern — collapsing
+does not resize the column's own box, so the empty space below the tab
+stays click-through to the 3D view. Last, `#shortcuts-panel` (`z-index: 3`)
+rendered UNDER the new column (`z-index: 20`) since both claim the same
+right-edge corner; `#shortcuts-panel` is now `z-index: 21`, since opening
+it is a deliberate, focused action that should win.
 
 **Words, run 0026** (`_cowork/design/DESIGN-BRIEF-3sep.md`'s Words
 section): "Session code" → "Group code"; "Publish to session" → "Send to
@@ -4023,7 +4048,13 @@ and render (Big Shoulders Display on headings/buttons, Jost on body text,
 confirmed via `getComputedStyle`), the grain shows on the top bar and
 sidebar, `.chip-ok`/`.chip-acc` render at the right colour and pill radius,
 `#save-column` sits clear of `#view-controls` at 1440×900, and the "Yours"
-chip renders red in the Units panel. Not checked: a narrow/mobile viewport
+chip renders red in the Units panel. A second live pass, prompted by a
+user actually using the column rather than only reading its source, found
+and fixed four more problems: horizontal overflow (untitled inputs wider
+than the column), no way to minimize it, the shortcuts panel rendering
+under it, and the area number's count-up restarting from zero on every
+edit — see the "Three more bugs" and the count-up paragraphs above (§11)
+for each. Not checked: a narrow/mobile viewport
 (this app has never targeted one; §5's plan/model toggle is its concession
 to a small screen, not this run's business) and an actual dark-mode
 preference (`prefers-color-scheme`) — this app has always been one fixed
