@@ -101,6 +101,16 @@ const CODE = /^[a-z0-9_-]{1,32}$/;
 const ID = /^[a-z0-9_-]{1,64}$/i;
 const INDEX_ATTEMPTS = 4;
 
+/** Two resident names as the same person (run 0026): trimmed, case-insensitive.
+ *  A republish by "ben" over a flat recorded as "Ben" is not a conflict — only
+ *  the COMPARISON folds case; the name as typed is still what gets stored and
+ *  shown (the ownership check below, and `isMine` in
+ *  src/library/unitBrowser.ts, which restates this rather than importing it —
+ *  that module is self-contained on purpose, see its own file header). */
+export function sameResident(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 class HttpError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -184,7 +194,7 @@ async function route(req: Request, kv: KV): Promise<Response> {
     // updateIndex's own retry, which is the upgrade path if it ever matters at
     // this scale (a five-person room, human-speed saves).
     const existing = (await readIndex(kv, indexKey)).flats[id];
-    if (existing && existing.resident !== resident && !replace) {
+    if (existing && !sameResident(existing.resident, resident) && !replace) {
       return json(
         {
           error: `"${id}" was published by ${existing.resident}; add ?replace=1 to take it over`,

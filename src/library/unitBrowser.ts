@@ -83,9 +83,14 @@ export interface UnitBrowserOptions {
  *  no DOM, so it is what `sessionCard`'s "Yours" mark and `refreshSession`'s
  *  ordering both test against, and what a plain vitest case pins directly —
  *  the module otherwise needs a live DOM to exercise at all. An empty `me`
- *  (no resident name typed yet) never matches anything. */
+ *  (no resident name typed yet) never matches anything.
+ *
+ *  The comparison is trimmed and case-insensitive (run 0026: "ana" is Ana),
+ *  matching `sameResident` in `src/session/store.ts` — restated here rather
+ *  than imported, since this module stays self-contained on purpose (see the
+ *  file header above); the two must be kept in step by hand. */
 export function isMine(resident: string, me: string): boolean {
-  return me.length > 0 && resident === me;
+  return me.length > 0 && resident.trim().toLowerCase() === me.trim().toLowerCase();
 }
 
 /** Stable "mine first" ordering over any list carrying a `resident` field —

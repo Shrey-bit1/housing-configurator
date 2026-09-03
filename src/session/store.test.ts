@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { handleSession, type KV } from "./store";
+import { handleSession, sameResident, type KV } from "./store";
 
 /**
  * The session store's contract (docs/store.md), driven through an in-memory
@@ -131,6 +131,17 @@ describe("publishing a flat", () => {
   });
 });
 
+describe("sameResident", () => {
+  it("is trimmed and case-insensitive; empty names are equal only to empty", () => {
+    expect(sameResident("Ana", "Ana")).toBe(true);
+    expect(sameResident("ana", "Ana")).toBe(true);
+    expect(sameResident("  Ana  ", "Ana")).toBe(true);
+    expect(sameResident("", "")).toBe(true);
+    expect(sameResident("", "Ana")).toBe(false);
+    expect(sameResident("Ana", "Ben")).toBe(false);
+  });
+});
+
 describe("a flat belongs to whoever published it", () => {
   it("refuses a different resident's PUT with 409 and the owner's name", async () => {
     const kv = new MemoryKV();
@@ -152,6 +163,17 @@ describe("a flat belongs to whoever published it", () => {
     const res = await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
     expect(res.status).toBe(200);
     expect((await res.json()).version).toBe(2);
+  });
+
+  it("a case-different republish is the same resident too (run 0026)", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/flats/u9?resident=Ben", UNIT_TEXT);
+    const res = await put(kv, "/api/session/abc/flats/u9?resident=ben", UNIT_TEXT);
+    expect(res.status).toBe(200);
+    const s = await res.json();
+    expect(s.version).toBe(2);
+    // The name as typed is what gets recorded — only the COMPARISON folded case.
+    expect(s.resident).toBe("ben");
   });
 
   it("?replace=1 lets a different resident take a flat over", async () => {
