@@ -96,6 +96,19 @@ netlify dev --port 8888`. `docs/store.md` is the contract. PROJECT_STATE §12.
 `reconfigure-flat` gate answers 401 to `/api/session/*` and even to an OPTIONS
 preflight, so run 0023 and the building side cannot call it until that changes.
 
+Run 0023 CONNECTED THE APP TO THE STORE. The save dialog has two fields at the
+top, resident name and session code (localStorage key `reconfigure.session`,
+`?session=room-42` in the URL wins and is stored, codes lowercased), a top-bar
+line shows the session, and a fourth checkbox, Publish to session, PUTs the
+unit download's exact bytes to `/api/session/<code>/flats/unit-<n>` on the same
+origin and reports "Published as Unit 6 to room-42, version 2". A failed
+publish never cancels a file. The Units panel lists the session's flats in a
+group ABOVE the library (resident, version, storeys, area, a changed mark),
+each openable as a copy. `GET /api/session/<code>/export` returns the state
+plus every flat body as a string. **The site password is off since 2 September
+2026** and the deployed round trip passes 26/26. PROJECT_STATE §10, §11, §12.
+Dev needs `netlify dev` (port 8888) for the store; plain `vite` has no function.
+
 **Last updated:** 2026-09-02
 
 ## What this project is
@@ -170,8 +183,10 @@ rules engine and the export format are the mature parts, the UI is not.
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 134 cases in eleven files as of run 0022 (126 in ten as of run 0021,
-  plus `src/session/store.test.ts` 8, the session store through an in-memory KV) (84 in eight before run
+  a second over 153 cases in twelve files as of run 0023 (134 in eleven as of run 0022,
+  plus `src/session/session.test.ts` 15, the session settings and the publish call;
+  126 in ten as of run 0021, plus `src/session/store.test.ts` 9, the session store
+  through an in-memory KV) (84 in eight before run
   0020,
   plus `src/core/stairSpec.test.ts` 23, the stair proportions and the spiral's
   miss, and `src/scene/props/bathroomFit.test.ts` 19, the bathroom fixture fit).

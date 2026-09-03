@@ -21,13 +21,44 @@ import {
  * follows a host theme without requiring one.
  */
 
+/** One flat as the session store summarises it: the `flats[]` entry of
+ *  `GET /api/session/{code}` (docs/store.md). Declared here rather than
+ *  imported so the module stays liftable on its own. */
+export interface SessionFlat {
+  id: string;
+  resident: string;
+  label: string;
+  version: number;
+  /** True since the last publish, false once a building run has read it. */
+  changed: boolean;
+  bbox: [number, number, number, number];
+  floors: number;
+  areaCells: number;
+  publishedAt: string;
+}
+
+/** Where the "In this session" group reads from (run 0023). The host owns the
+ *  session code, so both URLs are asked for on every refresh. */
+export interface SessionSource {
+  /** `GET /api/session/{code}` for the current session, or null when none is set. */
+  stateUrl(): string | null;
+  /** `GET /api/session/{code}/flats/{id}`: one flat's file, byte for byte. */
+  flatUrl(id: string): string;
+}
+
 export interface UnitBrowserOptions {
   /** URL of `units/index.json`. Entry `file`/`preview` names resolve against it. */
   manifestUrl: string;
   /** Called with the fetched `dwelling-unit` file (named `<id>.json`) when a
-   *  card's "Open a copy" is pressed. The browser itself never parses the
-   *  unit file — what to do with it is the host's business. */
-  onOpen: (file: File, entry: UnitManifestEntry) => void;
+   *  card's "Open a copy" is pressed, from the library or from the session.
+   *  The browser itself never parses the unit file — what to do with it is
+   *  the host's business. */
+  onOpen: (file: File, source: UnitManifestEntry | SessionFlat) => void;
+  /** OPTIONAL. When given, the panel grows a second group, "In this session",
+   *  listing the flats the store's poll returns, each openable as a copy the
+   *  same way. Refreshed when the panel opens and on its own Refresh control;
+   *  the browser never polls in the background. */
+  session?: SessionSource;
   /** OPTIONAL. When given, each card grows a Rename control that collects a
    *  new display name and hands it over. The module knows nothing about how a
    *  rename is persisted — the host owns that endpoint — so this stays as
@@ -93,15 +124,55 @@ const CSS = `
 }
 .ulb-close:hover { color: var(--ink, #141317); }
 .ulb-status { padding: 24px 16px; font-size: 12px; color: var(--meta, #6d6a62); }
+.ulb-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.ulb-group + .ulb-group { border-top: 2px solid var(--ink, #141317); }
+.ulb-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 16px 0;
+}
+.ulb-group-title {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--meta, #6d6a62);
+}
+.ulb-refresh {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--line-paper, #c9c5bb);
+  color: var(--meta, #6d6a62);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.ulb-refresh:hover { color: var(--ink, #141317); border-color: var(--ink, #141317); }
+.ulb-refresh:disabled { opacity: 0.5; cursor: default; }
 .ulb-grid {
-  flex: 1;
-  overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 14px;
   padding: 16px;
   align-content: start;
 }
+.ulb-session-card .ulb-name { padding-top: 11px; flex-wrap: wrap; }
+.ulb-session-card .ulb-meta { padding-left: 10px; }
+.ulb-tag {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--meta, #6d6a62);
+  border: 1px solid var(--line-paper, #c9c5bb);
+  padding: 1px 5px;
+}
+.ulb-tag.ulb-changed { color: var(--accent, #c2410c); border-color: var(--accent, #c2410c); }
 .ulb-card {
   display: flex;
   flex-direction: column;
@@ -181,22 +252,57 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
   close.addEventListener("click", () => api.close());
   header.append(title, count, close);
 
+  // Two groups in one scrolling column: (when the host gives a session source)
+  // the flats published in this session, then the library. The session comes
+  // first because the library already holds eight cards, which would push the
+  // neighbours' flats below the fold every time. Each group has its own grid
+  // so one failing to load leaves the other readable.
   const body = document.createElement("div");
-  body.className = "ulb-grid";
+  body.className = "ulb-body";
+  let sessionGrid: HTMLElement | null = null;
+  let sessionCode: HTMLElement | null = null;
+  let refreshBtn: HTMLButtonElement | null = null;
+  if (opts.session) {
+    sessionCode = document.createElement("span");
+    sessionCode.className = "ulb-count";
+    refreshBtn = document.createElement("button");
+    refreshBtn.type = "button";
+    refreshBtn.className = "ulb-refresh";
+    refreshBtn.textContent = "Refresh";
+    refreshBtn.addEventListener("click", () => void refreshSession());
+    sessionGrid = group(body, "In this session", sessionCode, refreshBtn);
+  }
+  const libGrid = group(body, "Library");
   el.append(header, body);
   mount.appendChild(el);
+
+  function group(parent: HTMLElement, name: string, ...extra: HTMLElement[]): HTMLElement {
+    const section = document.createElement("section");
+    section.className = "ulb-group";
+    const head = document.createElement("div");
+    head.className = "ulb-group-head";
+    const h = document.createElement("h3");
+    h.className = "ulb-group-title";
+    h.textContent = name;
+    head.append(h, ...extra);
+    const grid = document.createElement("div");
+    grid.className = "ulb-grid";
+    section.append(head, grid);
+    parent.appendChild(section);
+    return grid;
+  }
 
   /** Entry names resolve against the manifest's own URL, so the library can
    *  live anywhere the host serves it from. */
   const fileUrl = (name: string): string =>
     new URL(name, new URL(opts.manifestUrl, location.href)).toString();
 
-  function status(msg: string): void {
-    body.replaceChildren();
+  function status(grid: HTMLElement, msg: string): void {
+    grid.replaceChildren();
     const p = document.createElement("p");
     p.className = "ulb-status";
     p.textContent = msg;
-    body.appendChild(p);
+    grid.appendChild(p);
   }
 
   function card(entry: UnitManifestEntry): HTMLElement {
@@ -236,7 +342,7 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
         .then((text) => {
           opts.onOpen(new File([text], entry.file, { type: "application/json" }), entry);
         })
-        .catch((err: Error) => status(`Could not fetch ${entry.file}: ${err.message}`))
+        .catch((err: Error) => status(libGrid, `Could not fetch ${entry.file}: ${err.message}`))
         .finally(() => (openBtn.disabled = false));
     });
 
@@ -259,8 +365,8 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
         renameBtn.disabled = true;
         opts
           .onRename!(entry, trimmed)
-          .then(() => refresh())
-          .catch((err: Error) => status(`Could not rename ${entry.id}: ${err.message}`))
+          .then(() => refreshLibrary())
+          .catch((err: Error) => status(libGrid, `Could not rename ${entry.id}: ${err.message}`))
           .finally(() => (renameBtn.disabled = false));
       });
       actions.appendChild(renameBtn);
@@ -269,27 +375,114 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
     return c;
   }
 
-  async function refresh(): Promise<void> {
-    if (!api.isOpen) return;
+  /** A neighbour's flat: no preview (the store keeps none), the summary's
+   *  numbers instead, and the same "Open a copy" through the full-flat call. */
+  function sessionCard(flat: SessionFlat): HTMLElement {
+    const c = document.createElement("article");
+    c.className = "ulb-card ulb-session-card";
+
+    const nameRow = document.createElement("div");
+    nameRow.className = "ulb-name";
+    const name = document.createElement("span");
+    name.textContent = flat.label;
+    const version = document.createElement("span");
+    version.className = "ulb-tag";
+    version.textContent = `v${flat.version}`;
+    nameRow.append(name, version);
+    if (flat.changed) {
+      const changed = document.createElement("span");
+      changed.className = "ulb-tag ulb-changed";
+      changed.textContent = "changed since last building";
+      nameRow.appendChild(changed);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "ulb-meta";
+    const areaM2 = Math.round(flat.areaCells * 36) / 100; // 0.6 m cells
+    meta.textContent = `${flat.resident} · ${flat.floors} ${flat.floors === 1 ? "storey" : "storeys"} · ${areaM2} m²`;
+
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.className = "ulb-openbtn";
+    openBtn.textContent = "Open a copy";
+    openBtn.addEventListener("click", () => {
+      openBtn.disabled = true;
+      fetch(opts.session!.flatUrl(flat.id), { cache: "no-store" })
+        .then((r) => {
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          return r.text();
+        })
+        .then((text) => {
+          opts.onOpen(new File([text], `${flat.id}.json`, { type: "application/json" }), flat);
+        })
+        .catch((err: Error) => status(sessionGrid!, `Could not fetch ${flat.id}: ${err.message}`))
+        .finally(() => (openBtn.disabled = false));
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "ulb-actions";
+    actions.appendChild(openBtn);
+    c.append(nameRow, meta, actions);
+    return c;
+  }
+
+  async function refreshLibrary(): Promise<void> {
     count.textContent = "";
-    status("Loading…");
+    status(libGrid, "Loading…");
     try {
       const res = await fetch(opts.manifestUrl, { cache: "no-store" });
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const index = parseUnitLibraryIndex(await res.text());
       count.textContent = `${index.units.length}`;
       if (index.units.length === 0) {
-        status("No units yet. Save one from Save / Open → Export unit → Save to library.");
+        status(libGrid, "No units yet. Save one from Save / Open → Export unit → Save to library.");
         return;
       }
-      body.replaceChildren(...index.units.map(card));
+      libGrid.replaceChildren(...index.units.map(card));
     } catch (err) {
       status(
+        libGrid,
         err instanceof ManifestParseError
           ? `Manifest invalid: ${err.message}`
           : `Could not load ${opts.manifestUrl}: ${err instanceof Error ? err.message : String(err)}`
       );
     }
+  }
+
+  /** The session group: one line when no session is set, the poll's flats
+   *  otherwise. The poll is the same small call the building configurator
+   *  makes (docs/store.md), so this never fetches a flat body until asked. */
+  async function refreshSession(): Promise<void> {
+    if (!opts.session || !sessionGrid) return;
+    const url = opts.session.stateUrl();
+    sessionCode!.textContent = "";
+    if (url === null) {
+      status(sessionGrid, "No session set. Enter a session code under Save… to see the flats published in your room.");
+      return;
+    }
+    refreshBtn!.disabled = true;
+    status(sessionGrid, "Loading…");
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const state = (await res.json()) as { code?: string; flats?: SessionFlat[] };
+      const flats = Array.isArray(state.flats) ? state.flats : [];
+      sessionCode!.textContent = `${state.code ?? ""} · ${flats.length}`;
+      if (flats.length === 0) {
+        status(sessionGrid, `Nobody has published to ${state.code ?? "this session"} yet.`);
+        return;
+      }
+      sessionGrid.replaceChildren(...flats.map(sessionCard));
+    } catch (err) {
+      status(sessionGrid, `Could not load ${url}: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      refreshBtn!.disabled = false;
+    }
+  }
+
+  async function refresh(): Promise<void> {
+    if (!api.isOpen) return;
+    await Promise.all([refreshLibrary(), refreshSession()]);
   }
 
   const api: UnitBrowser = {

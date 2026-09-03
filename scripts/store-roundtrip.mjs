@@ -113,7 +113,28 @@ check(after.json?.building?.genome?.length === 5, "building run appears in the s
 const building = await call("GET", "/building");
 check(building.text === JSON.stringify(after.json?.building), "GET building matches the session's copy");
 
-// 7. Preflight, as a browser on another origin would send it.
+// 7. The whole session as one file: the state plus every body, verbatim (run 0023).
+const exp = await call("GET", "/export", undefined, { quiet: true });
+const expJson = exp.json ?? {};
+check(exp.status === 200 && expJson.code === code, "export answers with the session");
+for (const f of fixtures) {
+  const body = expJson.bodies?.[f.id];
+  const same = typeof body === "string" && Buffer.compare(Buffer.from(body), sent[f.id]) === 0;
+  check(same, `export carries ${f.id} byte-identical (${typeof body === "string" ? Buffer.byteLength(body) : 0} bytes)`);
+}
+check(
+  JSON.stringify(expJson.flats) === JSON.stringify(after.json?.flats) &&
+    JSON.stringify(expJson.residents) === JSON.stringify(after.json?.residents) &&
+    JSON.stringify(expJson.building) === JSON.stringify(after.json?.building),
+  "export's flats, residents and building match the session state"
+);
+const abbreviated = {
+  ...expJson,
+  bodies: Object.fromEntries(Object.entries(expJson.bodies ?? {}).map(([k, v]) => [k, `<${Buffer.byteLength(String(v))} bytes>`])),
+};
+console.log(`  export with bodies abbreviated: ${JSON.stringify(abbreviated)}`);
+
+// 8. Preflight, as a browser on another origin would send it.
 const opt = await fetch(`${base}/api/session/${code}/flats/flat-2`, { method: "OPTIONS" });
 console.log(`\nOPTIONS ${base}/api/session/${code}/flats/flat-2\n${opt.status} ${opt.statusText}  allow-methods=${opt.headers.get("access-control-allow-methods")}  allow-headers=${opt.headers.get("access-control-allow-headers")}`);
 check(opt.status === 204 && opt.headers.get("access-control-allow-origin") === "*", "preflight answers 204 with an open origin");

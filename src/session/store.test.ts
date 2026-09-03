@@ -176,6 +176,32 @@ describe("a building run", () => {
   });
 });
 
+describe("a session leaves as one file", () => {
+  it("exports the state the poll returns plus every flat body, byte for byte", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
+    await put(kv, "/api/session/abc/flats/u8?resident=Ben&label=Terrace", UNIT_TEXT.replace("Unit 9", "Unit 8"));
+    await put(kv, "/api/session/abc/residents/Ana", { share: 0.4 });
+    await put(kv, "/api/session/abc/building", { genome: [1], summary: null, by: "Ana" });
+
+    const res = await call(kv, "GET", "/api/session/abc/export");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    const out = await res.json();
+    const state = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(out.code).toBe("abc");
+    expect(out.flats).toEqual(state.flats);
+    expect(out.residents).toEqual(state.residents);
+    expect(out.building).toEqual(state.building);
+    expect(out.bodies).toEqual({ u9: UNIT_TEXT, u8: UNIT_TEXT.replace("Unit 9", "Unit 8") });
+    expect(Date.parse(out.exportedAt)).not.toBeNaN();
+
+    expect((await call(kv, "PUT", "/api/session/abc/export", "{}")).status).toBe(405);
+    const empty = await (await call(kv, "GET", "/api/session/nobody/export")).json();
+    expect(empty).toMatchObject({ code: "nobody", flats: [], residents: [], building: null, bodies: {} });
+  });
+});
+
 describe("two writers", () => {
   it("retries a write that lost the ETag race instead of overwriting", async () => {
     class RacingKV extends MemoryKV {

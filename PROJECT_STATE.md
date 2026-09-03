@@ -70,6 +70,7 @@ work-in-progress research artifact, not a production app.
 | **Group-move ghost** | `src/scene/groupGhostPreview.ts` | `GroupGhostPreview`: one translucent ghost mesh per selected member, positioned by its cell offset from the grabbed member's target origin, tinted green/red as ONE unit (mirrors `GhostPreview`'s shape/API). See §2h. |
 | Wiring / render loop / view-mode orchestration, **dev-only `?project=` loader + `window.__app` capture handle** | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
 | **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. See §12. |
+| **The session settings + the publish call** (who, which room, and the fourth output, run 0023) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, and `publishUnit(fetchLike, base, settings, id, label, text)` which PUTs the unit bytes and never throws. Pure; `session.test.ts` drives it with a Map and a stub. See §11, §12. |
 
 **Concave-corner wall logic** (part of `buildBoundaryWalls`): walls are inset to
 the INTERIOR side of their boundary line (no protrusion). N/S walls (run in x)
@@ -3399,6 +3400,26 @@ manifest test); `ids.ts` and `naming.ts` as above. The bottom-up repo builds
 its unit list against `docs/library-format.md`, lifting the module or just the
 schema.
 
+**The neighbours' flats (run 0023).** `createUnitBrowser` takes an optional
+`session: { stateUrl(): string | null; flatUrl(id): string }` (`SessionSource`,
+`src/library/unitBrowser.ts:42`). When given, the panel's body is two groups in
+one scrolling column, **In this session FIRST** (the library's eight cards
+would push it below the fold every time) and Library second
+(`unitBrowser.ts:263-275`). The session group fetches `stateUrl()` (the store's
+poll, `GET /api/session/{code}`, §12) when the panel opens and on its own
+Refresh control, never in the background (`refreshSession`,
+`unitBrowser.ts:455`); it says "No session set…" in one line when `stateUrl()`
+is null, "Nobody has published to <code> yet." when the poll is empty, and
+otherwise one `ulb-session-card` per flat (`sessionCard`, `:380`): label, a
+`v<n>` tag, a `changed since last building` tag when `changed`, and a meta line
+`<resident> · <floors> storey(s) · <areaCells×0.36> m²`. No preview image (the
+store keeps none). "Open a copy" fetches `flatUrl(id)` and hands the text to
+the SAME `onOpen(file, source)` the library cards use, with `source` now
+`UnitManifestEntry | SessionFlat` (`SessionFlat` is declared in the module,
+`:27`, so it stays liftable). main.ts wires `stateUrl`/`flatUrl` to
+`/api/session/<code>` on the same origin from the session settings
+(`main.ts:1328-1331`). Library cards, rename and the manifest are untouched.
+
 **Seeds** — `flat-2-single-storey` (69.84 m², pink) and `flat-3-terrace`
 (60.48 m², blue), converted through the REAL path (loaded via `?project=`,
 saved through the dialog action against the live canvas). The rule fixtures
@@ -3474,6 +3495,42 @@ deliberately: `flat-4.json` / `unit-4.json` instead of a timestamp, following
 the ids. `src/core/saveFiles.test.ts` pins both against the same expressions
 and against a committed unit file's own bytes.
 
+**The session fields and the fourth output (run 0023).** Two text inputs at
+the TOP of the dialog, `#save-resident` ("Your name") and `#save-session`
+("Session code", `index.html:157-160`), remembered in `localStorage` under ONE
+key `reconfigure.session` as `{"resident": "Ana", "code": "room-42"}`
+(`src/session/session.ts:45-71`, `readSession`/`writeSession`), never in a
+project file. A `?session=Room-42` in the URL wins over the stored code, is
+lowercased and stored at once (`readSession`, not DEV-gated), and the name
+survives. Codes are lowercased on every keystroke (`normalizeCode`), matching
+the store. The top bar shows `#tb-session` ("No session", "Session room-42 ·
+Ana"; `sessionLine`), muted until a code is set. A FOURTH checkbox, **Publish
+to session** (`#save-what-publish`, `OutputKind "publish"`, label "Session"),
+is disabled and unticked while either field is empty and its note says why
+(`whyPublishDisabled`: "type your name above first" …); when both are filled
+it comes back with the remembered choice (`syncSessionUI`, `main.ts:903`;
+`readSaveSelection` reads a disabled box as off, `syncSaveDialog` keeps the
+remembered value while it is disabled). `needsUnitBuild` counts publish, so a
+publish-only save still builds the unit and still raises the ONE rule confirm;
+a gate failure or a declined confirm marks publish failed/skipped like the
+other unit-derived outputs (`unitGateResults`). In `runSave` publishing is
+STEP 4, after the three files (`main.ts:1100-1119`): `publishUnit`
+(`session.ts:104`) PUTs `unitFileText(unitFile)`, the unit download's exact
+bytes, to `/api/session/<code>/flats/unit-<n>?resident=…&label=Unit+<n>` on
+the same origin and returns `{ok, version, …}` or `{ok: false, status,
+reason}`. It NEVER throws, so a failed publish is one red line ("not published
+— 400 <the store's error>", or "not published — Failed to fetch" at status 0)
+and the files already written stay written. The written line reads "Published
+as Unit 6 to room-42, version 2". The three download expressions are untouched
+(`git diff main -- src/core/saveFiles.ts` is empty; the
+`projectFileText`/`unitFileText`/`downloadAs` lines in `runSave` are the ones
+on `main`, character for character). `savePlan.test.ts` walks all SIXTEEN
+combinations; `session.test.ts` (15) pins the key, `?session=`, the refusals
+and `publishUnit` against a stubbed fetch. Under plain `vite` there is no
+function, so publish answers "not published — 404 …"; `netlify dev` (port
+8888, `.claude/netlify.cmd`, which clears `PORT` so Vite does not take 8888)
+serves the app and the store on one origin.
+
 **What was retired** — the `Export project` and `Export unit` menu items and
 the old dialog's `Save to library` action, all three subsumed. `Open project`
 survives: it is the import, not a save. Three DEAD callbacks
@@ -3497,8 +3554,9 @@ passed + the standing french-window `it.fails`.
 shared HTTP store both apps can reach, so five residents in one room can
 publish flats into one building without passing files by hand. The flat
 configurator will publish to it (run 0023); the building configurator will
-poll it (bottom-up 0042). **Nothing in the app's UI uses it yet** — run 0022
-built the store and proved it from the shell only.
+poll it (bottom-up 0042). Run 0022 built the store and proved it from the
+shell; **run 0023 connected the app**: the save dialog publishes to it (§11)
+and the unit browser lists what a session holds (§10).
 
 **Where it runs.** One Netlify Function (v2 style, `export default (req:
 Request) => Response`, `export const config = { path: "/api/session/*" }`)
@@ -3528,6 +3586,7 @@ without Netlify.
 | `PUT` | `…/flats/{id}?resident=…&label=…` | body = the `dwelling-unit` JSON as Export writes it. `parseUnit` checks only `format`, `storeys[].cells` as `[int,int]`; `measure` derives `bbox [minX,minZ,maxX,maxZ]`, `floors`, `areaCells`. Existing id → version+1, `changed: true`, 200; new → version 1, 201. `label` falls back to the unit's `name`. |
 | `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[]); each present key replaced whole. Returns `{name, …record}`. |
 | `GET`/`PUT` | `…/building` | PUT stores `{genome, summary, by, at: now}` and sets `changed = false` on every flat; GET returns it or `null`. |
+| `GET` | `…/export` | Run 0023 (`store.ts:185-195`). The session state plus `bodies: {id: <flat text>}` (every flat blob, as a STRING so the bytes survive; `null` if a blob is missing) and `exportedAt`. The only call that reads every blob; for the end of a session, never for polling. |
 | `OPTIONS` | anything | 204, `access-control-allow-origin: *`, methods `GET, PUT, OPTIONS`, headers `content-type`. Every other response carries the same CORS headers, errors included. |
 
 Errors: `HttpError` → `{error}` JSON with 400/404/405/409; anything else 500.
@@ -3559,17 +3618,22 @@ fresh session per run, publishes `public/units/flat-2-single-storey.json`
 Ben, republishes flat-2 (version 2), sets counts/share/ballot (Ben in two
 partial bodies), reads the state and checks the summaries (194 / 168 cells,
 bbox `0,0,15,14` / `0,0,14,12`), reads both flats back byte-identical, writes
-a run and checks `changed` cleared, preflight 204. 22 checks; exit 1 on any
-failure. Passed against `npx netlify dev --port 8888` (Blobs sandbox mode) in
-run 0022. The deployed branch (`run-0022--reconfigure-flat.netlify.app`) sits
-behind the site password, which answers 401 to every path including
-`/api/session/*` and even to an `OPTIONS` preflight, so the deployed round trip
-and any cross-origin call are blocked until that password is lifted for the
-API path or the whole site.
+a run and checks `changed` cleared, reads the export and checks both bodies
+byte-identical and the summaries equal to the state (run 0023), preflight 204.
+26 checks; exit 1 on any failure. Passed against `npx netlify dev --port 8888`
+(Blobs sandbox mode) in runs 0022 and 0023. **The site password was lifted on
+2 September 2026**; the deployed round trip passed 26/26 against
+`run-0023--reconfigure-flat.netlify.app` and the production base is
+`https://reconfigure-flat.netlify.app/api/session/`. Run 0022 had found the
+gate answering 401 to every path and to OPTIONS preflights; if it comes back,
+the store is unreachable from the app and from the other origin alike.
 
-**Tests.** `src/session/store.test.ts` — 8 cases, fast suite (no three.js):
+**Tests.** `src/session/store.test.ts` — 9 cases (the ninth, run 0023, is the
+export carrying every body verbatim), fast suite (no three.js):
 routing/CORS, empty session, rejections, create-vs-replace with bytes kept and
 no `storeys` in the poll, resident partial merge + validation, building write
 clears `changed` and the next publish sets it again, and a `RacingKV` whose
 first ETag write loses so the retry is exercised. Suite counts as of run 0022:
-**fast 134 passed in 11 files** (was 126 in 10), slow unchanged.
+**fast 134 passed in 11 files** (was 126 in 10), slow unchanged. As of run 0023:
+**fast 153 passed in 12 files** (`store.test.ts` 9, `session.test.ts` 15,
+`savePlan.test.ts` 17), slow 26 passed + 1 expected fail.

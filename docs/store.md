@@ -59,6 +59,7 @@ There are four things in a session: **flats**, **residents**, the last
 | `PUT` | `/api/session/{code}/residents/{name}` | any of `counts`, `share`, `ballot` | that resident's whole record after the merge |
 | `GET` | `/api/session/{code}/building` | none | the last run, or `null` |
 | `PUT` | `/api/session/{code}/building` | `genome`, `summary`, `by` | the stored run with its `at` timestamp |
+| `GET` | `/api/session/{code}/export` | none | the session state plus every flat body, as strings |
 | `OPTIONS` | anything | none | `204` with the CORS headers |
 
 Errors are JSON `{ "error": "…" }` with `400` for a body or name the store
@@ -221,6 +222,38 @@ content-type: application/json
 
 `GET` on the same path returns the same object, or `null` when no run has
 been written.
+
+### `GET /api/session/{code}/export` — a session as one file
+
+Added in run 0023 so the state of a room at the end of a user test can be
+kept as one document and committed as thesis material. It returns exactly
+what the session-state call returns, plus `bodies`, a map from flat id to
+that flat's published file **as a string**, so the bytes survive the JSON
+around them, and `exportedAt`. Reading a body back is `JSON.parse` of the
+document and then the string itself; nothing needs re-encoding. It is the
+one call that reads every flat blob, so it is for the end of a session
+rather than for polling.
+
+```
+GET /api/session/room-42/export
+```
+
+```json
+{
+  "code": "room-42",
+  "flats": [ { "id": "flat-2", "resident": "Ana", "label": "Flat 2", "version": 2, "changed": false, … } ],
+  "residents": [ { "name": "Ana", "counts": { "flat-2": 1 }, "share": 0.3, "ballot": ["laundry"] } ],
+  "building": { "genome": [3, 1, 4, 1, 5], "summary": { "flats": 2 }, "by": "Ben", "at": "2026-09-02T11:02:08.466Z" },
+  "bodies": {
+    "flat-2": "{\r\n  \"format\": \"dwelling-unit\",\r\n  \"version\": 1,\r\n  …"
+  },
+  "exportedAt": "2026-09-02T12:40:11.208Z"
+}
+```
+
+A flat whose body blob is missing, which the store never produces itself,
+appears in `bodies` as `null` rather than being dropped, so the export always
+names every flat the state names.
 
 ## Storage
 

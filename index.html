@@ -17,6 +17,10 @@
           <span class="tb-name">Flat Configurator</span>
           <span class="tb-meta" id="tb-meta">0.6 m grid</span>
         </span>
+        <!-- Which room this resident is in, and who they are, so the session is
+             visible without opening Save. Set from the save dialog's two
+             session fields (run 0023), or by ?session= in the URL. -->
+        <span id="tb-session" class="tb-session" title="Set under Save…">No session</span>
       </div>
       <div class="tb-centre">
         <div id="view-segments" role="group" aria-label="View mode">
@@ -144,6 +148,18 @@
              never project-file fields. -->
         <dialog id="save-dialog">
           <p class="vp-title">Save</p>
+          <!-- The session (run 0023): who is publishing and into which room.
+               Remembered in localStorage, never in a project file; the code
+               is lowercased on the way in to match the store. Both must be
+               filled before Publish to session below can be ticked. -->
+          <div class="save-session">
+            <label>Your name
+              <input id="save-resident" type="text" autocomplete="off" spellcheck="false" placeholder="who is publishing" />
+            </label>
+            <label>Session code
+              <input id="save-session" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
+            </label>
+          </div>
           <div class="save-fields">
             <label>Design number
               <input id="save-number" type="number" min="1" step="1" value="1" autocomplete="off" />
@@ -169,6 +185,11 @@
               <input type="checkbox" id="save-what-library" checked />
               <span class="sw-name">Library entry</span>
               <span class="sw-note">the unit plus a preview, browsable under Units</span>
+            </label>
+            <label>
+              <input type="checkbox" id="save-what-publish" checked />
+              <span class="sw-name">Publish to session</span>
+              <span class="sw-note" id="save-publish-note">the unit file, sent to the session for the building and the neighbours</span>
             </label>
           </fieldset>
           <div id="save-results" role="status" aria-live="polite"></div>

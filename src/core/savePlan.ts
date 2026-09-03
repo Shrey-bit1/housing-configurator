@@ -14,7 +14,7 @@
  * both gate outcomes. `src/main.ts` is thin wiring over it.
  */
 
-export type OutputKind = "project" | "unit" | "library";
+export type OutputKind = "project" | "unit" | "library" | "publish";
 
 export interface SaveSelection {
   /** The project JSON download, `flat-<n>.json`. */
@@ -23,6 +23,8 @@ export interface SaveSelection {
   unit: boolean;
   /** The library entry: the same unit file plus a JPEG preview and a manifest row. */
   library: boolean;
+  /** The same unit file, sent to the session store (docs/store.md) as `unit-<n>`. Run 0023. */
+  publish: boolean;
 }
 
 export type OutputStatus = "pending" | "written" | "failed" | "skipped";
@@ -35,7 +37,7 @@ export interface OutputResult {
 }
 
 /** Fixed display order, so the result block reads the same way every time. */
-const ORDER: OutputKind[] = ["project", "unit", "library"];
+const ORDER: OutputKind[] = ["project", "unit", "library", "publish"];
 
 /** The outputs a selection asks for, in display order. */
 export function planOutputs(sel: SaveSelection): OutputKind[] {
@@ -48,13 +50,14 @@ export function isEmptySelection(sel: SaveSelection): boolean {
 }
 
 /**
- * Whether this selection has to run `buildUnitExport` at all. Both the unit
- * file and the library entry are built from that one result; the project file
- * is serialized independently and never touches it. This is what makes a unit
- * HARD GATE failure survivable: the project save does not depend on it.
+ * Whether this selection has to run `buildUnitExport` at all. The unit file,
+ * the library entry and the published flat are all built from that one
+ * result; the project file is serialized independently and never touches it.
+ * This is what makes a unit HARD GATE failure survivable: the project save
+ * does not depend on it.
  */
 export function needsUnitBuild(sel: SaveSelection): boolean {
-  return sel.unit || sel.library;
+  return sel.unit || sel.library || sel.publish;
 }
 
 /**
@@ -88,5 +91,11 @@ export function unitGateResults(sel: SaveSelection, reason: string): OutputResul
 
 /** Human label for a result line's leading word. */
 export function outputLabel(kind: OutputKind): string {
-  return kind === "project" ? "Project file" : kind === "unit" ? "Unit file" : "Library entry";
+  return kind === "project"
+    ? "Project file"
+    : kind === "unit"
+      ? "Unit file"
+      : kind === "library"
+        ? "Library entry"
+        : "Session";
 }

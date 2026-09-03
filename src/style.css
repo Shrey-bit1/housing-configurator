@@ -1360,6 +1360,27 @@ button.primary:hover {
   width: 92px;
 }
 
+/* The two session fields (run 0023), above the design number. */
+.save-session {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+#save-dialog input[type="text"] {
+  background: var(--black);
+  color: var(--text);
+  border: 1px solid var(--line-soft);
+  padding: 5px 7px;
+  font-family: inherit;
+  font-size: 13px;
+  width: 150px;
+}
+
+#save-what input[type="checkbox"]:disabled + .sw-name {
+  color: var(--meta);
+}
+
 #save-dialog input[type="color"] {
   width: 44px;
   height: 26px;
@@ -1609,6 +1630,21 @@ button.primary:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Which session this resident is in (run 0023). Muted until a code is set. */
+.tb-session {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--meta);
+  border: 1px solid var(--line-paper);
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.tb-session.set {
+  color: var(--ink);
+  border-color: var(--ink);
 }
 
 .tb-centre {
