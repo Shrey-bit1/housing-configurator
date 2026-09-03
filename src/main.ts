@@ -68,6 +68,7 @@ import {
   whyPublishDisabled,
   sessionLine,
   publishUnit,
+  publishPreview,
   type SessionSettings,
 } from "./session/session";
 
@@ -785,6 +786,14 @@ function captureFlatPreview(): { dataUrl: string; bytes: number } {
 
   try {
     floors.floors.forEach((_, i) => floors.setFloorVisible(i, true));
+    // Every floor RENDERS solid too, not just visible: a floor other than the
+    // active one is normally dimmed translucent (FloorManager.applyDim), which
+    // read as a ghostly double-exposure over the storey below it the first
+    // time this was tried on a two-storey flat. `setDimmed` has no getter to
+    // save, but the dim state is entirely a function of the active index
+    // (`i !== activeIndexValue`), so restoring means recomputing that, not
+    // remembering it.
+    floors.floors.forEach((f) => f.setDimmed(false));
     setCutawayEnabled(false);
     floors.setSeedOutlinesVisible(false);
     if (floors.structureViewOn) floors.setStructureView(false);
@@ -822,6 +831,7 @@ function captureFlatPreview(): { dataUrl: string; bytes: number } {
     return { dataUrl, bytes };
   } finally {
     savedFloorVisible.forEach((v, i) => floors.setFloorVisible(i, v));
+    floors.floors.forEach((f, i) => f.setDimmed(i !== floors.activeIndexValue));
     setCutawayEnabled(cutawayOn);
     floors.setSeedOutlinesVisible(seedsOn);
     // Mutually exclusive in FloorManager, so only the one that was actually
@@ -971,6 +981,11 @@ let saveColorTouched = false;
 const saveResidentInput = document.getElementById("save-resident") as HTMLInputElement;
 const saveCodeInput = document.getElementById("save-session") as HTMLInputElement;
 const savePublishNote = document.getElementById("save-publish-note") as HTMLElement;
+/** Off by default (docs/store.md): a flat belongs to whoever published it,
+ *  so taking over someone else's is one deliberate tick, not the standing
+ *  choice `saveSelection`'s four checkboxes get. Reset to off after every
+ *  successful publish (run 0024). */
+const saveReplaceInput = document.getElementById("save-replace") as HTMLInputElement;
 const tbSession = document.getElementById("tb-session") as HTMLElement;
 const PUBLISH_NOTE = savePublishNote.textContent ?? "";
 
@@ -1212,21 +1227,39 @@ async function runSave(): Promise<void> {
   // 4. Publish to the session: the unit download's EXACT bytes, PUT to the
   //    store on this origin as `unit-<n>` (docs/store.md). The files above are
   //    already written, so a failure of any kind is one red line and nothing
-  //    else; `publishUnit` never throws.
+  //    else; `publishUnit` never throws. Right after, its axonometric follows
+  //    to the SAME id — a failed preview is noted on the same line and never
+  //    undoes the flat publish.
   if (sel.publish && unitFile) {
+    const id = slugifyUnitName(unitName);
     const r = await publishUnit(
       (url, init) => fetch(url, init),
       "",
       session,
-      slugifyUnitName(unitName),
+      id,
       unitName,
-      unitFileText(unitFile)
+      unitFileText(unitFile),
+      saveReplaceInput.checked
     );
     if (r.ok) {
-      setSaveResult("publish", "written", `Published as ${r.label} to ${session.code}, version ${r.version}`);
+      let line = `Published as ${r.label} to ${session.code}, version ${r.version}`;
+      const preview = captureFlatPreview();
+      if (preview.dataUrl.startsWith("data:image/jpeg") && preview.bytes >= 1000) {
+        const jpeg = await fetch(preview.dataUrl).then((res) => res.blob());
+        const pr = await publishPreview((url, init) => fetch(url, init), "", session.code, r.id, jpeg);
+        if (!pr.ok) line += ` (preview not sent — ${pr.reason})`;
+      } else {
+        line += ` (preview not sent — read back ${preview.bytes} bytes)`;
+      }
+      setSaveResult("publish", "written", line);
+      saveReplaceInput.checked = false; // one deliberate tick per takeover, not a standing default
       void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
     } else {
-      setSaveResult("publish", "failed", `not published — ${r.status ? `${r.status} ` : ""}${r.reason}`);
+      const detail =
+        r.ownerResident !== undefined
+          ? `not published — ${r.ownerResident} already owns ${unitName} in ${session.code}; tick Replace to take it over`
+          : `not published — ${r.status ? `${r.status} ` : ""}${r.reason}`;
+      setSaveResult("publish", "failed", detail);
     }
   }
 
@@ -1440,6 +1473,7 @@ const unitBrowser = createUnitBrowser({
   session: {
     stateUrl: () => (session.code ? `/api/session/${encodeURIComponent(session.code)}` : null),
     flatUrl: (id) => `/api/session/${encodeURIComponent(session.code)}/flats/${encodeURIComponent(id)}`,
+    previewUrl: (id) => `/api/session/${encodeURIComponent(session.code)}/flats/${encodeURIComponent(id)}/preview`,
   },
   // Rename is DEV-ONLY for the same reason saving is: the manifest lives on
   // disk beside the units and only the dev server can write it. Omitting the

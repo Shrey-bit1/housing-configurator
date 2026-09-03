@@ -8,6 +8,7 @@ import {
   whyPublishDisabled,
   sessionLine,
   publishUnit,
+  publishPreview,
   type KeyValue,
 } from "./session";
 
@@ -97,7 +98,7 @@ describe("publishUnit — the call the fourth output makes", () => {
 
   /** A fetch stub that records the one call and answers as told. */
   function stub(status: number, body: string) {
-    const calls: { url: string; init: { method: string; headers: Record<string, string>; body: string } }[] = [];
+    const calls: { url: string; init: { method: string; headers: Record<string, string>; body: BodyInit } }[] = [];
     const fetchFn = async (url: string, init: (typeof calls)[number]["init"]) => {
       calls.push({ url, init });
       return new Response(body, { status, headers: { "content-type": "application/json" } });
@@ -146,5 +147,62 @@ describe("publishUnit — the call the fourth output makes", () => {
     const { fetchFn } = stub(200, "{}");
     const r = await publishUnit(fetchFn, "", settings, "unit-4", "Unit 4", bytes);
     expect(r).toMatchObject({ ok: false, status: 200 });
+  });
+
+  it("carries the owner's name on a 409, for the dialog to show", async () => {
+    const { calls, fetchFn } = stub(409, '{"error":"\\"unit-4\\" was published by Ben; add ?replace=1 to take it over","resident":"Ben"}');
+    const r = await publishUnit(fetchFn, "", settings, "unit-4", "Unit 4", bytes);
+    expect(r).toEqual({ ok: false, status: 409, reason: expect.stringContaining("Ben"), ownerResident: "Ben" });
+    expect(calls[0].url).not.toContain("replace");
+  });
+
+  it("does not set ownerResident on a non-409 failure, even if the body carries a resident field", async () => {
+    const { fetchFn } = stub(400, '{"error":"bad request","resident":"Ben"}');
+    const r = await publishUnit(fetchFn, "", settings, "unit-4", "Unit 4", bytes);
+    expect((r as { ownerResident?: string }).ownerResident).toBeUndefined();
+  });
+
+  it("adds &replace=1 only when asked", async () => {
+    const { calls, fetchFn } = stub(200, '{"id":"unit-4","label":"Unit 4","version":2,"changed":true}');
+    await publishUnit(fetchFn, "", settings, "unit-4", "Unit 4", bytes, true);
+    expect(calls[0].url).toContain("replace=1");
+  });
+});
+
+describe("publishPreview — the call that sends a flat's picture", () => {
+  /** A fetch stub over PreviewPublishResult's needs: records the call, answers as told. */
+  function stub(status: number, body: string) {
+    const calls: { url: string; init: { method: string; headers: Record<string, string>; body: BodyInit } }[] = [];
+    const fetchFn = async (url: string, init: (typeof calls)[number]["init"]) => {
+      calls.push({ url, init });
+      return new Response(body, { status, headers: { "content-type": "application/json" } });
+    };
+    return { calls, fetchFn };
+  }
+  const jpeg = new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" });
+
+  it("PUTs the JPEG to the documented URL with the image content type", async () => {
+    const { calls, fetchFn } = stub(200, '{"ok":true,"bytes":3}');
+    const r = await publishPreview(fetchFn, "https://x.test", "room-42", "unit-4", jpeg);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("https://x.test/api/session/room-42/flats/unit-4/preview");
+    expect(calls[0].init.method).toBe("PUT");
+    expect(calls[0].init.headers["content-type"]).toBe("image/jpeg");
+    expect(calls[0].init.body).toBe(jpeg);
+    expect(r).toEqual({ ok: true });
+  });
+
+  it("carries the store's own reason on a refusal", async () => {
+    const { fetchFn } = stub(404, '{"error":"no flat \\"unit-4\\" in session \\"room-42\\""}');
+    const r = await publishPreview(fetchFn, "", "room-42", "unit-4", jpeg);
+    expect(r).toEqual({ ok: false, reason: 'no flat "unit-4" in session "room-42"' });
+  });
+
+  it("never throws on a network failure", async () => {
+    const fetchFn = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    const r = await publishPreview(fetchFn, "", "room-42", "unit-4", jpeg);
+    expect(r).toEqual({ ok: false, reason: "Failed to fetch" });
   });
 });
