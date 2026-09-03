@@ -34,3 +34,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0023 | 2026-09-02 | Publish | complete | 0023-publish.report.md |
 | 0024 | 2026-09-03 | Numbers in a room, and one view for every flat | complete | 0024-numbers-and-previews.report.md |
 | 0025 | 2026-09-03 | Whose flat is this | complete | 0025-whose-flat-is-this.report.md |
+| 0026 | 2026-09-03 | The flat app on paper, and two small store fixes | complete | 0026-the-flat-app-on-paper.report.md |
