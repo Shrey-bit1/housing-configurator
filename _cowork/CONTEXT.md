@@ -129,6 +129,23 @@ already a file where the child shape needed it to be a directory. All
 seven committed library JPEGs were re-rendered through the same function.
 PROJECT_STATE §10, §11, §12.
 
+Run 0025 answered whose flat is whose and made a takeover ask first. Every
+session card shows its owner on its own line, at normal card size; a match
+with the save dialog's own name gets a filled Yours badge and a heavier
+border, and the group sorts that resident's own flats first (isMine,
+sortMineFirst, pure, in src/library/unitBrowser.ts, since the project has
+no DOM test environment to exercise the module's DOM-building code).
+Replace no longer sends replace=1 on the first attempt: only a 409 with
+Replace ticked raises a confirm naming the current owner
+(takeoverConfirmText), and decideTakeover (session.ts) turns the answer
+into a retry, a skipped result line, or no change, pulled out pure so the
+decision is testable without driving window.confirm. A small UX pass
+against _cowork/ux-guidelines.md folded the session fields into one line
+once both are set, grouped the five checkboxes as Files and Session, and
+added a next-step hint to a successful publish's result line; one CSS bug
+(a `display` rule tying and beating the default `[hidden]` rule) was found
+and fixed in the process. PROJECT_STATE §10, §11.
+
 **Last updated:** 2026-09-03
 
 ## What this project is
@@ -203,10 +220,13 @@ rules engine and the export format are the mature parts, the UI is not.
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 177 cases in thirteen files as of run 0024 (153 in twelve as of
-  run 0023, plus 4 in naming.test.ts for a second list, 9 in store.test.ts for
-  the ownership refusal and the preview round trip, 6 in session.test.ts for
-  ownerResident and publishPreview, and the new previewFrame.test.ts at 5;
+  a second over 190 cases in fourteen files as of run 0025 (177 in thirteen as
+  of run 0024, plus 7 in session.test.ts for takeoverConfirmText and
+  decideTakeover, and the new unitBrowser.test.ts at 6, isMine/sortMineFirst
+  only; 153 in twelve as of run 0023, plus 4 in naming.test.ts for a second
+  list, 9 in store.test.ts for the ownership refusal and the preview round
+  trip, 6 in session.test.ts for ownerResident and publishPreview, and the
+  new previewFrame.test.ts at 5;
   134 in eleven as of run 0022, plus `src/session/session.test.ts` 15, the
   session settings and the publish call; 126 in ten as of run 0021, plus
   `src/session/store.test.ts` 9, the session store through an in-memory KV)

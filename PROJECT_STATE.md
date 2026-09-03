@@ -71,7 +71,7 @@ work-in-progress research artifact, not a production app.
 | Wiring / render loop / view-mode orchestration, **dev-only `?project=` loader + `window.__app` capture handle** | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
 | **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. See §12. |
 | **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
-| **The session settings + the publish call** (who, which room, and the fourth output, run 0023) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, and `publishUnit(fetchLike, base, settings, id, label, text)` which PUTs the unit bytes and never throws. Pure; `session.test.ts` drives it with a Map and a stub. See §11, §12. |
+| **The session settings + the publish call** (who, which room, the fourth output, and the takeover confirm, runs 0023-0025) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, `publishUnit(fetchLike, base, settings, id, label, text, replace?)` which PUTs the unit bytes and never throws, `takeoverConfirmText(owner)` and `decideTakeover(r, replaceTicked, confirmed)` (run 0025: the post-409 decision — retry, decline with its exact line, or proceed — pulled out so `window.confirm` never has to be driven in a test). Pure; `session.test.ts` drives it with a Map and a stub. See §10, §11, §12. |
 
 **Concave-corner wall logic** (part of `buildBoundaryWalls`): walls are inset to
 the INTERIOR side of their boundary line (no protrusion). N/S walls (run in x)
@@ -3467,6 +3467,22 @@ so the two read as one system — only when `flat.preview` is true, and adds
 still shows no picture at all, which is honest: no preview was ever sent for
 it.
 
+**Whose flat is this (run 0025).** Every session card gained a second line
+under the label, at the card's normal 12px/600 weight (not the smaller meta
+size): the flat's `resident`, `sessionCard`. When it matches the name typed
+into the save dialog, the card also gets a filled "Yours" badge
+(`.ulb-tag.ulb-yours`) and a heavier border (`.ulb-mine`), and the group
+sorts that resident's own flats first. Both the match test and the ordering
+are pure, DOM-free functions — `isMine(resident, me)` and
+`sortMineFirst(items, me)` (a stable sort; everything else keeps the poll's
+order) — exported from `unitBrowser.ts` specifically so they can be pinned
+without a DOM, which this project's vitest setup does not provide (no
+jsdom/happy-dom dependency, and `createUnitBrowser` calls
+`document.createElement` the moment it runs). `SessionSource` gained
+`residentName()` returning the save dialog's current name, trimmed, or `""`.
+`unitBrowser.test.ts` (new, 6 cases) is the ONLY test file for this module,
+importing just these two functions and never touching `createUnitBrowser`.
+
 **Seeds** — `flat-2-single-storey` (69.84 m², pink) and `flat-3-terrace`
 (60.48 m², blue), converted through the REAL path (loaded via `?project=`,
 saved through the dialog action against the live canvas). The rule fixtures
@@ -3484,6 +3500,9 @@ re-exported: storeys, edges, roomTypes, northAngle AND sourceProject reproduce
 exactly. Suite counts as of run 0018: fast 47 passed (was 33), slow 6 passed +
 the standing french-window `it.fails`. As of run 0024: fast 18 in
 `naming.test.ts` (was 14), `ids.test.ts` and `manifest.test.ts` unchanged.
+As of run 0025: `unitBrowser.test.ts` new at 6 (`isMine`/`sortMineFirst`
+only — see "Whose flat is this" above); everything else in this section
+unchanged.
 
 ---
 
@@ -3569,11 +3588,18 @@ the same origin and returns `{ok, version, …}` or `{ok: false, status,
 reason}`. It NEVER throws, so a failed publish is one red line ("not published
 — 400 <the store's error>", or "not published — Failed to fetch" at status 0)
 and the files already written stay written. The written line reads "Published
-as Unit 6 to room-42, version 2". The three download expressions are untouched
+as Unit 6 to room-42, version 2" (run 0025 appends " — Open Units to see the
+room."; see the UX-pass paragraph below). Since run 0025 the FIRST attempt
+never sends `replace=1` itself, even when Replace is ticked: only a 409 with
+Replace ticked raises `window.confirm(takeoverConfirmText(owner))`
+(`main.ts`), and `decideTakeover` (`session.ts`) turns the answer into a
+retry-with-replace, a "not published — you chose not to take over <owner>'s
+flat" skipped line, or (anything else) the same reporting this section
+already describes. The three download expressions are untouched
 (`git diff main -- src/core/saveFiles.ts` is empty; the
 `projectFileText`/`unitFileText`/`downloadAs` lines in `runSave` are the ones
 on `main`, character for character). `savePlan.test.ts` walks all SIXTEEN
-combinations; `session.test.ts` (15) pins the key, `?session=`, the refusals
+combinations; `session.test.ts` (28 as of run 0025) pins the key, `?session=`, the refusals
 and `publishUnit` against a stubbed fetch. Under plain `vite` there is no
 function, so publish answers "not published — 404 …"; `netlify dev` (port
 8888, `.claude/netlify.cmd`, which clears `PORT` so Vite does not take 8888)
@@ -3603,6 +3629,33 @@ reset to unticked after any successful publish (`main.ts:988`, `:1255`) so a
 takeover is a deliberate act each time, never a standing default. The SAME
 resident republishing their own flat never needs it, exactly as before this
 rule existed.
+
+**A UX pass, against `_cowork/ux-guidelines.md` (run 0025, small moves only).**
+Three changes, each one or two lines: the two session fields FOLD into one
+line once both are already set ("room-42 · Ana, change";
+`save-session-summary`/`save-session-fields` in index.html,
+`syncSessionFold`/`unfoldSessionFields` in main.ts, re-decided only on
+dialog open via the existing `whyPublishDisabled` check, never mid-edit —
+"reveal complexity gradually"), shown open the first time since there is
+nothing yet to fold; the four (now five, with Replace) checkboxes are
+grouped under FILES and SESSION sub-labels inside the same fieldset
+("group related information," `.sw-group`); a successful publish's result
+line gains one trailing clause, "— Open Units to see the room." ("end
+flows memorably," "make completion feel closer"). One CSS bug surfaced
+fixing the fold: `.save-session-fields`'s own `display: flex` tied the
+default `[hidden]{display:none}` rule in specificity and won on cascade
+order, so the fields stayed visible under `hidden`; fixed with an explicit
+`[hidden]{display:none}` override at higher specificity. "One primary
+button per screen" was already true of both the save dialog (Save vs.
+Close) and the Units panel (one action per card, none competing at the
+screen level) and needed no change. Guidelines judged NOT to need a move
+here: "Make targets large" (buttons already meet a comfortable tap size),
+"Follow familiar patterns" (a dialog with checkboxes and a primary button
+is the familiar pattern), "Show visible progress" (the pending/written/
+failed status classes on each result line already do this). Deferred to a
+future run as larger than "one or two lines": an "advanced" fold for
+residents in the BUILDING app's own panel (out of scope — this run touches
+only the flat app) and ownership-aware defaults on Replace.
 
 **What was retired** — the `Export project` and `Export unit` menu items and
 the old dialog's `Save to library` action, all three subsumed. `Open project`
@@ -3725,4 +3778,9 @@ first ETag write loses so the retry is exercised. Suite counts as of run 0022:
 6 new, for `ownerResident` on a 409, `?replace=1`, and `publishPreview` — plus
 the new `previewFrame.test.ts` at 5; `savePlan.test.ts` 17 and `manifest.test.ts`/
 `ids.test.ts` unchanged), slow 26 passed + 1 expected fail, `tsc`/`npm run build`
-clean, both fixture baselines still 12 and 7.
+clean, both fixture baselines still 12 and 7. As of run 0025: **fast 190
+passed in 14 files** (`session.test.ts` 21 to 28: 1 for `takeoverConfirmText`,
+6 for `decideTakeover`; the new `unitBrowser.test.ts` at 6; `store.test.ts`
+untouched at 18, since this run made no change to `src/session/store.ts`),
+slow 26 passed + 1 expected fail, `tsc`/`npm run build` clean, both fixture
+baselines still 12 and 7.

@@ -9,7 +9,10 @@ import {
   sessionLine,
   publishUnit,
   publishPreview,
+  takeoverConfirmText,
+  decideTakeover,
   type KeyValue,
+  type PublishResult,
 } from "./session";
 
 /**
@@ -204,5 +207,47 @@ describe("publishPreview — the call that sends a flat's picture", () => {
     };
     const r = await publishPreview(fetchFn, "", "room-42", "unit-4", jpeg);
     expect(r).toEqual({ ok: false, reason: "Failed to fetch" });
+  });
+});
+
+describe("takeoverConfirmText — the wording Save asks before a takeover", () => {
+  it("names the owner", () => {
+    expect(takeoverConfirmText("Ana")).toBe("This flat belongs to Ana. Take it over?");
+    expect(takeoverConfirmText("Ben")).toBe("This flat belongs to Ben. Take it over?");
+  });
+});
+
+describe("decideTakeover — what runSave does after a 409, without a DOM", () => {
+  const conflict: PublishResult = { ok: false, status: 409, reason: "…", ownerResident: "Ana" };
+  const success: PublishResult = { ok: true, id: "unit-6", label: "Unit 6", version: 1, changed: true };
+  const otherFailure: PublishResult = { ok: false, status: 500, reason: "boom" };
+  const conflictNoOwner: PublishResult = { ok: false, status: 409, reason: "…" };
+
+  it("retries when Replace is ticked and the confirm is accepted", () => {
+    expect(decideTakeover(conflict, true, true)).toEqual({ action: "retry" });
+  });
+
+  it("declines with a line naming the owner, sends nothing further", () => {
+    expect(decideTakeover(conflict, true, false)).toEqual({
+      action: "declined",
+      detail: "not published — you chose not to take over Ana's flat",
+    });
+  });
+
+  it("proceeds (reports the 409 as-is) when Replace was never ticked, confirm or not", () => {
+    expect(decideTakeover(conflict, false, true)).toEqual({ action: "proceed" });
+    expect(decideTakeover(conflict, false, false)).toEqual({ action: "proceed" });
+  });
+
+  it("proceeds for a success — there is nothing to decide", () => {
+    expect(decideTakeover(success, true, true)).toEqual({ action: "proceed" });
+  });
+
+  it("proceeds for a non-409 failure, even with Replace ticked", () => {
+    expect(decideTakeover(otherFailure, true, true)).toEqual({ action: "proceed" });
+  });
+
+  it("proceeds for a 409 that names no owner", () => {
+    expect(decideTakeover(conflictNoOwner, true, true)).toEqual({ action: "proceed" });
   });
 });

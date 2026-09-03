@@ -87,6 +87,18 @@ export function sessionLine(s: SessionSettings): string {
   return resident ? `Session ${s.code} · ${resident}` : `Session ${s.code}`;
 }
 
+/**
+ * The confirm shown before Replace takes another resident's flat over (run
+ * 0025), matching the library's own replace-or-new prompt. Pure, so a test
+ * pins the wording directly instead of driving `window.confirm` — the same
+ * automation trap run 0010 found: under scripting it returns `false` without
+ * ever displaying, so a test that called the real dialog would only prove
+ * the decline path.
+ */
+export function takeoverConfirmText(owner: string): string {
+  return `This flat belongs to ${owner}. Take it over?`;
+}
+
 export type PublishResult =
   | { ok: true; id: string; label: string; version: number; changed: boolean }
   // `ownerResident` is set on a 409: whoever the store says already owns this
@@ -153,6 +165,29 @@ export async function publishUnit(
     version: record.version,
     changed: record.changed === true,
   };
+}
+
+export type TakeoverDecision =
+  /** Retry the same publish with `replace: true`. */
+  | { action: "retry" }
+  /** Report this line and send nothing further; the flat is untouched. */
+  | { action: "declined"; detail: string }
+  /** Nothing to decide: report `r` exactly as `runSave` already would. */
+  | { action: "proceed" };
+
+/**
+ * What to do after a publish attempt that came back a 409 (run 0025): pure,
+ * so "a declined confirm sends no publish and writes the line" is testable
+ * without a DOM. The real `window.confirm(takeoverConfirmText(owner))` call
+ * happens in `main.ts`; this only turns its boolean answer, plus whether
+ * Replace was ticked, into what `runSave` does next. Any `r` that is not a
+ * 409-with-a-named-owner, or a 409 with Replace unticked, needs no decision —
+ * `runSave` reports it exactly as before this run.
+ */
+export function decideTakeover(r: PublishResult, replaceTicked: boolean, confirmed: boolean): TakeoverDecision {
+  if (r.ok || r.status !== 409 || r.ownerResident === undefined || !replaceTicked) return { action: "proceed" };
+  if (confirmed) return { action: "retry" };
+  return { action: "declined", detail: `not published — you chose not to take over ${r.ownerResident}'s flat` };
 }
 
 export type PreviewPublishResult = { ok: true } | { ok: false; reason: string };

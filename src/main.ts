@@ -69,6 +69,9 @@ import {
   sessionLine,
   publishUnit,
   publishPreview,
+  takeoverConfirmText,
+  decideTakeover,
+  type FetchLike,
   type SessionSettings,
 } from "./session/session";
 
@@ -989,6 +992,35 @@ const saveReplaceInput = document.getElementById("save-replace") as HTMLInputEle
 const tbSession = document.getElementById("tb-session") as HTMLElement;
 const PUBLISH_NOTE = savePublishNote.textContent ?? "";
 
+// The session fields fold into one line once both are already set (run 0025,
+// UX pass — "reveal complexity gradually"), re-decided on every dialog open,
+// never mid-edit: "change" unfolds for the rest of this dialog-open session.
+const saveSessionSummary = document.getElementById("save-session-summary") as HTMLElement;
+const saveSessionSummaryText = document.getElementById("save-session-summary-text") as HTMLElement;
+const saveSessionFields = document.getElementById("save-session-fields") as HTMLElement;
+const saveSessionChange = document.getElementById("save-session-change") as HTMLButtonElement;
+
+function unfoldSessionFields(): void {
+  saveSessionSummary.hidden = true;
+  saveSessionFields.hidden = false;
+}
+/** Fold only when both fields are already usable — `whyPublishDisabled` is
+ *  the one place "usable" is already defined, so this reuses it rather than
+ *  re-deriving the same condition. */
+function syncSessionFold(): void {
+  if (whyPublishDisabled(session) === null) {
+    saveSessionSummaryText.textContent = `${session.code} · ${session.resident.trim()}`;
+    saveSessionSummary.hidden = false;
+    saveSessionFields.hidden = true;
+  } else {
+    unfoldSessionFields();
+  }
+}
+saveSessionChange.addEventListener("click", () => {
+  unfoldSessionFields();
+  saveResidentInput.focus();
+});
+
 /** localStorage, or null where the browser refuses it (a sandboxed frame). */
 const sessionStorageArea = (() => {
   try {
@@ -1104,6 +1136,7 @@ async function openSaveDialog(): Promise<void> {
   for (const kind of ["project", "unit", "library", "publish"] as OutputKind[])
     saveWhatInputs[kind].checked = saveSelection[kind];
   syncSessionUI(); // and off again if the session fields are still empty
+  syncSessionFold(); // folded if both are already set, open otherwise
   syncSaveDialog();
   saveDialog.showModal();
   const entries = await readManifestEntries();
@@ -1227,39 +1260,53 @@ async function runSave(): Promise<void> {
   // 4. Publish to the session: the unit download's EXACT bytes, PUT to the
   //    store on this origin as `unit-<n>` (docs/store.md). The files above are
   //    already written, so a failure of any kind is one red line and nothing
-  //    else; `publishUnit` never throws. Right after, its axonometric follows
-  //    to the SAME id — a failed preview is noted on the same line and never
-  //    undoes the flat publish.
+  //    else; `publishUnit` never throws. A CONFLICT WITH REPLACE TICKED asks
+  //    first, naming the current owner (run 0025), before the takeover PUT
+  //    goes out — the first attempt never sends `replace=1` itself, so the
+  //    store's own 409 is what tells this code there is anyone to ask about;
+  //    declining costs only this line, nothing already written. Right after a
+  //    real publish, its axonometric follows to the SAME id — a failed
+  //    preview is noted on the same line and never undoes the flat publish.
   if (sel.publish && unitFile) {
     const id = slugifyUnitName(unitName);
-    const r = await publishUnit(
-      (url, init) => fetch(url, init),
-      "",
-      session,
-      id,
-      unitName,
-      unitFileText(unitFile),
-      saveReplaceInput.checked
-    );
-    if (r.ok) {
-      let line = `Published as ${r.label} to ${session.code}, version ${r.version}`;
-      const preview = captureFlatPreview();
-      if (preview.dataUrl.startsWith("data:image/jpeg") && preview.bytes >= 1000) {
-        const jpeg = await fetch(preview.dataUrl).then((res) => res.blob());
-        const pr = await publishPreview((url, init) => fetch(url, init), "", session.code, r.id, jpeg);
-        if (!pr.ok) line += ` (preview not sent — ${pr.reason})`;
-      } else {
-        line += ` (preview not sent — read back ${preview.bytes} bytes)`;
+    const text = unitFileText(unitFile);
+    const doFetch: FetchLike = (url, init) => fetch(url, init);
+    let r = await publishUnit(doFetch, "", session, id, unitName, text, false);
+    let declined = false;
+    if (!r.ok && r.status === 409 && r.ownerResident !== undefined && saveReplaceInput.checked) {
+      const confirmed = window.confirm(takeoverConfirmText(r.ownerResident));
+      const decision = decideTakeover(r, saveReplaceInput.checked, confirmed);
+      if (decision.action === "retry") {
+        r = await publishUnit(doFetch, "", session, id, unitName, text, true);
+      } else if (decision.action === "declined") {
+        declined = true;
+        setSaveResult("publish", "skipped", decision.detail);
       }
-      setSaveResult("publish", "written", line);
-      saveReplaceInput.checked = false; // one deliberate tick per takeover, not a standing default
-      void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
-    } else {
-      const detail =
-        r.ownerResident !== undefined
-          ? `not published — ${r.ownerResident} already owns ${unitName} in ${session.code}; tick Replace to take it over`
-          : `not published — ${r.status ? `${r.status} ` : ""}${r.reason}`;
-      setSaveResult("publish", "failed", detail);
+    }
+    if (!declined) {
+      if (r.ok) {
+        let line = `Published as ${r.label} to ${session.code}, version ${r.version}`;
+        const preview = captureFlatPreview();
+        if (preview.dataUrl.startsWith("data:image/jpeg") && preview.bytes >= 1000) {
+          const jpeg = await fetch(preview.dataUrl).then((res) => res.blob());
+          const pr = await publishPreview(doFetch, "", session.code, r.id, jpeg);
+          if (!pr.ok) line += ` (preview not sent — ${pr.reason})`;
+        } else {
+          line += ` (preview not sent — read back ${preview.bytes} bytes)`;
+        }
+        // Names the next step (run 0025, UX pass — "end flows memorably",
+        // "make completion feel closer"): where to go and check it landed.
+        line += " — Open Units to see the room.";
+        setSaveResult("publish", "written", line);
+        saveReplaceInput.checked = false; // one deliberate tick per takeover, not a standing default
+        void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
+      } else {
+        const detail =
+          r.ownerResident !== undefined
+            ? `not published — ${r.ownerResident} already owns ${unitName} in ${session.code}; tick Replace to take it over`
+            : `not published — ${r.status ? `${r.status} ` : ""}${r.reason}`;
+        setSaveResult("publish", "failed", detail);
+      }
     }
   }
 
@@ -1474,6 +1521,7 @@ const unitBrowser = createUnitBrowser({
     stateUrl: () => (session.code ? `/api/session/${encodeURIComponent(session.code)}` : null),
     flatUrl: (id) => `/api/session/${encodeURIComponent(session.code)}/flats/${encodeURIComponent(id)}`,
     previewUrl: (id) => `/api/session/${encodeURIComponent(session.code)}/flats/${encodeURIComponent(id)}/preview`,
+    residentName: () => session.resident.trim(),
   },
   // Rename is DEV-ONLY for the same reason saving is: the manifest lives on
   // disk beside the units and only the dev server can write it. Omitting the

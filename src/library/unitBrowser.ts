@@ -40,8 +40,8 @@ export interface SessionFlat {
 }
 
 /** Where the "In this session" group reads from (run 0023, `previewUrl` run
- *  0024). The host owns the session code, so every URL is asked for fresh on
- *  each refresh. */
+ *  0024, `residentName` run 0025). The host owns the session code and the
+ *  resident's own name, so both are asked for fresh on each refresh. */
 export interface SessionSource {
   /** `GET /api/session/{code}` for the current session, or null when none is set. */
   stateUrl(): string | null;
@@ -50,6 +50,9 @@ export interface SessionSource {
   /** `GET /api/session/{code}/flats/{id}/preview`: the flat's JPEG. Only
    *  fetched when the flat's summary says `preview: true`. */
   previewUrl(id: string): string;
+  /** The name typed into the save dialog, trimmed, or "" if none is set.
+   *  A card whose `resident` matches this is "mine" and sorts first. */
+  residentName(): string;
 }
 
 export interface UnitBrowserOptions {
@@ -74,6 +77,22 @@ export interface UnitBrowserOptions {
   /** Where to attach the panel. Default `document.body`. The panel positions
    *  absolutely, so the mount should be a positioning context. */
   mount?: HTMLElement;
+}
+
+/** Whether `resident` is the current save dialog's own name (run 0025). Pure,
+ *  no DOM, so it is what `sessionCard`'s "Yours" mark and `refreshSession`'s
+ *  ordering both test against, and what a plain vitest case pins directly —
+ *  the module otherwise needs a live DOM to exercise at all. An empty `me`
+ *  (no resident name typed yet) never matches anything. */
+export function isMine(resident: string, me: string): boolean {
+  return me.length > 0 && resident === me;
+}
+
+/** Stable "mine first" ordering over any list carrying a `resident` field —
+ *  everything else keeps the order it arrived in, since `Array.prototype.sort`
+ *  is spec-stable. Pure, no DOM. */
+export function sortMineFirst<T extends { resident: string }>(items: readonly T[], me: string): T[] {
+  return [...items].sort((a, b) => Number(isMine(b.resident, me)) - Number(isMine(a.resident, me)));
 }
 
 export interface UnitBrowser {
@@ -183,6 +202,25 @@ const CSS = `
   padding: 1px 5px;
 }
 .ulb-tag.ulb-changed { color: var(--accent, #c2410c); border-color: var(--accent, #c2410c); }
+/* The owner, one line under the label, at the card's normal (not meta) size —
+   "put essentials first": whose flat this is matters as much as what it is
+   named. ".ulb-yours" is a filled badge (Von Restorff) rather than another
+   outline tag, and the card itself gets a heavier border so a resident's own
+   flats are findable at a glance in a crowded room (run 0025). */
+.ulb-owner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.ulb-tag.ulb-yours {
+  background: var(--ink, #141317);
+  color: var(--panel-ink, #edece8);
+  border-color: var(--ink, #141317);
+}
+.ulb-session-card.ulb-mine { border-width: 2px; }
 .ulb-card {
   display: flex;
   flex-direction: column;
@@ -386,10 +424,15 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
   }
 
   /** A neighbour's flat: no preview (the store keeps none), the summary's
-   *  numbers instead, and the same "Open a copy" through the full-flat call. */
+   *  numbers instead, and the same "Open a copy" through the full-flat call.
+   *  The owner is its own line, and "mine" — the resident name typed into
+   *  the save dialog, if any, matches this flat's — gets a "Yours" badge and
+   *  a heavier border (run 0025; sorting itself happens in `refreshSession`,
+   *  over the same `isMine` test, so the mark and the order never disagree). */
   function sessionCard(flat: SessionFlat): HTMLElement {
+    const mine = isMine(flat.resident, opts.session!.residentName());
     const c = document.createElement("article");
-    c.className = "ulb-card ulb-session-card";
+    c.className = "ulb-card ulb-session-card" + (mine ? " ulb-mine" : "");
 
     // The flat's own axonometric (run 0024), sized like a library card's —
     // same `.ulb-preview` class — only when the summary says one exists;
@@ -420,10 +463,25 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
       nameRow.appendChild(changed);
     }
 
+    // The owner: the first line after the label, at the card's normal size
+    // (run 0025) — not folded into the smaller meta line, since whose flat
+    // this is matters as much as what it is called.
+    const ownerRow = document.createElement("div");
+    ownerRow.className = "ulb-owner";
+    const ownerName = document.createElement("span");
+    ownerName.textContent = flat.resident;
+    ownerRow.appendChild(ownerName);
+    if (mine) {
+      const yours = document.createElement("span");
+      yours.className = "ulb-tag ulb-yours";
+      yours.textContent = "Yours";
+      ownerRow.appendChild(yours);
+    }
+
     const meta = document.createElement("div");
     meta.className = "ulb-meta";
     const areaM2 = Math.round(flat.areaCells * 36) / 100; // 0.6 m cells
-    meta.textContent = `${flat.resident} · ${flat.floors} ${flat.floors === 1 ? "storey" : "storeys"} · ${areaM2} m²`;
+    meta.textContent = `${flat.floors} ${flat.floors === 1 ? "storey" : "storeys"} · ${areaM2} m²`;
 
     const openBtn = document.createElement("button");
     openBtn.type = "button";
@@ -446,7 +504,7 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
     const actions = document.createElement("div");
     actions.className = "ulb-actions";
     actions.appendChild(openBtn);
-    c.append(nameRow, meta, actions);
+    c.append(nameRow, ownerRow, meta, actions);
     return c;
   }
 
@@ -496,7 +554,10 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
         status(sessionGrid, `Nobody has published to ${state.code ?? "this session"} yet.`);
         return;
       }
-      sessionGrid.replaceChildren(...flats.map(sessionCard));
+      // Mine first — a stable sort, so flats that are neither the resident's
+      // own keep the order the poll gave them (run 0025).
+      const ordered = sortMineFirst(flats, opts.session!.residentName());
+      sessionGrid.replaceChildren(...ordered.map(sessionCard));
     } catch (err) {
       status(sessionGrid, `Could not load ${url}: ${err instanceof Error ? err.message : String(err)}`);
     } finally {

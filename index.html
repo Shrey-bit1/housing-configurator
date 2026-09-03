@@ -151,14 +151,25 @@
           <!-- The session (run 0023): who is publishing and into which room.
                Remembered in localStorage, never in a project file; the code
                is lowercased on the way in to match the store. Both must be
-               filled before Publish to session below can be ticked. -->
+               filled before Publish to session below can be ticked.
+               FOLDED once both are set (run 0025, UX pass — "reveal
+               complexity gradually"): the dialog opens on a one-line summary
+               instead of two open text fields; "change" reveals them again
+               for this dialog session. Shown open the first time, before
+               anything is set, since there is nothing yet to fold. -->
           <div class="save-session">
-            <label>Your name
-              <input id="save-resident" type="text" autocomplete="off" spellcheck="false" placeholder="who is publishing" />
-            </label>
-            <label>Session code
-              <input id="save-session" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
-            </label>
+            <p id="save-session-summary" class="save-session-summary" hidden>
+              <span id="save-session-summary-text"></span>
+              <button type="button" id="save-session-change" class="save-session-change">change</button>
+            </p>
+            <div id="save-session-fields" class="save-session-fields">
+              <label>Your name
+                <input id="save-resident" type="text" autocomplete="off" spellcheck="false" placeholder="who is publishing" />
+              </label>
+              <label>Session code
+                <input id="save-session" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
+              </label>
+            </div>
           </div>
           <div class="save-fields">
             <label>Design number
@@ -171,34 +182,42 @@
           <p id="save-names" class="save-names"></p>
           <fieldset id="save-what">
             <legend>What to write</legend>
-            <label>
-              <input type="checkbox" id="save-what-project" checked />
-              <span class="sw-name">Project file</span>
-              <span class="sw-note">the whole design, the only thing that reopens for editing</span>
-            </label>
-            <label>
-              <input type="checkbox" id="save-what-unit" checked />
-              <span class="sw-name">Unit file</span>
-              <span class="sw-note">the contract with the building</span>
-            </label>
-            <label>
-              <input type="checkbox" id="save-what-library" checked />
-              <span class="sw-name">Library entry</span>
-              <span class="sw-note">the unit plus a preview, browsable under Units</span>
-            </label>
-            <label>
-              <input type="checkbox" id="save-what-publish" checked />
-              <span class="sw-name">Publish to session</span>
-              <span class="sw-note" id="save-publish-note">the unit file, sent to the session for the building and the neighbours</span>
-            </label>
-            <!-- Off by default: a flat belongs to whoever published it
-                 (docs/store.md), so replacing someone else's is a deliberate
-                 tick, not the normal republish path. -->
-            <label class="save-replace-row">
-              <input type="checkbox" id="save-replace" />
-              <span class="sw-name">Replace</span>
-              <span class="sw-note">take over a flat someone else published under this number</span>
-            </label>
+            <!-- Grouped as files vs. session (run 0025, UX pass): the first
+                 three write to THIS machine, the last two to the room. -->
+            <div class="sw-group">
+              <p class="sw-group-label">Files</p>
+              <label>
+                <input type="checkbox" id="save-what-project" checked />
+                <span class="sw-name">Project file</span>
+                <span class="sw-note">the whole design, the only thing that reopens for editing</span>
+              </label>
+              <label>
+                <input type="checkbox" id="save-what-unit" checked />
+                <span class="sw-name">Unit file</span>
+                <span class="sw-note">the contract with the building</span>
+              </label>
+              <label>
+                <input type="checkbox" id="save-what-library" checked />
+                <span class="sw-name">Library entry</span>
+                <span class="sw-note">the unit plus a preview, browsable under Units</span>
+              </label>
+            </div>
+            <div class="sw-group">
+              <p class="sw-group-label">Session</p>
+              <label>
+                <input type="checkbox" id="save-what-publish" checked />
+                <span class="sw-name">Publish to session</span>
+                <span class="sw-note" id="save-publish-note">the unit file, sent to the session for the building and the neighbours</span>
+              </label>
+              <!-- Off by default: a flat belongs to whoever published it
+                   (docs/store.md), so replacing someone else's is a deliberate
+                   tick, not the normal republish path. -->
+              <label class="save-replace-row">
+                <input type="checkbox" id="save-replace" />
+                <span class="sw-name">Replace</span>
+                <span class="sw-note">take over a flat someone else published under this number</span>
+              </label>
+            </div>
           </fieldset>
           <div id="save-results" role="status" aria-live="polite"></div>
           <div class="dialog-actions">
