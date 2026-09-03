@@ -78,20 +78,20 @@ describe("readSession — the localStorage key and ?session=", () => {
 });
 
 describe("whyPublishDisabled — publish is refused without a name or a code", () => {
-  it("names the missing field", () => {
-    expect(whyPublishDisabled({ resident: "", code: "" })).toMatch(/name and a session code/);
+  it("names the missing field, in group wording (run 0026)", () => {
+    expect(whyPublishDisabled({ resident: "", code: "" })).toMatch(/name and a group code/);
     expect(whyPublishDisabled({ resident: "  ", code: "room-42" })).toMatch(/name/);
-    expect(whyPublishDisabled({ resident: "Ana", code: "" })).toMatch(/session code/);
+    expect(whyPublishDisabled({ resident: "Ana", code: "" })).toMatch(/group code/);
     expect(whyPublishDisabled({ resident: "Ana", code: "room 42" })).toMatch(/1 to 32/);
   });
   it("is null when both are usable", () => {
     expect(whyPublishDisabled({ resident: "Ana", code: "room-42" })).toBeNull();
   });
-  it("writes the top-bar line for every state", () => {
-    expect(sessionLine({ resident: "", code: "" })).toBe("No session");
-    expect(sessionLine({ resident: "Ana", code: "" })).toBe("No session · Ana");
-    expect(sessionLine({ resident: "", code: "room-42" })).toBe("Session room-42");
-    expect(sessionLine({ resident: "Ana ", code: "room-42" })).toBe("Session room-42 · Ana");
+  it("writes the top-bar line for every state, in group wording (run 0026)", () => {
+    expect(sessionLine({ resident: "", code: "" })).toBe("No group");
+    expect(sessionLine({ resident: "Ana", code: "" })).toBe("No group · Ana");
+    expect(sessionLine({ resident: "", code: "room-42" })).toBe("Group room-42");
+    expect(sessionLine({ resident: "Ana ", code: "room-42" })).toBe("Group room-42 · Ana");
   });
 });
 
