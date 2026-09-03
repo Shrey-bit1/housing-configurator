@@ -226,6 +226,25 @@ describe("a building run", () => {
 
     expect((await put(kv, "/api/session/abc/building", "[]")).status).toBe(400);
   });
+
+  it("carries an opaque plot (run 0026), optional and rejected only if not an object", async () => {
+    const kv = new MemoryKV();
+    const plot = { modulesX: 11, modulesY: 11, floors: 7 };
+    const run = await put(kv, "/api/session/abc/building", { genome: [1], summary: null, by: "Ben", plot });
+    expect(run.status).toBe(200);
+    expect((await run.json()).plot).toEqual(plot);
+    const session = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(session.building.plot).toEqual(plot);
+
+    // No plot at all: still fine, and the field is simply absent.
+    const noPlot = await put(kv, "/api/session/abc/building", { genome: [1], summary: null, by: "Ben" });
+    expect(noPlot.status).toBe(200);
+    expect("plot" in (await noPlot.json())).toBe(false);
+
+    // A plot that is not a JSON object: 400, whether an array or a scalar.
+    expect((await put(kv, "/api/session/abc/building", { genome: [1], summary: null, by: "Ben", plot: [1, 2] })).status).toBe(400);
+    expect((await put(kv, "/api/session/abc/building", { genome: [1], summary: null, by: "Ben", plot: "flat" })).status).toBe(400);
+  });
 });
 
 describe("a session leaves as one file", () => {

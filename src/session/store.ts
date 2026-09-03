@@ -75,6 +75,12 @@ export interface BuildingRun {
   summary: unknown;
   by: string;
   at: string;
+  /** OPTIONAL, opaque (run 0026): the building app's own plot — module grid
+   *  size, floor count, whatever it decides a plot is. Stored exactly as sent
+   *  and never read inside; the flat app's Regenerate (a future run) is the
+   *  one reader, and even it need not understand every key. Absent when the
+   *  building app that wrote this run predates the field. */
+  plot?: Record<string, unknown>;
 }
 
 /** The index blob. Maps here, lists on the wire (see `sessionView`). */
@@ -248,6 +254,10 @@ async function route(req: Request, kv: KV): Promise<Response> {
     by: typeof body.by === "string" ? body.by : "",
     at: new Date().toISOString(),
   };
+  if ("plot" in body) {
+    if (!isRecord(body.plot)) return fail(400, "plot must be a JSON object");
+    run.plot = body.plot;
+  }
   await updateIndex(kv, indexKey, (index) => {
     index.building = run;
     for (const flat of Object.values(index.flats)) flat.changed = false;
