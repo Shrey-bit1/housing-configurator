@@ -39,7 +39,7 @@ export interface SessionFlat {
   preview: boolean;
 }
 
-/** Where the "In this session" group reads from (run 0023, `previewUrl` run
+/** Where the "Your group" group reads from (run 0023, `previewUrl` run
  *  0024, `residentName` run 0025). The host owns the session code and the
  *  resident's own name, so both are asked for fresh on each refresh. */
 export interface SessionSource {
@@ -63,7 +63,9 @@ export interface UnitBrowserOptions {
    *  The browser itself never parses the unit file — what to do with it is
    *  the host's business. */
   onOpen: (file: File, source: UnitManifestEntry | SessionFlat) => void;
-  /** OPTIONAL. When given, the panel grows a second group, "In this session",
+  /** OPTIONAL. When given, the panel grows a second group, "Your group"
+   *  (run 0026; "In this session" before it — the word a resident reads is
+   *  group, never session, per `_cowork/design/DESIGN-BRIEF-3sep.md`),
    *  listing the flats the store's poll returns, each openable as a copy the
    *  same way. Refreshed when the panel opens and on its own Refresh control;
    *  the browser never polls in the background. */
@@ -121,9 +123,9 @@ const CSS = `
   z-index: 45;
   display: none;
   flex-direction: column;
-  background: var(--bg, #ece8e0);
-  border: 2px solid var(--ink, #141317);
-  color: var(--ink, #141317);
+  background: var(--bg, #ece6d8);
+  border: 2px solid var(--ink, #161616);
+  color: var(--ink, #161616);
   font-family: inherit;
 }
 .ulb-panel.ulb-open { display: flex; }
@@ -132,7 +134,7 @@ const CSS = `
   align-items: baseline;
   gap: 10px;
   padding: 12px 16px;
-  border-bottom: 2px solid var(--ink, #141317);
+  border-bottom: 2px solid var(--ink, #161616);
 }
 .ulb-title {
   margin: 0;
@@ -141,21 +143,21 @@ const CSS = `
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
-.ulb-count { font-size: 11px; color: var(--meta, #6d6a62); }
+.ulb-count { font-size: 11px; color: var(--meta, #6b665c); }
 .ulb-close {
   margin-left: auto;
   background: none;
   border: 0;
-  color: var(--meta, #6d6a62);
+  color: var(--meta, #6b665c);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
   padding: 2px 4px;
 }
-.ulb-close:hover { color: var(--ink, #141317); }
-.ulb-status { padding: 24px 16px; font-size: 12px; color: var(--meta, #6d6a62); }
+.ulb-close:hover { color: var(--ink, #161616); }
+.ulb-status { padding: 24px 16px; font-size: 12px; color: var(--meta, #6b665c); }
 .ulb-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-.ulb-group + .ulb-group { border-top: 2px solid var(--ink, #141317); }
+.ulb-group + .ulb-group { border-top: 2px solid var(--ink, #161616); }
 .ulb-group-head {
   display: flex;
   align-items: baseline;
@@ -168,13 +170,13 @@ const CSS = `
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--meta, #6d6a62);
+  color: var(--meta, #6b665c);
 }
 .ulb-refresh {
   margin-left: auto;
   background: none;
   border: 1px solid var(--line-paper, #c9c5bb);
-  color: var(--meta, #6d6a62);
+  color: var(--meta, #6b665c);
   font-family: inherit;
   font-size: 10px;
   letter-spacing: 0.12em;
@@ -182,7 +184,7 @@ const CSS = `
   padding: 4px 8px;
   cursor: pointer;
 }
-.ulb-refresh:hover { color: var(--ink, #141317); border-color: var(--ink, #141317); }
+.ulb-refresh:hover { color: var(--ink, #161616); border-color: var(--ink, #161616); }
 .ulb-refresh:disabled { opacity: 0.5; cursor: default; }
 .ulb-grid {
   display: grid;
@@ -202,11 +204,12 @@ const CSS = `
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--meta, #6d6a62);
+  color: var(--meta, #6b665c);
   border: 1px solid var(--line-paper, #c9c5bb);
-  padding: 1px 5px;
+  border-radius: 999px;
+  padding: 1px 6px;
 }
-.ulb-tag.ulb-changed { color: var(--accent, #c2410c); border-color: var(--accent, #c2410c); }
+.ulb-tag.ulb-changed { color: var(--accent, #d6341c); border-color: var(--accent, #d6341c); }
 /* The owner, one line under the label, at the card's normal (not meta) size —
    "put essentials first": whose flat this is matters as much as what it is
    named. ".ulb-yours" is a filled badge (Von Restorff) rather than another
@@ -220,18 +223,39 @@ const CSS = `
   font-size: 12px;
   font-weight: 600;
 }
+/* Red, not ink: the brief's colour for "the resident's own" (their flat in
+   the building, their shape in the radar) — the same rule applied to the
+   card's own border below. */
 .ulb-tag.ulb-yours {
-  background: var(--ink, #141317);
+  background: var(--accent, #d6341c);
   color: var(--panel-ink, #edece8);
-  border-color: var(--ink, #141317);
+  border-color: var(--accent, #d6341c);
 }
-.ulb-session-card.ulb-mine { border-width: 2px; }
+.ulb-session-card.ulb-mine { border-width: 2px; border-color: var(--accent, #d6341c); }
 .ulb-card {
   display: flex;
   flex-direction: column;
-  background: var(--plate, #d8d4cb);
-  border: 1px solid var(--ink, #141317);
+  background: var(--card, #f4f0e6);
+  border: 0;
+  border-top: 3px solid var(--ink, #161616);
+  box-shadow: 0 1px 0 var(--line-paper, #c9c5bb);
+  /* Rise in, one after another (the brief's motion language): a plain CSS
+     stagger over the first few cards, then a flat cap — a grid can hold
+     far more than the wireframe's short lists ever did. */
+  animation: ulb-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
+@keyframes ulb-rise {
+  from { opacity: 0; transform: translateY(14px); }
+}
+.ulb-grid > *:nth-child(1) { animation-delay: 0ms; }
+.ulb-grid > *:nth-child(2) { animation-delay: 60ms; }
+.ulb-grid > *:nth-child(3) { animation-delay: 120ms; }
+.ulb-grid > *:nth-child(4) { animation-delay: 180ms; }
+.ulb-grid > *:nth-child(5) { animation-delay: 240ms; }
+.ulb-grid > *:nth-child(6) { animation-delay: 300ms; }
+.ulb-grid > *:nth-child(7) { animation-delay: 360ms; }
+.ulb-grid > *:nth-child(8) { animation-delay: 420ms; }
+.ulb-grid > *:nth-child(n + 9) { animation-delay: 480ms; }
 .ulb-preview {
   width: 100%;
   aspect-ratio: 3 / 2;
@@ -252,15 +276,15 @@ const CSS = `
   width: 11px;
   height: 11px;
   flex: 0 0 11px;
-  border: 1px solid var(--ink, #141317);
+  border: 1px solid var(--ink, #161616);
 }
-.ulb-meta { padding: 0 10px 9px 28px; font-size: 10px; color: var(--meta, #6d6a62); }
+.ulb-meta { padding: 0 10px 9px 28px; font-size: 10px; color: var(--meta, #6b665c); }
 .ulb-actions { display: flex; gap: 6px; margin: 0 10px 10px; }
 .ulb-openbtn, .ulb-renamebtn {
   padding: 7px 10px;
   background: transparent;
-  border: 1px solid var(--ink, #141317);
-  color: var(--ink, #141317);
+  border: 1px solid var(--ink, #161616);
+  color: var(--ink, #161616);
   font-family: inherit;
   font-size: 10px;
   font-weight: 600;
@@ -269,8 +293,8 @@ const CSS = `
   cursor: pointer;
 }
 .ulb-openbtn { flex: 1; }
-.ulb-renamebtn { color: var(--meta, #6d6a62); border-color: var(--line-paper, #c9c5bb); }
-.ulb-openbtn:hover, .ulb-renamebtn:hover { background: var(--ink, #141317); color: var(--panel-ink, #edece8); }
+.ulb-renamebtn { color: var(--meta, #6b665c); border-color: var(--line-paper, #c9c5bb); }
+.ulb-openbtn:hover, .ulb-renamebtn:hover { background: var(--ink, #161616); color: var(--panel-ink, #edece8); }
 .ulb-openbtn:disabled, .ulb-renamebtn:disabled { opacity: 0.5; cursor: default; }
 `;
 
@@ -323,7 +347,7 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
     refreshBtn.className = "ulb-refresh";
     refreshBtn.textContent = "Refresh";
     refreshBtn.addEventListener("click", () => void refreshSession());
-    sessionGrid = group(body, "In this session", sessionCode, refreshBtn);
+    sessionGrid = group(body, "Your group", sessionCode, refreshBtn);
   }
   const libGrid = group(body, "Library");
   el.append(header, body);
@@ -544,7 +568,7 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
     const url = opts.session.stateUrl();
     sessionCode!.textContent = "";
     if (url === null) {
-      status(sessionGrid, "No session set. Enter a session code under Save… to see the flats published in your room.");
+      status(sessionGrid, "No group set. Enter a group code under Save… to see the flats published in your group.");
       return;
     }
     refreshBtn!.disabled = true;
@@ -556,7 +580,7 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
       const flats = Array.isArray(state.flats) ? state.flats : [];
       sessionCode!.textContent = `${state.code ?? ""} · ${flats.length}`;
       if (flats.length === 0) {
-        status(sessionGrid, `Nobody has published to ${state.code ?? "this session"} yet.`);
+        status(sessionGrid, `Nobody has published to ${state.code ?? "this group"} yet.`);
         return;
       }
       // Mine first — a stable sort, so flats that are neither the resident's
