@@ -77,6 +77,30 @@ describe("nextFreeNumber", () => {
     expect(nextFreeNumber([entry("unit-1"), entry("unit-2"), entry("unit-3"), entry("unit-4", "Studio A")])).toBe(5);
   });
 
+  it("counts a second list too, with a gap in EACH", () => {
+    // The library has 1, 3 (gap at 2); the session has 2, 5 (gap at 1, 3, 4).
+    // Neither list alone is free at 2 (library has no 2, but the session
+    // does), so the combined answer must be the lowest free across BOTH.
+    expect(
+      nextFreeNumber([entry("unit-1"), entry("unit-3")], [entry("unit-2"), entry("unit-5")])
+    ).toBe(4);
+  });
+
+  it("a plain library-only gap still works with the same call, unchanged", () => {
+    // The pre-0024 call: one list, no second argument.
+    expect(nextFreeNumber([entry("unit-1"), entry("unit-2"), entry("unit-4")])).toBe(3);
+  });
+
+  it("an empty second list changes nothing", () => {
+    expect(nextFreeNumber([entry("unit-1"), entry("unit-2")], [])).toBe(3);
+  });
+
+  it("a renamed entry in the second list still holds its number", () => {
+    expect(
+      nextFreeNumber([entry("unit-1")], [entry("unit-2", "Studio A")])
+    ).toBe(3);
+  });
+
   it("agrees with the committed library, whatever it currently holds", () => {
     // Asserted as a PROPERTY, not as a literal. Run 0019 pinned this at 4,
     // which was true of the library that day and false the moment a unit was

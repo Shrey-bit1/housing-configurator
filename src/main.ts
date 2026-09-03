@@ -952,7 +952,7 @@ function syncSaveDialog(): void {
   if (sel.project) parts.push(projectNameFor(n));
   if (needsUnitBuild(sel)) parts.push(unitNameFor(n));
   saveNamesLine.textContent = parts.length
-    ? `Writes ${parts.join(" and ")}`
+    ? `Writes ${parts.join(" and ")}` + (numberCountsSession ? ` — next free in the library and ${session.code}` : "")
     : "Nothing selected";
   if (!saveColorTouched) saveColorInput.value = defaultUnitColor(unitNameFor(n));
   saveGoBtn.disabled = isEmptySelection(sel);
@@ -971,9 +971,32 @@ async function readManifestEntries(): Promise<UnitManifestEntry[]> {
   }
 }
 
-/** Open on the NEXT FREE NUMBER: the lowest positive integer no library entry
- *  holds (src/library/naming.ts), re-read on every open so a save made a
- *  moment ago is already counted. */
+/** The session's own published flats, as `{id, name}` for `nextFreeNumber` —
+ *  `label` stands in for `name` since a flat has no separate display name.
+ *  Empty when no session is set or the poll fails; the dialog must still open
+ *  either way (run 0024, mirrors `readManifestEntries`). */
+async function readSessionFlatNames(): Promise<{ id: string; name: string }[]> {
+  if (!session.code) return [];
+  try {
+    const res = await fetch(`/api/session/${encodeURIComponent(session.code)}`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const state = (await res.json()) as { flats?: { id: string; label: string }[] };
+    return (state.flats ?? []).map((f) => ({ id: f.id, name: f.label }));
+  } catch {
+    return [];
+  }
+}
+
+/** Whether the number just proposed came from the library alone or from the
+ *  library and the session together — read by `syncSaveDialog` to add one
+ *  clause to the names line, so a resident in a room knows the room's other
+ *  flats were counted too (run 0024). */
+let numberCountsSession = false;
+
+/** Open on the NEXT FREE NUMBER: the lowest positive integer neither the
+ *  library manifest nor (with a session set) the session's own flats hold
+ *  (src/library/naming.ts), re-read on every open so a save made a moment ago
+ *  is already counted. */
 async function openSaveDialog(): Promise<void> {
   saveResultsEl.replaceChildren();
   for (const kind of ["project", "unit", "library", "publish"] as OutputKind[])
@@ -982,7 +1005,9 @@ async function openSaveDialog(): Promise<void> {
   syncSaveDialog();
   saveDialog.showModal();
   const entries = await readManifestEntries();
-  saveNumberInput.value = String(nextFreeNumber(entries));
+  const sessionFlats = await readSessionFlatNames();
+  numberCountsSession = session.code.length > 0;
+  saveNumberInput.value = String(nextFreeNumber(entries, sessionFlats));
   syncSaveDialog();
 }
 
