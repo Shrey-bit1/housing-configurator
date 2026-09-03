@@ -69,9 +69,10 @@ work-in-progress research artifact, not a production app.
 | Interaction | `src/interaction/picker.ts`, `dragDrop.ts`, `selection.ts` | Raycast picking (`cellAt`/`groupAt`/`groundPoint`, scoped to the ACTIVE floor's store — this is also why floor visibility needs no picker-side filtering, see §5), palette→canvas placement, select/**multi-select**/move/**group-move**/rotate/**mirror**/delete/**group-delete**/**Shift+D-duplicate** (any count) of modules, plus entrance AND door select/delete (two `MarkerSelectionAdapter`s — mutually exclusive singletons, excluded from multi-select). `R`/`M` work on the palette ghost, the move ghost, the duplicate ghost, and a SINGLE selected instance — no-op on 2+ (§2h). `dragDrop.cancelPlacement()`/`selection.cancelDuplicate()`/`entranceController.cancel()` are public, no-argument, and NOT wired to their own Escape listeners — Escape is arbitrated centrally by main.ts (§2h). `dragDrop`/`selection` take an `onAfterAction` callback (fires after a committed mutation → undo snapshot, see §2f); `selection` also takes `onSelectionChange`/`onNoopHint` callbacks and an `EntranceSelectionAdapter`. |
 | **Group-move ghost** | `src/scene/groupGhostPreview.ts` | `GroupGhostPreview`: one translucent ghost mesh per selected member, positioned by its cell offset from the grabbed member's target origin, tinted green/red as ONE unit (mirrors `GhostPreview`'s shape/API). See §2h. |
 | Wiring / render loop / view-mode orchestration, **dev-only `?project=` loader + `window.__app` capture handle** | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
-| **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. See §12. |
+| **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. `sameResident(a, b)` (run 0026: trimmed, case-insensitive) is the ownership check's rule; a building run's optional `plot` (run 0026, opaque) rides alongside `genome`/`summary`. See §12. |
 | **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
-| **The session settings + the publish call** (who, which room, the fourth output, and the takeover confirm, runs 0023-0025) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, `publishUnit(fetchLike, base, settings, id, label, text, replace?)` which PUTs the unit bytes and never throws, `takeoverConfirmText(owner)` and `decideTakeover(r, replaceTicked, confirmed)` (run 0025: the post-409 decision — retry, decline with its exact line, or proceed — pulled out so `window.confirm` never has to be driven in a test). Pure; `session.test.ts` drives it with a Map and a stub. See §10, §11, §12. |
+| **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by the save column's "Your flat" card (`refreshFlatCard`, `main.ts`). See §11. |
+| **The session settings + the publish call** (who, which group, the fourth output, and the takeover confirm, runs 0023-0026) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, `publishUnit(fetchLike, base, settings, id, label, text, replace?)` which PUTs the unit bytes and never throws, `takeoverConfirmText(owner)` and `decideTakeover(r, replaceTicked, confirmed)` (run 0025: the post-409 decision — retry, decline with its exact line, or proceed — pulled out so `window.confirm` never has to be driven in a test). Pure; `session.test.ts` drives it with a Map and a stub. Its OWN strings say "group", never "session" or "room" (run 0026, words only — the module, the type, the storage key and every `/api/session/…` path keep their names). See §10, §11, §12. |
 
 **Concave-corner wall logic** (part of `buildBoundaryWalls`): walls are inset to
 the INTERIOR side of their boundary line (no protrusion). N/S walls (run in x)
@@ -3480,8 +3481,27 @@ without a DOM, which this project's vitest setup does not provide (no
 jsdom/happy-dom dependency, and `createUnitBrowser` calls
 `document.createElement` the moment it runs). `SessionSource` gained
 `residentName()` returning the save dialog's current name, trimmed, or `""`.
-`unitBrowser.test.ts` (new, 6 cases) is the ONLY test file for this module,
+`unitBrowser.test.ts` (6 cases as of run 0025, 7 as of run 0026 — one more
+for the case-insensitive match) is the ONLY test file for this module,
 importing just these two functions and never touching `createUnitBrowser`.
+
+**Ana is ana, and the group's words (run 0026).** `isMine`'s comparison is
+now trimmed and case-insensitive (`isMine("Ana ", "ana")` is true), restating
+`sameResident` (`src/session/store.ts`) rather than importing it — this
+module stays self-contained on purpose (its own file header), so the two
+copies are kept in step by hand, not by a shared import. The session group's
+heading is "Your group" (was "In this session"); its two status lines say
+"No group set…"/"…published to \<code\> yet" (were "No session…"/"…this
+session…"). `.ulb-tag.ulb-yours` fills red (`var(--accent)`) instead of ink,
+and `.ulb-session-card.ulb-mine`'s heavier border is red too — the brief's
+rule that red marks "the resident's own" applies here as much as it does to
+the resident's own flat in the building — and every card animates in
+(`ulb-rise`, translateY+opacity, an 8-step stagger then a flat cap) rather
+than appearing at once. `.ulb-card` itself moved to the brief's card look:
+`var(--card, #f4f0e6)` fill, `border-top: 3px solid var(--ink)` and nothing
+else (no side borders, no radius), a 1px hairline shadow underneath — the
+same look `.card` gives the save column (§11). None of this touches the
+manifest, the store, or a library card's own actions.
 
 **Seeds** — `flat-2-single-storey` (69.84 m², pink) and `flat-3-terrace`
 (60.48 m², blue), converted through the REAL path (loaded via `?project=`,
@@ -3502,11 +3522,13 @@ the standing french-window `it.fails`. As of run 0024: fast 18 in
 `naming.test.ts` (was 14), `ids.test.ts` and `manifest.test.ts` unchanged.
 As of run 0025: `unitBrowser.test.ts` new at 6 (`isMine`/`sortMineFirst`
 only — see "Whose flat is this" above); everything else in this section
-unchanged.
+unchanged. As of run 0026: `unitBrowser.test.ts` 7 (one more for the
+case-insensitive match); the new `src/core/unitStats.ts` gets its own
+`unitStats.test.ts` at 4 (see §11).
 
 ---
 
-## 11. One save, three outputs (`#save-dialog` + `savePlan.ts` + `saveFiles.ts`)
+## 11. One save, three outputs (`#save-column` + `savePlan.ts` + `saveFiles.ts`)
 
 Added in run 0019, from Shrey's own bottleneck: authoring a baseline unit cost
 three separate trips through the menu (Export project, Export unit, Save to
@@ -3518,7 +3540,10 @@ project file is the whole design and the ONLY thing that reopens for editing
 A library entry is a unit plus a preview plus a manifest row (§10,
 `docs/library-format.md`). What collapsed is the doing, not the model.
 
-**The dialog** (`#save-dialog` in index.html, wired in main.ts):
+**The fields** (run 0019; since run 0026 these live folded under the save
+column's "More", `#more-body` in index.html — see the run-0026 paragraph
+below for the column itself; nothing about the fields' own behaviour
+changed, only their container):
 - **Design number** — the only text input, `type="number"`, floored at 1 so a
   cleared field cannot write `Flat NaN`. A live line restates what it resolves
   to ("Writes Flat 4 and Unit 4"), so the two names are never a guess.
@@ -3530,10 +3555,11 @@ A library entry is a unit plus a preview plus a manifest row (§10,
   three trips they replace; the choice is REMEMBERED for the session (a plain
   module-level `saveSelection`, never serialized — this is how you save, not
   part of the design), so the second unit costs one click.
-- **A result block**, one line per selected output, rendered IN THE DIALOG,
-  which is why the dialog stays open on Save and closes on its own Close
-  button. Toasts were wrong here: a unit that failed its gate must not read as
-  a project save that failed.
+- **A result block**, one line per selected output, rendered in the save
+  column's "Your group" card (run 0026; was rendered in the dialog itself,
+  which stayed open on Save and closed on its own Close button — both gone
+  now that the column is always visible, see below). Toasts were wrong here:
+  a unit that failed its gate must not read as a project save that failed.
 
 **The naming convention** (`src/library/naming.ts`, Shrey's, 10 August): a name
 is a capitalised word, a space and a number. `Flat 4` for the project, `Unit 4`
@@ -3657,6 +3683,90 @@ future run as larger than "one or two lines": an "advanced" fold for
 residents in the BUILDING app's own panel (out of scope — this run touches
 only the flat app) and ownership-aware defaults on Replace.
 
+**The dialog becomes a column, always visible (run 0026, the brief).**
+`_cowork/design/DESIGN-BRIEF-3sep.md` and its wireframe
+(`_cowork/design/wireframe/FlatDraw.dc.html`) wanted the whole save UI
+beside the editor, not behind a click. `#save-dialog` (a native `<dialog>`,
+`showModal`/`close`) became `#save-column`, an `<aside>` positioned
+absolutely over `#viewport`'s right edge (`top/right: 16px`, `bottom: 230px`
+— clear of `#view-controls`, the Display/compass card, which is ALSO
+`bottom: 16px; right: 16px` and was never moved). No resize or camera-aspect
+code changed: the column sits on top of the 3D view exactly the way the
+Units panel already does, rather than becoming a flex sibling of the
+canvas. `openSaveDialog` keeps its name (it still means "this is stale,
+freshen it") but no longer shows a modal; it runs once at startup and again
+whenever "More" (below) opens. `#save-close` and the modal's `::backdrop`
+are gone — there is nothing left to close.
+
+Three cards, in the brief's order:
+- **"Your flat"** (`#flat-card`): the unit's name, three numbers (area,
+  storeys, glazing) and a check line. All four are LIVE, read through
+  `refreshFlatCard` (`main.ts`) off `buildUnitExport(floors, "", "#000000")`
+  — the SAME function a real save calls — so the card can never show a
+  number a save would disagree with. `unitStats` (`src/core/unitStats.ts`,
+  new; see §2's table and §10) turns a built unit's storeys into area/
+  storeys/glazing; the check line reads `validate(computeDwellingGraph(…))`
+  exactly as Check Layout does, showing a red "N must fix" chip (`.chip
+  .chip-acc`) with the first violation's `description` and a "show me" link
+  that calls the SAME `runCheck()` Check Layout's button does, or a green
+  "checks pass" chip (`.chip .chip-ok`) at zero. A gate failure (no
+  entrance yet, a disconnected floor) shows 0/0/0 and the gate's own reason
+  — not an error, an unfinished flat. `refreshFlatCard` is called from
+  `commitHistory` itself (`main.ts:140`, one line added) rather than
+  `floors.onLayoutChange`: the latter is wired to the room STORE alone and
+  never fires for an entrance or a door, where `commitHistory` is the one
+  point CLAUDE.md's own convention already routes every mutating action
+  through. The area number counts up (the brief's `.cnt`/`@property --n`
+  technique, copied from the wireframe's own CSS): `animateCount`
+  (`main.ts`) sets `--to` and toggles the `.cnt` class off and on to force
+  a restart, and because `@keyframes flat-count { to { --n: var(--to); } }`
+  has no explicit `from`, it counts from wherever `--n` last landed rather
+  than always from zero — "the numbers count up when the flat changes",
+  verified live (a fixture's area animates from a previous flat's value to
+  its own, `store-roundtrip`-style, in the browser pane). Storeys and
+  glazing are plain text, matching the wireframe (only its area number
+  carries the `.cnt` class).
+- **"Your group"** (`#group-card`): the same fold as run 0025
+  (`save-session-summary`/`-fields`, `syncSessionFold`, unchanged), then the
+  ONE red button, `.btn-send` (`#save-go`, relabeled from "Save"): "Send it
+  to your group", an arrow that nudges (`@keyframes btn-nudge`, the
+  wireframe's own timing). It is the SAME click handler as before —
+  `runSave()` is untouched — so pressing it still writes every OUTPUT
+  ticked under "More", publish included; the label is the brief's exact
+  words, not a new action. `#save-results` sits under it, unchanged.
+  `button.primary`'s OWN look (ink-filled) stays for the one place it is
+  still used outside this card, the sidebar's Grid-size "Apply" — an editor
+  TOOL, not "the one primary action on a screen" the brief means, so it
+  keeps its old look and `.btn-send` is a new class rather than a
+  `button.primary` restyle.
+- **"More"** (`#more-card`, `.more-card`, a dashed rule instead of the solid
+  card-top): folded shut by default (`#more-body[hidden]`, a "+"/"−" toggle,
+  `setMoreOpen` in `main.ts`), holding exactly what the old dialog's body
+  was — Design number, Colour, and the five checkboxes (Files: Project/
+  Unit/Library; Group: Send to group/Replace) — relocated, not redesigned;
+  `runSave`/`savePlan.ts`/`saveFiles.ts` never changed. Opening it re-runs
+  `openSaveDialog()`, so the proposed number is never stale. The "Save…"
+  menu item (`#menu-save`) now opens "More" instead of a dialog that no
+  longer exists.
+
+**Words, run 0026** (`_cowork/design/DESIGN-BRIEF-3sep.md`'s Words
+section): "Session code" → "Group code"; "Publish to session" → "Send to
+group"; its note, "…sent to your group for the building and your
+neighbours" (was "…the session…"); the sw-group label "Session" → "Group";
+a written publish's line, "Sent to \<code\> as \<label\>[, version N if it
+moved] · open Units to see your group" (was "Published as \<label\> to
+\<code\>, version N" plus run 0025's "— Open Units to see the room."); its
+row LABEL, `outputLabel("publish")` (`src/core/savePlan.ts`), "Group" (was
+"Session" — found live, not by the grep audit: the label never contains the
+word "session" as a STRING to grep for, only as the `OutputKind` it stands
+for). `session.ts`'s `whyPublishDisabled`/`sessionLine` say "group" too (see
+§2's table). What did NOT change: every code identifier (`SessionSettings`,
+`sessionLine`, `tbSession`, `SESSION_STORAGE_KEY`, every `/api/session/…`
+path, `?session=`), the store's OWN error strings (`docs/store.md`'s
+contract, untouched beyond `plot` — §12), and the save dialog's
+`placeholder="room-42"` (kept as the store's own running example, matching
+`docs/store.md` throughout, a judgement call rather than an oversight).
+
 **What was retired** — the `Export project` and `Export unit` menu items and
 the old dialog's `Save to library` action, all three subsumed. `Open project`
 survives: it is the import, not a save. Three DEAD callbacks
@@ -3747,15 +3857,42 @@ against the file that was sent with `Buffer.compare`.
 **No auth.** Anyone with the code can read and overwrite everything in the
 session. Written down as the limit in `docs/store.md`.
 
+**The building carries its plot, opaque (run 0026).** `BuildingRun` gained
+`plot?: Record<string, unknown>`, exactly like `genome`/`summary`: stored on
+`PUT …/building` if present (`isRecord` checked — a non-object `plot` is
+`400` — but never read inside), returned unread on `GET …/building`, on the
+session state as `building.plot`, and on `GET …/export`. Absent when the
+building app that wrote a run predates the field, which is the ordinary
+case for every run before this one. `docs/store.md` documents it with the
+one example the building app is expected to send,
+`{"modulesX": 11, "modulesY": 11, "floors": 7}`.
+
+**Ana is ana (run 0026).** `sameResident(a, b)` — trimmed,
+case-insensitive — is the store's ownership check now
+(`store.ts`: `!sameResident(existing.resident, resident)` replaces
+`existing.resident !== resident`), so a republish by "ben" over a flat
+recorded as "Ben" is accepted as the same owner, not refused. The name AS
+TYPED is still what gets stored and shown; only the comparison folds case.
+`src/library/unitBrowser.ts`'s `isMine` restates the identical rule inline
+rather than importing it (see §10) — that module is self-contained on
+purpose, so `store.ts` stays its one canonical home and the two are kept in
+step by hand. Framed by the `design-automation` skill's Production Rules
+(IF-THEN) pattern (its §2.1): one rule, "IF two names match trimmed and
+case-insensitively THEN treat them as the same resident", applied at the
+one real decision point the store owns and restated at the one place a
+second module needs the same answer.
+
 **Proof.** `scripts/store-roundtrip.mjs <base-url>` (plain Node, no deps):
 fresh session per run, publishes `public/units/flat-2-single-storey.json`
 (37484 bytes) as Ana and `public/units/flat-3-terrace.json` (33388 bytes) as
 Ben, republishes flat-2 (version 2), sets counts/share/ballot (Ben in two
 partial bodies), reads the state and checks the summaries (194 / 168 cells,
 bbox `0,0,15,14` / `0,0,14,12`), reads both flats back byte-identical, writes
-a run and checks `changed` cleared, reads the export and checks both bodies
-byte-identical and the summaries equal to the state (run 0023), preflight 204.
-26 checks; exit 1 on any failure. Passed against `npx netlify dev --port 8888`
+a run WITH A PLOT (run 0026) and checks `changed` cleared and the plot comes
+back byte-identical on both the building call and the session state, reads
+the export and checks both bodies byte-identical and the summaries equal to
+the state (run 0023), preflight 204. 28 checks (26 through run 0025, 2 more
+for the plot); exit 1 on any failure. Passed against `npx netlify dev --port 8888`
 (Blobs sandbox mode) in runs 0022 and 0023. **The site password was lifted on
 2 September 2026**; the deployed round trip passed 26/26 against
 `run-0023--reconfigure-flat.netlify.app` and the production base is
@@ -3783,4 +3920,111 @@ passed in 14 files** (`session.test.ts` 21 to 28: 1 for `takeoverConfirmText`,
 6 for `decideTakeover`; the new `unitBrowser.test.ts` at 6; `store.test.ts`
 untouched at 18, since this run made no change to `src/session/store.ts`),
 slow 26 passed + 1 expected fail, `tsc`/`npm run build` clean, both fixture
-baselines still 12 and 7.
+baselines still 12 and 7. As of run 0026: **fast 198 passed in 15 files**
+(`store.test.ts` 18 to 21 — 1 for `sameResident`'s own cases, 1 for a
+case-different republish, 1 for the plot round trip and its rejection
+cases together; `unitBrowser.test.ts` 6 to 7; the new `unitStats.test.ts`
+at 4; `session.test.ts` (28), `savePlan.test.ts` (17) and every other file
+unchanged in count, though two of `session.test.ts`'s cases and one
+assertion in `savePlan.test.ts`'s `outputLabel` test now pin "Group"/"group"
+wording where they pinned "Session"/"session" before), slow 26 passed + 1
+expected fail, `tsc`/`npm run build` clean, both
+fixture baselines still 12 and 7, `scripts/store-roundtrip.mjs` 28 checks
+(26 through run 0025) against `netlify dev`.
+
+---
+
+## 13. The brief's skin (`src/style.css` tokens + fonts, run 0026)
+
+**Source of truth:** `_cowork/design/DESIGN-BRIEF-3sep.md`, written 3
+September from a wireframe Shrey approved that day
+(`_cowork/design/wireframe/`, seven `.dc.html` screens; this app is
+`FlatDraw.dc.html`). Both `Re_Configure` apps get this look; they stay two
+apps. **Constraint honoured:** the editor's own colour (the 3D scene's
+`scene.background`, `sceneSetup.ts`, `--canvas-bg`) is untouched — the brief
+says so explicitly, and nothing in this run reads or writes it. Everything
+else the resident sees reads the tokens below.
+
+**Tokens, repointed at the brief's exact values** (`:root`, `style.css`):
+`--bg` #ece6d8 (paper ground; was #ece8e0), `--ink` #161616 (was #141317),
+`--accent` #d6341c red (was #d2232e), `--meta` #6b665c muted ink (was
+#6d6a62); new: `--blue` #1d4fa3, `--yellow` #f2b41c, `--dim` #a39c8d, `--card`
+#f4f0e6 (a card's own fill, a touch lighter than the ground). The repointed
+Bauhaus aliases (`--black`, `--paper`, `--text`, `--text-dim`, …, the run
+0016/17 reskin's own device for touching ~140 old declarations at once
+without rewriting them) move with their new-name counterparts, so old chrome
+inherits the brief's palette for free; `--line`/`--line-paper` (hairline
+grey) are UNCHANGED — the brief names four colours, not five, and a neutral
+hairline was never one of them. `--yellow` and `--blue` are declared for
+this app's own future use (shared-space/annotation colour, matching the
+building app) — nothing in the flat app's chrome uses either yet, since it
+has no shared spaces or annotations to mark; declaring them now keeps both
+apps' tokens in step rather than adding them piecemeal per run.
+
+**Type, one Google Fonts link** (`index.html`, not a dependency): Big
+Shoulders Display 700/800/900, Jost 400-700, JetBrains Mono 400/500 — the
+brief's own weights. `--font-display`/`--font-body`/`--font-mono` tokens;
+`body`'s base font is `--font-body` (was the old Helvetica Neue stack), so
+every rule already reading `font-family: inherit` picked it up for free.
+Button-like controls read `--font-display` instead — a global `button {
+font-family: var(--font-body); }` safety net plus ONE grouped override
+(`.floor-tab, #view-toggle, …, #display-body button { font-family:
+var(--font-display); }`, placed last in the file so it wins over each
+individual rule's own `inherit` without editing a dozen of them by hand).
+Headings (`.panel-title`, `.vp-title`) and the top-bar brand read
+`--font-display` too; the group code (`.tb-session`) reads `--font-mono`,
+matching the brief's treatment of a code like "review-0023".
+
+**The paper's grain**: the brief's exact SVG `feTurbulence` filter, one
+`--grain` token, applied as a second `background-image` layer (alongside
+the solid `background-color`) on `#topbar` and `#sidebar` ONLY — the two
+large flat panels that ARE the ground. Cards (below) sit on top of it
+solid, matching the wireframe (`.root:before` grains the ground; `.card`
+never does). Nowhere else reads it: the 3D viewport is covered edge to edge
+by the canvas regardless, so grain behind it would never render.
+
+**A card, the brief's way** (`.card`, `style.css`, new utility class):
+`var(--card)` fill, `border-top: 3px solid var(--ink)` and NOTHING else — no
+side borders, no radius, one `box-shadow: 0 1px 0 var(--line-paper)`
+hairline underneath. Used by the save column (§11, three cards) and restated
+(not imported) by the units panel's own injected stylesheet (§10,
+`unitBrowser.ts`, self-contained on purpose).
+
+**A chip, the brief's way** (`.chip`/`.chip-ok`/`.chip-acc`, new): an
+outlined pill (`border-radius: 999px`), ink by default, green when a check
+passes (`--note`), red when it does not (`--accent`) — the save column's
+check line (§11) is the one place this app uses it; `.ulb-tag` (units
+panel) already existed and gained `border-radius: 999px` to match, plus
+`.ulb-tag.ulb-yours` moved from an ink fill to `var(--accent)` — the brief's
+rule that red marks "the resident's own" (§10).
+
+**A button, the brief's way**: `button.primary`'s look (ink-filled, used
+by the sidebar's Grid-size "Apply") is UNCHANGED beyond its font — that
+control is an editor TOOL, not "the one primary action on a screen" the
+brief means. `.btn-send` (new class, the save column's "Send it to your
+group", §11) is the brief's red block with the nudging arrow
+(`@keyframes btn-nudge`, the wireframe's own timing), scoped to that one
+button rather than to `button.primary` generally, precisely so the Grid-size
+Apply button (found live, mid-verification, wearing an unwanted red pill)
+never had to change.
+
+**The top bar**: brand `(Re)<b>Configure</b> / Flat` (only "Configure"
+reads red, matching the wireframe's own markup), a 3px ink rule under the
+bar (was 1px `--line-paper`), and a new `.tb-steps` widget — "01 Draw"
+always current (a breathing red disc, `@keyframes tb-breathe`), "02 Send"
+always plain — ADDED alongside the existing view-mode segments, Units,
+Check Layout, Frame View and Save/Open, none of which the brief's own
+(necessarily bare) wireframe bar shows because it has nothing else to
+communicate. Those controls are unchanged; only their font and colours
+follow the tokens above.
+
+**Verified live** (`netlify dev`, the Browser pane, this run): fonts load
+and render (Big Shoulders Display on headings/buttons, Jost on body text,
+confirmed via `getComputedStyle`), the grain shows on the top bar and
+sidebar, `.chip-ok`/`.chip-acc` render at the right colour and pill radius,
+`#save-column` sits clear of `#view-controls` at 1440×900, and the "Yours"
+chip renders red in the Units panel. Not checked: a narrow/mobile viewport
+(this app has never targeted one; §5's plan/model toggle is its concession
+to a small screen, not this run's business) and an actual dark-mode
+preference (`prefers-color-scheme`) — this app has always been one fixed
+theme, paper-and-ink, and the brief does not ask for a second one.

@@ -146,6 +146,32 @@ added a next-step hint to a successful publish's result line; one CSS bug
 (a `display` rule tying and beating the default `[hidden]` rule) was found
 and fixed in the process. PROJECT_STATE §10, §11.
 
+Run 0026 put the flat app in the brief's skin
+(`_cowork/design/DESIGN-BRIEF-3sep.md`, from the wireframe Shrey approved 3
+September, `_cowork/design/wireframe/`) and did two small fixes from run
+0025's own open questions: the store's building run carries an opaque
+`plot` object now (genome/summary's own treatment — stored, never read),
+and resident names compare trimmed and case-insensitive everywhere two
+meet (`sameResident`, store.ts; restated, not imported, in unitBrowser.ts's
+`isMine`, which stays self-contained on purpose). The big piece: the save
+dialog is gone. `#save-column`, always visible over the viewport's right
+edge (absolutely positioned, like the Units panel — no resize/camera code
+touched), holds three cards in the brief's order — "Your flat" (name,
+LIVE area/storeys/glazing numbers and a check line, all read off
+`buildUnitExport` the same way a save itself would, refreshed on every
+`commitHistory`), "Your group" (the existing fold, one red "Send it to
+your group" button — the SAME `runSave`/`savePlan.ts` under a new label),
+and a folded "More" holding the design number, colour and five checkboxes
+that used to be the whole dialog. Every word a resident reads now says
+"group", never "session" or "room" (the code — `SessionSettings`,
+`?session=`, `/api/session/…` — keeps its names). New tokens/fonts/grain
+across `style.css` (Big Shoulders Display, Jost, JetBrains Mono, one Google
+Fonts link; `--accent` #d6341c, `--bg` #ece6d8, plus `--blue`/`--yellow`/
+`--dim`/`--card`), a `.card` look (3px ink rule on top, nothing else) and
+`.chip` pill used by the save column and restated by the Units panel,
+whose "Yours" badge is red now, not ink, and whose cards animate in.
+PROJECT_STATE §2, §10, §11, §12, new §13.
+
 **Last updated:** 2026-09-03
 
 ## What this project is
@@ -199,6 +225,11 @@ rules engine and the export format are the mature parts, the UI is not.
 - `scripts/` — shell-run scripts, so far only `store-roundtrip.mjs`, which
   drives the session store against a base URL and exits 1 on any failed check.
 - `_cowork/` — the bridge traffic. Tracked in git on purpose.
+- `_cowork/design/` — the approved 3 September design brief
+  (`DESIGN-BRIEF-3sep.md`) and its wireframe (`wireframe/`, seven `.dc.html`
+  screens plus `generate.py`), the source both `Re_Configure` apps' skins
+  read from (run 0026 applied it to this one). Added ahead of run 0026,
+  tracked like the rest of `_cowork/`.
 
 ## Entry points
 
@@ -220,7 +251,10 @@ rules engine and the export format are the mature parts, the UI is not.
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 190 cases in fourteen files as of run 0025 (177 in thirteen as
+  a second over 198 cases in fifteen files as of run 0026 (`store.test.ts` 18 to
+  21, `sameResident` and the plot round trip; `unitBrowser.test.ts` 6 to 7; the
+  new `unitStats.test.ts` at 4, the save column's live numbers, pure); 190 in
+  fourteen as of run 0025 (177 in thirteen as
   of run 0024, plus 7 in session.test.ts for takeoverConfirmText and
   decideTakeover, and the new unitBrowser.test.ts at 6, isMine/sortMineFirst
   only; 153 in twelve as of run 0023, plus 4 in naming.test.ts for a second
