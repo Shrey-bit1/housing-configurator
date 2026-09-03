@@ -4,23 +4,47 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Grid Module Configurator</title>
+    <!-- The brief's three families (run 0026): Big Shoulders Display for
+         headings/buttons/big numbers, Jost for sentences and labels,
+         JetBrains Mono for codes and timestamps. One Google Fonts link,
+         not a dependency. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Jost:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
   </head>
   <body>
-    <!-- Top bar (handoff Part 2, 1a). Every control here existed before; they
-         are regrouped, not added. The segmented control replaces the separate
-         Diagram and Top View buttons, so their mutual exclusivity, which the
-         code always enforced, is finally visible. -->
+    <!-- Top bar (handoff Part 2, 1a; the brief's skin and two steps, run
+         0026). Every control here existed before; they are regrouped, not
+         added. The segmented control replaces the separate Diagram and Top
+         View buttons, so their mutual exclusivity, which the code always
+         enforced, is finally visible. The brand and the two steps read the
+         brief's language (`_cowork/design/wireframe/FlatDraw.dc.html`)
+         alongside those controls, not instead of them — this app still
+         needs Units/Check Layout/Save where the wireframe (having nothing
+         else to show) does not. -->
     <header id="topbar">
       <div class="tb-left">
         <span class="tb-mark" aria-hidden="true"><i></i></span>
         <span class="tb-project">
-          <span class="tb-name">Flat Configurator</span>
+          <span class="tb-name">(Re)<b>Configure</b> / Flat</span>
           <span class="tb-meta" id="tb-meta">0.6 m grid</span>
         </span>
-        <!-- Which room this resident is in, and who they are, so the session is
-             visible without opening Save. Set from the save dialog's two
-             session fields (run 0023), or by ?session= in the URL. -->
-        <span id="tb-session" class="tb-session" title="Set under Save…">No session</span>
+        <!-- The flat app is one screen, always: drawing and sending are not
+             a sequence the resident finishes, so "Draw" is always the
+             current (breathing) step and "Send" stays the plain, upcoming
+             one — matching the wireframe's own FlatDraw.dc.html exactly
+             (only step 01 carries `.step.now`; nothing carries `.done`). -->
+        <div class="tb-steps" aria-hidden="true">
+          <span class="tb-step now"><span class="n">01</span>Draw</span>
+          <span class="tb-step"><span class="n">02</span>Send</span>
+        </div>
+        <!-- Which group this resident is in, and who they are, so it is
+             visible without opening Save. Set from the save column's two
+             group fields (run 0023), or by ?session= in the URL. -->
+        <span id="tb-session" class="tb-session" title="Set under Save…">No group</span>
       </div>
       <div class="tb-centre">
         <div id="view-segments" role="group" aria-label="View mode">
@@ -138,26 +162,46 @@
         <div id="selection-readout"><span id="selection-text"></span></div>
         <div id="drop-overlay"><span>Drop project file to import</span></div>
         <div id="toast"></div>
-        <!-- ONE save dialog, three outputs (run 0019). The design NUMBER is the
-             single input: it names the project file `Flat n` and the unit and
-             its library entry `Unit n`, so one dwelling carries one number
-             across both. The checkboxes say what to write; the choice is
-             remembered for the session. Results are reported IN HERE, one line
-             per output, because a unit that fails its gate must not look like
-             a project save that failed. Name + colour remain SAVE-TIME inputs,
-             never project-file fields. -->
-        <dialog id="save-dialog">
-          <p class="vp-title">Save</p>
-          <!-- The session (run 0023): who is publishing and into which room.
-               Remembered in localStorage, never in a project file; the code
-               is lowercased on the way in to match the store. Both must be
-               filled before Publish to session below can be ticked.
-               FOLDED once both are set (run 0025, UX pass — "reveal
-               complexity gradually"): the dialog opens on a one-line summary
-               instead of two open text fields; "change" reveals them again
-               for this dialog session. Shown open the first time, before
-               anything is set, since there is nothing yet to fold. -->
-          <div class="save-session">
+        <!-- The save column (run 0026, the brief): ALWAYS visible beside the
+             editor, replacing the old `<dialog>` — the same underlying save
+             (src/core/savePlan.ts, unchanged) in the brief's order: the
+             flat's name and three numbers with the check line, the group,
+             one red button, a folded More holding the files and the library
+             (run 0019's three outputs plus run 0023's publish and run 0024's
+             Replace — nothing new, only relocated). Positioned over the
+             viewport's right edge; see #save-column in style.css. -->
+        <aside id="save-column">
+          <section class="card" id="flat-card">
+            <p class="card-label">Your flat</p>
+            <h2 class="flat-name" id="flat-name">Flat 1</h2>
+            <div class="flat-numbers">
+              <div class="num">
+                <span class="v"><span class="cnt" id="flat-area-cnt" style="--to: 0"></span><small> m²</small></span>
+                <span class="l">area</span>
+              </div>
+              <div class="num">
+                <span class="v" id="flat-storeys">0</span>
+                <span class="l">storey(s)</span>
+              </div>
+              <div class="num">
+                <span class="v"><span id="flat-glazing">0</span><small> m</small></span>
+                <span class="l">glazing</span>
+              </div>
+            </div>
+            <div class="flat-check" id="flat-check"></div>
+          </section>
+
+          <section class="card" id="group-card">
+            <p class="card-label">Your group</p>
+            <!-- The group (run 0023): who is publishing and into which group.
+                 Remembered in localStorage, never in a project file; the code
+                 is lowercased on the way in to match the store. Both must be
+                 filled before Send actually reaches the store (whyPublishDisabled).
+                 FOLDED once both are set (run 0025, UX pass — "reveal
+                 complexity gradually"): starts on a one-line summary instead
+                 of two open text fields; "change" reveals them again. Shown
+                 open the first time, before anything is set, since there is
+                 nothing yet to fold. -->
             <p id="save-session-summary" class="save-session-summary" hidden>
               <span id="save-session-summary-text"></span>
               <button type="button" id="save-session-change" class="save-session-change">change</button>
@@ -166,65 +210,74 @@
               <label>Your name
                 <input id="save-resident" type="text" autocomplete="off" spellcheck="false" placeholder="who is publishing" />
               </label>
-              <label>Session code
+              <label>Group code
                 <input id="save-session" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
               </label>
             </div>
-          </div>
-          <div class="save-fields">
-            <label>Design number
-              <input id="save-number" type="number" min="1" step="1" value="1" autocomplete="off" />
-            </label>
-            <label>Colour
-              <input id="save-color" type="color" value="#4dabf7" />
-            </label>
-          </div>
-          <p id="save-names" class="save-names"></p>
-          <fieldset id="save-what">
-            <legend>What to write</legend>
-            <!-- Grouped as files vs. session (run 0025, UX pass): the first
-                 three write to THIS machine, the last two to the room. -->
-            <div class="sw-group">
-              <p class="sw-group-label">Files</p>
-              <label>
-                <input type="checkbox" id="save-what-project" checked />
-                <span class="sw-name">Project file</span>
-                <span class="sw-note">the whole design, the only thing that reopens for editing</span>
-              </label>
-              <label>
-                <input type="checkbox" id="save-what-unit" checked />
-                <span class="sw-name">Unit file</span>
-                <span class="sw-note">the contract with the building</span>
-              </label>
-              <label>
-                <input type="checkbox" id="save-what-library" checked />
-                <span class="sw-name">Library entry</span>
-                <span class="sw-note">the unit plus a preview, browsable under Units</span>
-              </label>
+            <button id="save-go" class="btn-send" type="button">
+              <span>Send it to your group</span><span aria-hidden="true">→</span>
+            </button>
+            <p class="group-hint">Your neighbours see it within seconds.</p>
+            <p id="save-names" class="save-names"></p>
+            <div id="save-results" role="status" aria-live="polite"></div>
+          </section>
+
+          <section class="card more-card" id="more-card">
+            <button type="button" class="more-head" id="more-toggle" aria-expanded="false" aria-controls="more-body">
+              <span>More</span><span class="plus" id="more-plus" aria-hidden="true">+</span>
+            </button>
+            <div class="more-body" id="more-body" hidden>
+              <div class="save-fields">
+                <label>Design number
+                  <input id="save-number" type="number" min="1" step="1" value="1" autocomplete="off" />
+                </label>
+                <label>Colour
+                  <input id="save-color" type="color" value="#4dabf7" />
+                </label>
+              </div>
+              <fieldset id="save-what">
+                <legend>What to write</legend>
+                <!-- Grouped as files vs. group (run 0025, UX pass, worded for
+                     the brief in run 0026): the first three write to THIS
+                     machine, the last two to the group. -->
+                <div class="sw-group">
+                  <p class="sw-group-label">Files</p>
+                  <label>
+                    <input type="checkbox" id="save-what-project" checked />
+                    <span class="sw-name">Project file</span>
+                    <span class="sw-note">the whole design, the only thing that reopens for editing</span>
+                  </label>
+                  <label>
+                    <input type="checkbox" id="save-what-unit" checked />
+                    <span class="sw-name">Unit file</span>
+                    <span class="sw-note">the contract with the building</span>
+                  </label>
+                  <label>
+                    <input type="checkbox" id="save-what-library" checked />
+                    <span class="sw-name">Library entry</span>
+                    <span class="sw-note">the unit plus a preview, browsable under Units</span>
+                  </label>
+                </div>
+                <div class="sw-group">
+                  <p class="sw-group-label">Group</p>
+                  <label>
+                    <input type="checkbox" id="save-what-publish" checked />
+                    <span class="sw-name">Send to group</span>
+                    <span class="sw-note" id="save-publish-note">the unit file, sent to your group for the building and your neighbours</span>
+                  </label>
+                  <!-- Off by default: a flat belongs to whoever published it
+                       (docs/store.md), so replacing someone else's is a deliberate
+                       tick, not the normal republish path. -->
+                  <label class="save-replace-row">
+                    <input type="checkbox" id="save-replace" />
+                    <span class="sw-name">Replace</span>
+                    <span class="sw-note">take over a flat someone else published under this number</span>
+                  </label>
+                </div>
+              </fieldset>
             </div>
-            <div class="sw-group">
-              <p class="sw-group-label">Session</p>
-              <label>
-                <input type="checkbox" id="save-what-publish" checked />
-                <span class="sw-name">Publish to session</span>
-                <span class="sw-note" id="save-publish-note">the unit file, sent to the session for the building and the neighbours</span>
-              </label>
-              <!-- Off by default: a flat belongs to whoever published it
-                   (docs/store.md), so replacing someone else's is a deliberate
-                   tick, not the normal republish path. -->
-              <label class="save-replace-row">
-                <input type="checkbox" id="save-replace" />
-                <span class="sw-name">Replace</span>
-                <span class="sw-note">take over a flat someone else published under this number</span>
-              </label>
-            </div>
-          </fieldset>
-          <div id="save-results" role="status" aria-live="polite"></div>
-          <div class="dialog-actions">
-            <button id="save-close" class="secondary" type="button">Close</button>
-            <button id="save-go" class="primary" type="button">Save</button>
-          </div>
-        </dialog>
+          </section>
+        </aside>
       </main>
     </div>
     <script type="module" src="/src/main.ts"></script>
