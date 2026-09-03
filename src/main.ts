@@ -12,6 +12,7 @@ import { Picker } from "./interaction/picker";
 import { DragDropController } from "./interaction/dragDrop";
 import { SelectionController, type MarkerSelectionAdapter } from "./interaction/selection";
 import { updateCutaway, setCutawayEnabled } from "./scene/cutaway";
+import { axoFrame } from "./core/previewFrame";
 import { setHovered } from "./scene/moduleMesh";
 import { createCompassDial } from "./ui/compassDial";
 import { computeDwellingGraph } from "./core/adjacencyGraph";
@@ -755,6 +756,92 @@ interfaceToggle.addEventListener("click", () => {
   syncViewToggles();
 });
 
+// ---- One axonometric for every flat (run 0024) ------------------------------
+// The library preview and the session preview are the SAME picture: the
+// flat's own axonometric, framed to its bounding box (src/core/previewFrame.ts,
+// the app's own "zoom to extent" pose), on the paper ground, every floor
+// visible, the Cutaway/Seeds/Structure/Interface overlays off, at one fixed
+// size — never whatever view the author happened to be in when they saved.
+//
+// It borrows the LIVE scene for one frame: every piece of view state it
+// touches is read before and put back exactly after, so a resident mid-orbit
+// never sees their camera jump. Nothing here is DEV-gated — a production
+// build has no capture sink, but the render itself needs no server.
+const PREVIEW_W = 800;
+const PREVIEW_H = 600;
+
+function captureFlatPreview(): { dataUrl: string; bytes: number } {
+  const savedFloorVisible = floors.floors.map((_, i) => floors.isFloorVisible(i));
+  const savedStructure = floors.structureViewOn;
+  const savedInterface = floors.interfaceViewOn;
+  const savedPos = camera.position.clone();
+  const savedUp = camera.up.clone();
+  const savedZoom = camera.zoom;
+  const savedViewSize = (camera as unknown as { viewSize: number }).viewSize;
+  const savedTarget = controls.target.clone();
+  const savedPixelRatio = renderer.getPixelRatio();
+  const savedStyleW = canvas.style.width;
+  const savedStyleH = canvas.style.height;
+
+  try {
+    floors.floors.forEach((_, i) => floors.setFloorVisible(i, true));
+    setCutawayEnabled(false);
+    floors.setSeedOutlinesVisible(false);
+    if (floors.structureViewOn) floors.setStructureView(false);
+    if (floors.interfaceViewOn) floors.setInterfaceView(false);
+
+    // A fixed backing resolution, pixel ratio 1 so it comes out exactly
+    // PREVIEW_W×PREVIEW_H, and the CSS size matched too so frameBox's own
+    // aspect read (canvas.clientWidth/clientHeight) agrees with the buffer —
+    // otherwise the frustum would be cut for the on-screen aspect and the
+    // fixed-size buffer would show it stretched.
+    renderer.setPixelRatio(1);
+    canvas.style.width = `${PREVIEW_W}px`;
+    canvas.style.height = `${PREVIEW_H}px`;
+    renderer.setSize(PREVIEW_W, PREVIEW_H, false);
+
+    const box = floors.contentBox();
+    const frame = axoFrame(
+      { min: { x: box.min.x, y: box.min.y, z: box.min.z }, max: { x: box.max.x, y: box.max.y, z: box.max.z } },
+      PREVIEW_W / PREVIEW_H
+    );
+    camera.up.set(frame.up.x, frame.up.y, frame.up.z);
+    (camera as unknown as { viewSize: number }).viewSize = frame.viewSize;
+    camera.zoom = 1;
+    const center = new THREE.Vector3(frame.center.x, frame.center.y, frame.center.z);
+    const dir = new THREE.Vector3(frame.direction.x, frame.direction.y, frame.direction.z);
+    camera.position.copy(center).addScaledVector(dir, 100);
+    controls.target.copy(center);
+    camera.lookAt(center);
+    ctx.handleResize();
+    controls.update();
+
+    renderer.render(scene, camera);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    const bytes = Math.max(0, Math.floor(((dataUrl.length - dataUrl.indexOf(",") - 1) * 3) / 4));
+    return { dataUrl, bytes };
+  } finally {
+    savedFloorVisible.forEach((v, i) => floors.setFloorVisible(i, v));
+    setCutawayEnabled(cutawayOn);
+    floors.setSeedOutlinesVisible(seedsOn);
+    // Mutually exclusive in FloorManager, so only the one that was actually
+    // on needs restoring; the other is already off from the block above.
+    if (savedStructure) floors.setStructureView(true);
+    if (savedInterface) floors.setInterfaceView(true);
+    renderer.setPixelRatio(savedPixelRatio);
+    canvas.style.width = savedStyleW;
+    canvas.style.height = savedStyleH;
+    camera.position.copy(savedPos);
+    camera.up.copy(savedUp);
+    camera.zoom = savedZoom;
+    (camera as unknown as { viewSize: number }).viewSize = savedViewSize;
+    controls.target.copy(savedTarget);
+    camera.lookAt(savedTarget);
+    ctx.handleResize();
+    controls.update();
+  }
+}
+
 // Initial view: frame whatever's on the (likely empty) starting floor instead
 // of a hardcoded camera position, so this stays correct however the default
 // grid size changes.
@@ -1431,6 +1518,13 @@ if (import.meta.env.DEV) {
         method: "POST",
         body: canvas.toDataURL("image/png"),
       }).then((r) => r.json());
+    },
+    /** The one axonometric every flat gets (run 0024), through the exact
+     *  function `saveLibraryEntry` and Publish call. Dev-only handle so a
+     *  check can drive it directly and read the camera/controls before and
+     *  after, to prove it leaves the live view untouched. */
+    capturePreview(): { dataUrl: string; bytes: number } {
+      return captureFlatPreview();
     },
   };
   const wanted = new URLSearchParams(location.search).get("project");
