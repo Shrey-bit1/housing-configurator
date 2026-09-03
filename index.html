@@ -171,12 +171,16 @@
              Replace — nothing new, only relocated). Positioned over the
              viewport's right edge; see #save-column in style.css. -->
         <aside id="save-column">
+          <button type="button" id="save-column-toggle" class="save-column-toggle" aria-expanded="true" aria-controls="save-column-body" title="Minimize">
+            <span>Save</span><span class="sc-caret" aria-hidden="true">▾</span>
+          </button>
+          <div id="save-column-body" class="save-column-body">
           <section class="card" id="flat-card">
             <p class="card-label">Your flat</p>
             <h2 class="flat-name" id="flat-name">Flat 1</h2>
             <div class="flat-numbers">
               <div class="num">
-                <span class="v"><span class="cnt" id="flat-area-cnt" style="--to: 0"></span><small> m²</small></span>
+                <span class="v"><span id="flat-area-cnt">0</span><small> m²</small></span>
                 <span class="l">area</span>
               </div>
               <div class="num">
@@ -277,6 +281,7 @@
               </fieldset>
             </div>
           </section>
+          </div>
         </aside>
       </main>
     </div>

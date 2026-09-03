@@ -1020,7 +1020,10 @@ button.primary:hover {
   position: absolute;
   top: 142px;
   right: 16px;
-  z-index: 3;
+  /* Above #save-column (z-index 20, found live sitting on top of this
+     panel once the column was added): opening shortcuts is a deliberate,
+     focused action and should win over the always-visible column. */
+  z-index: 21;
   width: 260px;
   max-height: calc(100% - 160px);
   overflow-y: auto;
@@ -1425,20 +1428,66 @@ button.primary:hover {
   z-index: 20; /* under the Units panel's 45, over the 3D view */
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+  /* Vertical scroll only — nothing inside should ever force the column
+     wider than its own 320px (found live: two side-by-side text inputs
+     with no explicit width did exactly that; fixed below). */
+  overflow-x: hidden;
   overflow-y: auto;
+}
+
+/* The column's own header: always visible, minimizes the three cards
+   below it without moving or resizing the column itself (found live: the
+   column has no way to get out of a resident's way otherwise). */
+.save-column-toggle {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card);
+  border-top: 3px solid var(--ink);
+  box-shadow: 0 1px 0 var(--line-paper);
+  padding: 8px 14px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  cursor: pointer;
+}
+.sc-caret {
+  transition: transform var(--dur-tap) var(--ease-out);
+}
+.save-column-toggle[aria-expanded="false"] .sc-caret {
+  transform: rotate(-90deg);
+}
+.save-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.save-column-body[hidden] {
+  display: none;
 }
 
 #save-column label {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-dim);
 }
 
 #save-column input[type="number"],
 #save-column input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   background: transparent;
   color: var(--text);
   border: 0;
@@ -1506,24 +1555,6 @@ button.primary:hover {
   text-transform: uppercase;
   letter-spacing: 0.14em;
 }
-/* The area count-up (the brief, `.cnt`): an integer CSS counter animated
-   via `@property --n`, restarted from JS by toggling this class so it
-   counts from the OLD value to the new one, "when the flat changes". */
-@property --n {
-  syntax: "<integer>";
-  initial-value: 0;
-  inherits: false;
-}
-.cnt {
-  counter-reset: n var(--n);
-  animation: flat-count 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
-}
-.cnt::after {
-  content: counter(n);
-}
-@keyframes flat-count {
-  to { --n: var(--to); }
-}
 .flat-check {
   display: flex;
   align-items: baseline;
@@ -1543,6 +1574,10 @@ button.primary:hover {
 .save-session-fields {
   display: flex;
   gap: 16px;
+}
+.save-session-fields > label {
+  flex: 1;
+  min-width: 0;
 }
 
 /* The folded one-line summary (run 0025, UX pass — "reveal complexity

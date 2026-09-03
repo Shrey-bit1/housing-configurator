@@ -990,6 +990,18 @@ function setMoreOpen(open: boolean): void {
 }
 moreToggle.addEventListener("click", () => setMoreOpen(moreBody.hidden));
 
+// The column's own minimize (found live: a resident needs a way to get the
+// whole thing out of the way, not just fold "More"). Collapsing hides the
+// three cards; the toggle itself stays docked at the column's own top-right
+// corner, matching #display-header's header/body pattern.
+const saveColumnToggle = document.getElementById("save-column-toggle") as HTMLButtonElement;
+const saveColumnBody = document.getElementById("save-column-body") as HTMLElement;
+saveColumnToggle.addEventListener("click", () => {
+  const open = saveColumnBody.hidden;
+  saveColumnBody.hidden = !open;
+  saveColumnToggle.setAttribute("aria-expanded", String(open));
+});
+
 // ---- "Your flat": name, three live numbers, the check line (run 0026) ----
 // The wireframe's card shows what the CURRENT design already is, not what a
 // save is about to write, so this reads straight from `floors` — the same
@@ -1001,16 +1013,49 @@ const flatStoreysEl = document.getElementById("flat-storeys") as HTMLElement;
 const flatGlazingEl = document.getElementById("flat-glazing") as HTMLElement;
 const flatCheckEl = document.getElementById("flat-check") as HTMLElement;
 
-/** Restarts the CSS counter animation (style.css's `.cnt`) from wherever it
- *  last landed to `to` — "the numbers count up when the flat changes", not
- *  always from zero. Removing and re-adding the class forces the browser to
- *  restart it; the reflow read is what makes the browser notice the removal
- *  before the class comes back. */
+/** Where each animated element's tween currently is, and its in-flight
+ *  frame handle, so a second call retargets instead of restarting: found
+ *  live that a CSS `@property`-animated counter, restarted by toggling its
+ *  class, snaps back to the registered `initial-value` the INSTANT the
+ *  class is removed (that is the only place its value lived), which is why
+ *  the number was starting from zero on every edit instead of from wherever
+ *  it last landed. A plain rAF tween keeps that value in JS instead. */
+const countState = new WeakMap<HTMLElement, { shown: number; raf: number }>();
+
+/** Animates `el`'s text from wherever it last landed to `to` over 700ms —
+ *  "the numbers count up when the flat changes", not always from zero.
+ *  Calling this again before the previous tween finishes cancels it and
+ *  retargets from the CURRENT displayed value, so repeated edits (an entrance
+ *  right after a room) retarget smoothly instead of restarting and visibly
+ *  juddering. */
 function animateCount(el: HTMLElement, to: number): void {
-  el.style.setProperty("--to", String(Math.max(0, Math.round(to))));
-  el.classList.remove("cnt");
-  void el.offsetWidth;
-  el.classList.add("cnt");
+  const target = Math.max(0, Math.round(to));
+  const state = countState.get(el) ?? { shown: 0, raf: 0 };
+  cancelAnimationFrame(state.raf);
+  const from = state.shown;
+  if (from === target) {
+    el.textContent = String(target);
+    state.raf = 0;
+    countState.set(el, state);
+    return;
+  }
+  const start = performance.now();
+  const DURATION = 700;
+  const tick = (now: number): void => {
+    const t = Math.min(1, (now - start) / DURATION);
+    const eased = 1 - (1 - t) ** 3; // ease-out cubic
+    const value = Math.round(from + (target - from) * eased);
+    el.textContent = String(value);
+    // Kept current every frame, not only on completion, so a SECOND edit
+    // arriving before this tween finishes retargets from what is actually
+    // on screen rather than from where the last completed tween started.
+    state.shown = value;
+    state.raf = t < 1 ? requestAnimationFrame(tick) : 0;
+    if (t >= 1) state.shown = target;
+    countState.set(el, state);
+  };
+  state.raf = requestAnimationFrame(tick);
+  countState.set(el, state);
 }
 
 /** Recomputed on every layout change (`floors.onLayoutChange`, below) and
