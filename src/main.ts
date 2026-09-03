@@ -991,6 +991,35 @@ const saveReplaceInput = document.getElementById("save-replace") as HTMLInputEle
 const tbSession = document.getElementById("tb-session") as HTMLElement;
 const PUBLISH_NOTE = savePublishNote.textContent ?? "";
 
+// The session fields fold into one line once both are already set (run 0025,
+// UX pass — "reveal complexity gradually"), re-decided on every dialog open,
+// never mid-edit: "change" unfolds for the rest of this dialog-open session.
+const saveSessionSummary = document.getElementById("save-session-summary") as HTMLElement;
+const saveSessionSummaryText = document.getElementById("save-session-summary-text") as HTMLElement;
+const saveSessionFields = document.getElementById("save-session-fields") as HTMLElement;
+const saveSessionChange = document.getElementById("save-session-change") as HTMLButtonElement;
+
+function unfoldSessionFields(): void {
+  saveSessionSummary.hidden = true;
+  saveSessionFields.hidden = false;
+}
+/** Fold only when both fields are already usable — `whyPublishDisabled` is
+ *  the one place "usable" is already defined, so this reuses it rather than
+ *  re-deriving the same condition. */
+function syncSessionFold(): void {
+  if (whyPublishDisabled(session) === null) {
+    saveSessionSummaryText.textContent = `${session.code} · ${session.resident.trim()}`;
+    saveSessionSummary.hidden = false;
+    saveSessionFields.hidden = true;
+  } else {
+    unfoldSessionFields();
+  }
+}
+saveSessionChange.addEventListener("click", () => {
+  unfoldSessionFields();
+  saveResidentInput.focus();
+});
+
 /** localStorage, or null where the browser refuses it (a sandboxed frame). */
 const sessionStorageArea = (() => {
   try {
@@ -1106,6 +1135,7 @@ async function openSaveDialog(): Promise<void> {
   for (const kind of ["project", "unit", "library", "publish"] as OutputKind[])
     saveWhatInputs[kind].checked = saveSelection[kind];
   syncSessionUI(); // and off again if the session fields are still empty
+  syncSessionFold(); // folded if both are already set, open otherwise
   syncSaveDialog();
   saveDialog.showModal();
   const entries = await readManifestEntries();
@@ -1261,6 +1291,9 @@ async function runSave(): Promise<void> {
         } else {
           line += ` (preview not sent — read back ${preview.bytes} bytes)`;
         }
+        // Names the next step (run 0025, UX pass — "end flows memorably",
+        // "make completion feel closer"): where to go and check it landed.
+        line += " — Open Units to see the room.";
         setSaveResult("publish", "written", line);
         saveReplaceInput.checked = false; // one deliberate tick per takeover, not a standing default
         void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
