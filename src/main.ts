@@ -1282,13 +1282,13 @@ async function saveLibraryEntry(
   color: string,
   unitFile: DwellingUnitFile
 ): Promise<void> {
-  // The preview: render and read back in the same turn (the context has no
-  // preserveDrawingBuffer), then BYTE-CHECK — a hidden canvas "succeeds" with
-  // an empty image, and an empty preview in the library is worse than a
+  // The SAME axonometric a session publish sends (run 0024): every library
+  // entry and every published flat's picture come from captureFlatPreview,
+  // never from whatever angle the author happened to be viewing. It already
+  // reads back and BYTE-CHECKS in the same turn — a hidden canvas "succeeds"
+  // with an empty image, and an empty preview in the library is worse than a
   // refused save.
-  renderer.render(scene, camera);
-  const preview = canvas.toDataURL("image/jpeg", 0.9);
-  const previewBytes = Math.max(0, Math.floor(((preview.length - preview.indexOf(",") - 1) * 3) / 4));
+  const { dataUrl: preview, bytes: previewBytes } = captureFlatPreview();
   if (!preview.startsWith("data:image/jpeg") || previewBytes < 1000) {
     setSaveResult(
       "library",
@@ -1558,6 +1558,18 @@ if (import.meta.env.DEV) {
      *  check can drive it directly and read the camera/controls before and
      *  after, to prove it leaves the live view untouched. */
     capturePreview(): { dataUrl: string; bytes: number } {
+      return captureFlatPreview();
+    },
+    /** Load a project (a library entry's `sourceProject`, typically) and
+     *  capture its preview in one call, for a batch re-render driven from
+     *  outside the app. No confirm, no toast: this is a dev tool operating
+     *  on state nobody is looking at, not a user-facing import. Run 0024
+     *  used it once to put every committed library unit through the same
+     *  function a session publish now uses. */
+    loadAndCapturePreview(sourceProject: unknown): { dataUrl: string; bytes: number } {
+      floors.loadProject(sourceProject as ProjectFile);
+      renderSidebar();
+      syncNorthUI();
       return captureFlatPreview();
     },
   };

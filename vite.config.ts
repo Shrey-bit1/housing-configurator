@@ -222,6 +222,42 @@ function librarySink(root: string): Plugin {
           }
         });
       });
+
+      // PREVIEW (run 0024): overwrite an existing entry's JPEG in place, id
+      // and the rest of the manifest untouched. Used once by the batch
+      // re-render that put every committed library unit through the same
+      // captureFlatPreview a session publish now uses, and available again
+      // whenever a future run needs to redo one.
+      server.middlewares.use("/__library/preview", (req, res) => {
+        const reply = (status: number, payload: unknown) => {
+          res.statusCode = status;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify(payload));
+        };
+        if (req.method !== "POST") return reply(405, { ok: false, error: "POST only" });
+        let body = "";
+        req.on("data", (c) => (body += c));
+        req.on("end", () => {
+          try {
+            const { id, preview } = JSON.parse(body) as { id?: string; preview?: string };
+            if (!id || typeof id !== "string")
+              return reply(400, { ok: false, error: "missing id" });
+            const manifest = readManifest(manifestPath);
+            const entry = manifest.units.find((u) => u.id === id);
+            if (!entry) return reply(404, { ok: false, error: `no entry with id "${id}"` });
+            const comma = preview?.indexOf(",") ?? -1;
+            if (!preview?.startsWith("data:image/jpeg") || comma < 0)
+              return reply(400, { ok: false, error: "preview is not a JPEG data URL" });
+            const jpeg = Buffer.from(preview.slice(comma + 1), "base64");
+            if (jpeg.length < 1000)
+              return reply(400, { ok: false, error: `preview is ${jpeg.length} bytes — the canvas read back empty` });
+            writeFileSync(join(unitsDir, entry.preview), jpeg);
+            reply(200, { ok: true, id, bytes: jpeg.length });
+          } catch (err) {
+            reply(500, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          }
+        });
+      });
     },
   };
 }
