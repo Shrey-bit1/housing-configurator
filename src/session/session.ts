@@ -70,21 +70,24 @@ export function writeSession(storage: KeyValue | null, s: SessionSettings): void
   }
 }
 
-/** Why Publish is disabled, in the dialog's own words, or null when it can run. */
+/** Why Send is disabled, in the column's own words, or null when it can run.
+ *  Words only (run 0026): a resident reads "group", never "session" — see
+ *  `_cowork/design/DESIGN-BRIEF-3sep.md`'s Words section. The code itself
+ *  (`SessionSettings`, `?session=`, `/api/session/…`) keeps its name. */
 export function whyPublishDisabled(s: SessionSettings): string | null {
   const resident = s.resident.trim();
-  if (!resident && !s.code) return "type your name and a session code above first";
+  if (!resident && !s.code) return "type your name and a group code above first";
   if (!resident) return "type your name above first";
-  if (!s.code) return "enter a session code above first";
-  if (!isValidCode(s.code)) return "a session code is 1 to 32 of a-z, 0-9, - and _";
+  if (!s.code) return "enter a group code above first";
+  if (!isValidCode(s.code)) return "a group code is 1 to 32 of a-z, 0-9, - and _";
   return null;
 }
 
-/** The top-bar line: which room, and who. */
+/** The top-bar line: which group, and who (words only, run 0026). */
 export function sessionLine(s: SessionSettings): string {
   const resident = s.resident.trim();
-  if (!s.code) return resident ? `No session · ${resident}` : "No session";
-  return resident ? `Session ${s.code} · ${resident}` : `Session ${s.code}`;
+  if (!s.code) return resident ? `No group · ${resident}` : "No group";
+  return resident ? `Group ${s.code} · ${resident}` : `Group ${s.code}`;
 }
 
 /**

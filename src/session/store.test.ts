@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { handleSession, type KV } from "./store";
+import { handleSession, sameResident, type KV } from "./store";
 
 /**
  * The session store's contract (docs/store.md), driven through an in-memory
@@ -131,6 +131,17 @@ describe("publishing a flat", () => {
   });
 });
 
+describe("sameResident", () => {
+  it("is trimmed and case-insensitive; empty names are equal only to empty", () => {
+    expect(sameResident("Ana", "Ana")).toBe(true);
+    expect(sameResident("ana", "Ana")).toBe(true);
+    expect(sameResident("  Ana  ", "Ana")).toBe(true);
+    expect(sameResident("", "")).toBe(true);
+    expect(sameResident("", "Ana")).toBe(false);
+    expect(sameResident("Ana", "Ben")).toBe(false);
+  });
+});
+
 describe("a flat belongs to whoever published it", () => {
   it("refuses a different resident's PUT with 409 and the owner's name", async () => {
     const kv = new MemoryKV();
@@ -152,6 +163,17 @@ describe("a flat belongs to whoever published it", () => {
     const res = await put(kv, "/api/session/abc/flats/u9?resident=Ana", UNIT_TEXT);
     expect(res.status).toBe(200);
     expect((await res.json()).version).toBe(2);
+  });
+
+  it("a case-different republish is the same resident too (run 0026)", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/flats/u9?resident=Ben", UNIT_TEXT);
+    const res = await put(kv, "/api/session/abc/flats/u9?resident=ben", UNIT_TEXT);
+    expect(res.status).toBe(200);
+    const s = await res.json();
+    expect(s.version).toBe(2);
+    // The name as typed is what gets recorded — only the COMPARISON folded case.
+    expect(s.resident).toBe("ben");
   });
 
   it("?replace=1 lets a different resident take a flat over", async () => {
@@ -225,6 +247,25 @@ describe("a building run", () => {
     expect(byId).toEqual({ u9: true, u8: false });
 
     expect((await put(kv, "/api/session/abc/building", "[]")).status).toBe(400);
+  });
+
+  it("carries an opaque plot (run 0026), optional and rejected only if not an object", async () => {
+    const kv = new MemoryKV();
+    const plot = { modulesX: 11, modulesY: 11, floors: 7 };
+    const run = await put(kv, "/api/session/abc/building", { genome: [1], summary: null, by: "Ben", plot });
+    expect(run.status).toBe(200);
+    expect((await run.json()).plot).toEqual(plot);
+    const session = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(session.building.plot).toEqual(plot);
+
+    // No plot at all: still fine, and the field is simply absent.
+    const noPlot = await put(kv, "/api/session/abc/building", { genome: [1], summary: null, by: "Ben" });
+    expect(noPlot.status).toBe(200);
+    expect("plot" in (await noPlot.json())).toBe(false);
+
+    // A plot that is not a JSON object: 400, whether an array or a scalar.
+    expect((await put(kv, "/api/session/abc/building", { genome: [1], summary: null, by: "Ben", plot: [1, 2] })).status).toBe(400);
+    expect((await put(kv, "/api/session/abc/building", { genome: [1], summary: null, by: "Ben", plot: "flat" })).status).toBe(400);
   });
 });
 

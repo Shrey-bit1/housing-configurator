@@ -105,11 +105,16 @@ for (const f of fixtures) {
 }
 
 // 6. A building run clears changed on every flat and is readable on its own.
-const run = await call("PUT", "/building", JSON.stringify({ genome: [3, 1, 4, 1, 5], summary: { flats: 2, fitness: 0.71 }, by: "Ben" }));
+// Run 0026: the run also carries a plot, opaque to the store, which must come
+// back byte-for-byte on every one of the three calls that carry a building run.
+const plot = { modulesX: 11, modulesY: 11, floors: 7 };
+const run = await call("PUT", "/building", JSON.stringify({ genome: [3, 1, 4, 1, 5], summary: { flats: 2, fitness: 0.71 }, by: "Ben", plot }));
 check(run.status === 200 && typeof run.json?.at === "string" && run.json?.by === "Ben", "building run stored with a timestamp");
+check(JSON.stringify(run.json?.plot) === JSON.stringify(plot), "building run carries the plot back at once");
 const after = await call("GET", "");
 check(after.json?.flats?.length === 2 && after.json.flats.every((f) => f.changed === false), "changed cleared on both flats");
 check(after.json?.building?.genome?.length === 5, "building run appears in the session state");
+check(JSON.stringify(after.json?.building?.plot) === JSON.stringify(plot), "the session state's building run carries the plot too");
 const building = await call("GET", "/building");
 check(building.text === JSON.stringify(after.json?.building), "GET building matches the session's copy");
 

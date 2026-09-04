@@ -40,6 +40,7 @@ import {
   type ProjectFile,
 } from "./core/projectIO";
 import { buildUnitExport, type DwellingUnitFile } from "./core/unitExport";
+import { unitStats } from "./core/unitStats";
 import { slugifyUnitName } from "./library/ids";
 import { projectNameFor, unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
 import { parseUnitLibraryIndex, type UnitManifestEntry } from "./library/manifest";
@@ -137,7 +138,14 @@ const f0 = floors.active;
 // Created near the end of setup (restore depends on functions defined below);
 // controllers snapshot through this stable wrapper meanwhile.
 let history: History | undefined;
-const commitHistory = () => history?.commit();
+// Every mutating action calls this, entrances and doors included — a wider
+// net than `floors.onLayoutChange` (wired to the room STORE alone), so the
+// save column's three numbers (run 0026, `refreshFlatCard` below) piggyback
+// on the SAME single point rather than adding a second, narrower hook.
+const commitHistory = () => {
+  history?.commit();
+  refreshFlatCard();
+};
 
 // ---- Interaction ----
 const ghost = new GhostPreview(f0.group, f0.grid, f0.store);
@@ -651,11 +659,14 @@ saveOpenBtn.addEventListener("click", (e) => {
 document.addEventListener("click", () => setSaveOpenOpen(false));
 // One Save item, and Open project beside it. The three separate items (Export
 // project, Export unit, and the dialog's own Save to library action) are
-// retired: the save dialog writes any combination of the three, so a second
-// route to a subset of them is only a way to forget one.
+// retired: the save column writes any combination of the three, so a second
+// route to a subset of them is only a way to forget one. The column is
+// always visible (run 0026), so "Save…" now opens "More" — where those
+// choices live — and refreshes the proposed number, rather than opening a
+// dialog that no longer exists.
 document.getElementById("menu-save")!.addEventListener("click", () => {
   setSaveOpenOpen(false);
-  void openSaveDialog();
+  setMoreOpen(true);
 });
 document.getElementById("menu-import")!.addEventListener("click", () => {
   setSaveOpenOpen(false);
@@ -953,12 +964,141 @@ function downloadAs(href: string, filename: string, revoke: boolean): void {
   if (revoke) URL.revokeObjectURL(href);
 }
 
-const saveDialog = document.getElementById("save-dialog") as HTMLDialogElement;
+// The save column is always visible (run 0026) — not a `<dialog>` any more,
+// so there is no show/hide; `openSaveDialog` (below) now means "refresh the
+// column's proposed number and session-derived state", called at startup and
+// whenever "More" is opened.
 const saveNumberInput = document.getElementById("save-number") as HTMLInputElement;
 const saveColorInput = document.getElementById("save-color") as HTMLInputElement;
 const saveNamesLine = document.getElementById("save-names") as HTMLElement;
 const saveResultsEl = document.getElementById("save-results") as HTMLElement;
 const saveGoBtn = document.getElementById("save-go") as HTMLButtonElement;
+
+// ---- "More": folded by default (run 0026), holding the design number,
+// colour and the five checkboxes that used to be the whole dialog. ----
+const moreToggle = document.getElementById("more-toggle") as HTMLButtonElement;
+const moreBody = document.getElementById("more-body") as HTMLElement;
+const morePlus = document.getElementById("more-plus") as HTMLElement;
+function setMoreOpen(open: boolean): void {
+  moreBody.hidden = !open;
+  moreToggle.setAttribute("aria-expanded", String(open));
+  morePlus.textContent = open ? "−" : "+";
+  // The proposed number can go stale while folded (another resident may have
+  // published in the meantime); refresh it whenever a resident actually opens
+  // this, same as opening the old dialog used to.
+  if (open) void openSaveDialog();
+}
+moreToggle.addEventListener("click", () => setMoreOpen(moreBody.hidden));
+
+// The column's own minimize (found live: a resident needs a way to get the
+// whole thing out of the way, not just fold "More"). Collapsing hides the
+// three cards; the toggle itself stays docked at the column's own top-right
+// corner, matching #display-header's header/body pattern.
+const saveColumnToggle = document.getElementById("save-column-toggle") as HTMLButtonElement;
+const saveColumnBody = document.getElementById("save-column-body") as HTMLElement;
+saveColumnToggle.addEventListener("click", () => {
+  const open = saveColumnBody.hidden;
+  saveColumnBody.hidden = !open;
+  saveColumnToggle.setAttribute("aria-expanded", String(open));
+});
+
+// ---- "Your flat": name, three live numbers, the check line (run 0026) ----
+// The wireframe's card shows what the CURRENT design already is, not what a
+// save is about to write, so this reads straight from `floors` — the same
+// source `buildUnitExport`/`validate` already read for Check Layout and for
+// the unit build below — rather than waiting for a save.
+const flatNameEl = document.getElementById("flat-name") as HTMLElement;
+const flatAreaCnt = document.getElementById("flat-area-cnt") as HTMLElement;
+const flatStoreysEl = document.getElementById("flat-storeys") as HTMLElement;
+const flatGlazingEl = document.getElementById("flat-glazing") as HTMLElement;
+const flatCheckEl = document.getElementById("flat-check") as HTMLElement;
+
+/** Where each animated element's tween currently is, and its in-flight
+ *  frame handle, so a second call retargets instead of restarting: found
+ *  live that a CSS `@property`-animated counter, restarted by toggling its
+ *  class, snaps back to the registered `initial-value` the INSTANT the
+ *  class is removed (that is the only place its value lived), which is why
+ *  the number was starting from zero on every edit instead of from wherever
+ *  it last landed. A plain rAF tween keeps that value in JS instead. */
+const countState = new WeakMap<HTMLElement, { shown: number; raf: number }>();
+
+/** Animates `el`'s text from wherever it last landed to `to` over 700ms —
+ *  "the numbers count up when the flat changes", not always from zero.
+ *  Calling this again before the previous tween finishes cancels it and
+ *  retargets from the CURRENT displayed value, so repeated edits (an entrance
+ *  right after a room) retarget smoothly instead of restarting and visibly
+ *  juddering. */
+function animateCount(el: HTMLElement, to: number): void {
+  const target = Math.max(0, Math.round(to));
+  const state = countState.get(el) ?? { shown: 0, raf: 0 };
+  cancelAnimationFrame(state.raf);
+  const from = state.shown;
+  if (from === target) {
+    el.textContent = String(target);
+    state.raf = 0;
+    countState.set(el, state);
+    return;
+  }
+  const start = performance.now();
+  const DURATION = 700;
+  const tick = (now: number): void => {
+    const t = Math.min(1, (now - start) / DURATION);
+    const eased = 1 - (1 - t) ** 3; // ease-out cubic
+    const value = Math.round(from + (target - from) * eased);
+    el.textContent = String(value);
+    // Kept current every frame, not only on completion, so a SECOND edit
+    // arriving before this tween finishes retargets from what is actually
+    // on screen rather than from where the last completed tween started.
+    state.shown = value;
+    state.raf = t < 1 ? requestAnimationFrame(tick) : 0;
+    if (t >= 1) state.shown = target;
+    countState.set(el, state);
+  };
+  state.raf = requestAnimationFrame(tick);
+  countState.set(el, state);
+}
+
+/** Recomputed on every layout change (`floors.onLayoutChange`, below) and
+ *  once at startup: the exact figures a save would write right now, read
+ *  through `buildUnitExport` — the SAME function the save itself calls —
+ *  so the card can never show a number the save disagrees with. A gate
+ *  failure (no entrance yet, a disconnected floor) shows 0/0/0 and the
+ *  gate's own reason as the check line; it is not an error, just an
+ *  unfinished flat. */
+function refreshFlatCard(): void {
+  flatNameEl.textContent = unitNameFor(saveDesignNumber());
+  const built = buildUnitExport(floors, "", "#000000");
+  const stats = built.ok ? unitStats(built.file.storeys) : { areaM2: 0, storeys: 0, glazingM: 0 };
+  animateCount(flatAreaCnt, stats.areaM2);
+  flatStoreysEl.textContent = String(stats.storeys);
+  flatGlazingEl.textContent = String(stats.glazingM);
+
+  flatCheckEl.replaceChildren();
+  if (!built.ok) {
+    const note = document.createElement("span");
+    note.className = "s";
+    note.textContent = built.reason;
+    flatCheckEl.appendChild(note);
+    return;
+  }
+  const hard = validate(computeDwellingGraph(floors.floors), floors.orientationPreference).filter(
+    (v) => v.severity === "hard"
+  );
+  const chip = document.createElement("span");
+  chip.className = hard.length ? "chip chip-acc" : "chip chip-ok";
+  chip.textContent = hard.length ? `${hard.length} must fix` : "checks pass";
+  flatCheckEl.appendChild(chip);
+  if (hard.length) {
+    const rest = document.createElement("span");
+    rest.className = "s";
+    rest.textContent = hard[0].description + " · ";
+    const showMe = document.createElement("a");
+    showMe.textContent = "show me";
+    showMe.addEventListener("click", () => runCheck());
+    rest.appendChild(showMe);
+    flatCheckEl.appendChild(rest);
+  }
+}
 const saveWhatInputs: Record<OutputKind, HTMLInputElement> = {
   project: document.getElementById("save-what-project") as HTMLInputElement,
   unit: document.getElementById("save-what-unit") as HTMLInputElement,
@@ -1079,6 +1219,7 @@ function saveDesignNumber(): number {
  *  re-derived from the two inputs. Nothing ticked is not a save. */
 function syncSaveDialog(): void {
   const n = saveDesignNumber();
+  flatNameEl.textContent = unitNameFor(n);
   const sel = readSaveSelection();
   // A disabled Publish box keeps the remembered choice rather than forgetting it.
   saveSelection = { ...sel, publish: saveWhatInputs.publish.disabled ? saveSelection.publish : sel.publish };
@@ -1127,18 +1268,20 @@ async function readSessionFlatNames(): Promise<{ id: string; name: string }[]> {
  *  flats were counted too (run 0024). */
 let numberCountsSession = false;
 
-/** Open on the NEXT FREE NUMBER: the lowest positive integer neither the
- *  library manifest nor (with a session set) the session's own flats hold
- *  (src/library/naming.ts), re-read on every open so a save made a moment ago
- *  is already counted. */
+/**
+ * Refresh the (always-visible, run 0026) save column's proposed number and
+ * session-derived state: the NEXT FREE NUMBER, the lowest positive integer
+ * neither the library manifest nor (with a session set) the session's own
+ * flats hold (src/library/naming.ts). Named for what it did before this run
+ * — open the dialog — since the call sites (startup, "More" opening) are
+ * the same "this is now stale, freshen it" moments a dialog-open used to be.
+ */
 async function openSaveDialog(): Promise<void> {
-  saveResultsEl.replaceChildren();
   for (const kind of ["project", "unit", "library", "publish"] as OutputKind[])
     saveWhatInputs[kind].checked = saveSelection[kind];
   syncSessionUI(); // and off again if the session fields are still empty
   syncSessionFold(); // folded if both are already set, open otherwise
   syncSaveDialog();
-  saveDialog.showModal();
   const entries = await readManifestEntries();
   const sessionFlats = await readSessionFlatNames();
   numberCountsSession = session.code.length > 0;
@@ -1285,7 +1428,13 @@ async function runSave(): Promise<void> {
     }
     if (!declined) {
       if (r.ok) {
-        let line = `Published as ${r.label} to ${session.code}, version ${r.version}`;
+        // Words, run 0026: "Sent to <code> as <label>", the brief's exact
+        // phrasing (run 0025's "Published as… to…, version N" carried the
+        // same facts in session wording; the version now shows only when it
+        // moved, since "version 1" says nothing a first send doesn't already
+        // imply).
+        let line = `Sent to ${session.code} as ${r.label}`;
+        if (r.version > 1) line += `, version ${r.version}`;
         const preview = captureFlatPreview();
         if (preview.dataUrl.startsWith("data:image/jpeg") && preview.bytes >= 1000) {
           const jpeg = await fetch(preview.dataUrl).then((res) => res.blob());
@@ -1296,7 +1445,7 @@ async function runSave(): Promise<void> {
         }
         // Names the next step (run 0025, UX pass — "end flows memorably",
         // "make completion feel closer"): where to go and check it landed.
-        line += " — Open Units to see the room.";
+        line += " · open Units to see your group.";
         setSaveResult("publish", "written", line);
         saveReplaceInput.checked = false; // one deliberate tick per takeover, not a standing default
         void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
@@ -1405,7 +1554,6 @@ saveColorInput.addEventListener("input", () => (saveColorTouched = true));
 for (const input of Object.values(saveWhatInputs))
   input.addEventListener("change", syncSaveDialog);
 saveGoBtn.addEventListener("click", () => void runSave());
-document.getElementById("save-close")!.addEventListener("click", () => saveDialog.close());
 
 /** Nothing authored yet: one floor, nothing placed, no doors, no entrances. Used
  *  to decide whether an import has anything to destroy. */
@@ -1702,6 +1850,7 @@ function restoreState(snapshot: string): void {
   floors.setActive(Math.min(prevActive, newCount - 1));
   renderSidebar();
   syncNorthUI(); // north is in the snapshot — reflect the restored angle on the dial
+  refreshFlatCard(); // an undo/redo/import changes the flat as much as any edit does
 }
 
 function updateHistoryButtons(): void {
@@ -1776,6 +1925,11 @@ window.addEventListener("keydown", (e) => {
 const resizeObserver = new ResizeObserver(() => ctx.handleResize());
 resizeObserver.observe(canvas);
 window.addEventListener("resize", () => ctx.handleResize());
+
+// The save column is always visible (run 0026), so its own state needs one
+// startup read rather than waiting for a first "open".
+void openSaveDialog();
+refreshFlatCard();
 
 // ---- Render loop ----
 /** Timestamp of the previous frame, for a real delta rather than an assumed

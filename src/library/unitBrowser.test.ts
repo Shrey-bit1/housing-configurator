@@ -21,6 +21,11 @@ describe("isMine", () => {
     expect(isMine("Ana", "")).toBe(false);
     expect(isMine("", "")).toBe(false);
   });
+
+  it("is trimmed and case-insensitive (run 0026: ana is Ana)", () => {
+    expect(isMine("Ana ", "ana")).toBe(true);
+    expect(isMine("  ana", "Ana")).toBe(true);
+  });
 });
 
 describe("sortMineFirst", () => {

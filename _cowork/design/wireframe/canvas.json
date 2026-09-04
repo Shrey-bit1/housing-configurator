@@ -1,0 +1,79 @@
+{
+  "artboards": [
+    {
+      "file": "FlatDraw.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 820,
+      "title": "Flat app \u00b7 Draw your flat"
+    },
+    {
+      "file": "Join.dc.html",
+      "x": 0,
+      "y": 960,
+      "w": 1280,
+      "h": 820,
+      "title": "Building app \u00b7 01 Join"
+    },
+    {
+      "file": "Wishes.dc.html",
+      "x": 1360,
+      "y": 960,
+      "w": 1280,
+      "h": 820,
+      "title": "Building app \u00b7 02 Your wishes"
+    },
+    {
+      "file": "Main.dc.html",
+      "x": 2720,
+      "y": 960,
+      "w": 1280,
+      "h": 820,
+      "title": "Building app \u00b7 03 The group"
+    },
+    {
+      "file": "YourFlat.dc.html",
+      "x": 0,
+      "y": 1920,
+      "w": 1280,
+      "h": 820,
+      "title": "Building app \u00b7 04 Your flat"
+    },
+    {
+      "file": "Vote.dc.html",
+      "x": 1360,
+      "y": 1920,
+      "w": 1280,
+      "h": 820,
+      "title": "Building app \u00b7 05 Vote"
+    },
+    {
+      "file": "Architect.dc.html",
+      "x": 2720,
+      "y": 1920,
+      "w": 1280,
+      "h": 820,
+      "title": "Building app \u00b7 the Architect drawer"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": 1360,
+      "y": 40,
+      "w": 520,
+      "text": "(Re)Configure, the final interface. Third pass, Bauhaus on paper, 3 Sept 2026.\nTop row: the flat app. Rows two and three: the building app, five steps left to right, plus the Architect drawer.\nMotion is part of the design: click into an artboard and reload it to see the building draw itself, the numbers count, the radar trace, the heading type. Orange = the one primary action per screen. Orange NOTE blocks are for the reader, not part of the interface."
+    },
+    {
+      "id": "taste",
+      "x": 2720,
+      "y": 40,
+      "w": 460,
+      "text": "Where the look comes from:\n\u00b7 Bauhaus: paper, black rules, red / blue / yellow, circles and triangles as controls, a flat square-cut condensed face (Big Shoulders) with Jost (a Futura cousin) for reading\n\u00b7 BASEBORN: heavy uppercase, a clock in the bar, hover that moves\n\u00b7 Critical Danger: the headline arrives out of a blur, one hot colour\n\u00b7 SearchSystem: tiny mono labels, slashes, numbered everything, corner marks on frames\n\u00b7 anime.js: instrument rings with tick marks, typed-in text, numbers that count\n\u00b7 Smithsons' Soho House: as found. The building is drawn as lines first, skin second."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

@@ -254,6 +254,24 @@ content-type: application/json
 `GET` on the same path returns the same object, or `null` when no run has
 been written.
 
+`plot` is OPTIONAL (run 0026) and opaque, exactly like `genome` and `summary`:
+the building app's own record of the plot it built on — module grid size,
+floor count, whatever it decides a plot is — stored exactly as sent and never
+read inside. It travels back on `GET .../building`, on `GET /api/session/{code}`
+(as `building.plot`) and on `GET .../export`, the same three places the rest of
+a building run appears.
+
+```
+PUT /api/session/room-42/building
+content-type: application/json
+
+{ "genome": [3, 1, 4, 1, 5], "summary": { "flats": 2, "fitness": 0.71 }, "by": "Ben",
+  "plot": { "modulesX": 11, "modulesY": 11, "floors": 7 } }
+```
+
+A `plot` present but not a JSON object is `400`; its absence means a building
+app that predates the field, or a run with nothing yet to say about the plot.
+
 ### `GET`/`PUT /api/session/{code}/flats/{id}/preview` — a flat's picture
 
 Added in run 0024, alongside the axonometric every flat gets when it is

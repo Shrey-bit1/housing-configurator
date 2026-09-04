@@ -89,7 +89,9 @@ export function unitGateResults(sel: SaveSelection, reason: string): OutputResul
   );
 }
 
-/** Human label for a result line's leading word. */
+/** Human label for a result line's leading word. Words only (run 0026): a
+ *  resident reads "Group", never "Session" — the `OutputKind` identifier
+ *  keeps its name (`SaveSelection.publish`, `planOutputs`, …). */
 export function outputLabel(kind: OutputKind): string {
   return kind === "project"
     ? "Project file"
@@ -97,5 +99,5 @@ export function outputLabel(kind: OutputKind): string {
       ? "Unit file"
       : kind === "library"
         ? "Library entry"
-        : "Session";
+        : "Group";
 }

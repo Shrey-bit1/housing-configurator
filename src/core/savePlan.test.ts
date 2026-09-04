@@ -150,6 +150,6 @@ describe("outputLabel", () => {
     expect(outputLabel("project")).toBe("Project file");
     expect(outputLabel("unit")).toBe("Unit file");
     expect(outputLabel("library")).toBe("Library entry");
-    expect(outputLabel("publish")).toBe("Session");
+    expect(outputLabel("publish")).toBe("Group");
   });
 });
