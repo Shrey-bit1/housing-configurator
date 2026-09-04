@@ -201,13 +201,13 @@ describe("a resident's wishes", () => {
     const kv = new MemoryKV();
     const a = await put(kv, "/api/session/abc/residents/Ana%20B", { counts: { u9: 2 }, share: 0.3, ballot: ["laundry", "workshop"] });
     expect(a.status).toBe(200);
-    expect(await a.json()).toEqual({ name: "Ana B", counts: { u9: 2 }, share: 0.3, ballot: ["laundry", "workshop"] });
+    expect(await a.json()).toEqual({ name: "Ana B", counts: { u9: 2 }, share: 0.3, ballot: ["laundry", "workshop"], shareM2: null, extraM2: null });
 
     const b = await put(kv, "/api/session/abc/residents/Ana%20B", { share: 0.5 });
-    expect(await b.json()).toEqual({ name: "Ana B", counts: { u9: 2 }, share: 0.5, ballot: ["laundry", "workshop"] });
+    expect(await b.json()).toEqual({ name: "Ana B", counts: { u9: 2 }, share: 0.5, ballot: ["laundry", "workshop"], shareM2: null, extraM2: null });
 
     const c = await put(kv, "/api/session/abc/residents/Ben", {});
-    expect(await c.json()).toEqual({ name: "Ben", counts: {}, share: null, ballot: [] });
+    expect(await c.json()).toEqual({ name: "Ben", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null });
 
     expect((await put(kv, "/api/session/abc/residents/Ben", { share: 1.5 })).status).toBe(400);
     expect((await put(kv, "/api/session/abc/residents/Ben", { counts: { u9: -1 } })).status).toBe(400);
@@ -217,9 +217,61 @@ describe("a resident's wishes", () => {
 
     const session = await (await call(kv, "GET", "/api/session/abc")).json();
     expect(session.residents).toEqual([
-      { name: "Ana B", counts: { u9: 2 }, share: 0.5, ballot: ["laundry", "workshop"] },
-      { name: "Ben", counts: {}, share: null, ballot: [] },
+      { name: "Ana B", counts: { u9: 2 }, share: 0.5, ballot: ["laundry", "workshop"], shareM2: null, extraM2: null },
+      { name: "Ben", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null },
     ]);
+  });
+});
+
+describe("the two square-metre answers (run 0030)", () => {
+  it("reads back null on both when the resident has never been written", async () => {
+    const kv = new MemoryKV();
+    const r = await put(kv, "/api/session/abc/residents/Cara", {});
+    expect(await r.json()).toEqual({
+      name: "Cara", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null,
+    });
+  });
+
+  it("merges a body carrying only shareM2 and leaves counts and ballot alone", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/residents/Ana", { counts: { u9: 2 }, ballot: ["garden"] });
+    const r = await put(kv, "/api/session/abc/residents/Ana", { shareM2: 7 });
+    expect(await r.json()).toEqual({
+      name: "Ana", counts: { u9: 2 }, share: null, ballot: ["garden"], shareM2: 7, extraM2: null,
+    });
+  });
+
+  it("accepts zero and null, which are different answers", async () => {
+    const kv = new MemoryKV();
+    const zero = await put(kv, "/api/session/abc/residents/Ana", { shareM2: 0, extraM2: 0 });
+    expect(zero.status).toBe(200);
+    expect(await zero.json()).toMatchObject({ shareM2: 0, extraM2: 0 });
+    // Zero is "I answered, and my answer is none of it". Null is "I never
+    // answered". The building app's median has to be able to tell them apart.
+    const back = await put(kv, "/api/session/abc/residents/Ana", { shareM2: null });
+    expect(await back.json()).toMatchObject({ shareM2: null, extraM2: 0 });
+  });
+
+  it("refuses a negative, a fraction and a string, on either key", async () => {
+    const kv = new MemoryKV();
+    for (const key of ["shareM2", "extraM2"]) {
+      for (const bad of [-1, 7.5, "7"]) {
+        const r = await put(kv, "/api/session/abc/residents/Ana", { [key]: bad });
+        expect(r.status, `${key} = ${JSON.stringify(bad)}`).toBe(400);
+        expect(await r.text()).toContain(`${key} must be a whole number of square metres`);
+      }
+    }
+  });
+
+  it("carries both fields through the export as well as the poll", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/residents/Ana", { shareM2: 7, extraM2: 5 });
+    const polled = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(polled.residents).toEqual([
+      { name: "Ana", counts: {}, share: null, ballot: [], shareM2: 7, extraM2: 5 },
+    ]);
+    const exported = await (await call(kv, "GET", "/api/session/abc/export")).json();
+    expect(exported.residents).toEqual(polled.residents);
   });
 });
 
@@ -348,6 +400,9 @@ describe("two writers", () => {
       override async getWithMetadata(key: string) {
         const cur = await super.getWithMetadata(key);
         // Someone else's resident lands between this writer's read and write, once.
+        // It goes straight into the index rather than through the merge, so it
+        // is written with the THREE keys a record had before run 0030 — which
+        // is exactly what a record already sitting in a live store looks like.
         if (cur && !this.raced) {
           this.raced = true;
           const other = JSON.parse(cur.data);
@@ -363,7 +418,10 @@ describe("two writers", () => {
     expect(res.status).toBe(200);
     const session = await (await call(kv, "GET", "/api/session/abc")).json();
     expect(session.residents).toEqual([
-      { name: "Ana", counts: {}, share: 0.9, ballot: [] },
+      { name: "Ana", counts: {}, share: 0.9, ballot: [], shareM2: null, extraM2: null },
+      // Ben keeps the shape he was written with. The store reads a record back
+      // as it found it and does not backfill, so an old record stays readable
+      // and its two missing keys simply read as absent rather than as zero.
       { name: "Ben", counts: {}, share: 0.2, ballot: [] },
     ]);
   });
