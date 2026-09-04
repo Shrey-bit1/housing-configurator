@@ -2042,7 +2042,8 @@ sheet spanning the viewport bottom, rendered by `ui/validationPanel.ts`:
   (`OR1 (1/2)`), because hover emphasis targets ONE violation's rooms and a merged
   card would have nothing single to point at.
 - `ACTION_BY_RULE` (`validationPanel.ts:46`) is a display-only suggested move per
-  rule id, covering 34 of the 41 rules; the seven notes have no entry and render
+  rule id, covering 35 of the 42 rules (run 0029 added P4's); the seven notes have
+  no entry and render
   no action line. It is deliberately NOT in `RULES` — `validate()`'s returned data
   is unchanged and `rules.test.ts` never sees this file.
 - `bindWheelToScroll` calls `preventDefault` only while the rail can still move
@@ -2074,7 +2075,7 @@ repository reads. Renaming the preset would change a file format. The report and
 the diagram therefore still say Circulation while the palette says Hall.
 
 **DOCS DRIFT, MEASURED.** `docs/rules-list.html` and `docs/rules-list.md`
-document 37 of the 41 rules; FAC1, OR2, ST3 and WET1 have no entry, and E1 is
+document 37 of the 42 rules; FAC1, OR2, P4, ST3 and WET1 have no entry, and E1 is
 filed as a note where `rules.ts` has it hard. Run 0017 corrected the totals it was
 already rewriting (35/36 → 41, and the tier index 11/19/7 → 14/21/6) but left the
 per-rule entries alone, because filling them is a docs regeneration rather than a
@@ -3136,6 +3137,7 @@ typology — open-plan, en-suite, efficient services).
 | P1 | 🔴 hard | A dwelling needs a bathroom. |
 | P2 | 🔴 hard | A dwelling needs a kitchen. |
 | P3 | 🟢 note | More than one kitchen — atypical, but not a problem. |
+| P4 | 🔴 hard | A dwelling needs a bedroom — place one so the flat has somewhere to sleep. |
 | MB1 | 🟡 soft | A floor has bedrooms but no bathroom (nighttime stair trip). GATED on P1 silent (a bathroom exists somewhere) — never double-fires with P1 on a bathroom-less flat. Per-floor. |
 
 **Reachability** (entrance-rooted, whole dwelling, DOOR-BASED — traverses ACCESS/`viaDoor` edges only, across door-gated stairs; corridors NOT required). The blocked-BFS family (H2/H3/H6/G1) EXEMPTS the seed/root node from blocking — you enter *through* the host by definition, so an entrance ON a bedroom/bathroom/outdoor space doesn't detonate every room; G2 is the gentle signal for that typology.

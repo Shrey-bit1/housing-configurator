@@ -53,6 +53,7 @@ const ACTION_BY_RULE: Record<string, string> = {
   E2: "clear whatever now sits against that edge",
   P1: "place a bathroom",
   P2: "place a kitchen",
+  P4: "place a bedroom",
   MB1: "add a bathroom on that floor",
   H1: "add a door on a route back to the entrance",
   H2: "add a second door that avoids the bathroom",

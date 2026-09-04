@@ -584,6 +584,21 @@ export const RULES: Rule[] = [
     },
   },
   {
+    // The third of the programme rules, added in run 0029 on Shrey's decision of
+    // 4 September: in this project the smallest flat is a proper one-bedroom and
+    // there is NO studio exception. A living room that doubles as a bedroom is a
+    // real dwelling type and it is deliberately not one this configurator makes,
+    // because the packer downstream allocates one flat per resident and a flat
+    // with nowhere to sleep is not one.
+    id: "P4",
+    severity: "hard",
+    description: "A dwelling needs a bedroom — place one so the flat has somewhere to sleep.",
+    check(graph, ctx) {
+      if (graph.nodes.some(ctx.is.bedroom)) return [];
+      return [{ ruleId: "P4", severity: "hard", description: RULES_BY_ID.P4.description, nodeIds: [], layout: true }];
+    },
+  },
+  {
     // A sleeping floor with no toilet is the classic multi-storey miss — a
     // nighttime stair trip to the bathroom (comfort norm, SOFT). GATED on P1
     // being silent (some bathroom exists somewhere): a bathroom-less one-floor
