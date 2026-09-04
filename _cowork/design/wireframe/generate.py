@@ -23,7 +23,7 @@ CSS = f"""
     .brand {{ white-space:nowrap; font-family:{DISPLAY}; font-weight:900; font-size:20px; letter-spacing:0.02em; text-transform:uppercase; }}
     .brand b {{ color:{ACC}; font-weight:900; }}
     .steps {{ display:flex; gap:4px; align-items:center; flex-grow:1; }}
-    .step {{ white-space:nowrap; display:flex; align-items:center; gap:8px; padding:0 10px; height:64px; font-family:{DISPLAY}; font-weight:800; font-size:16px; text-transform:uppercase; letter-spacing:0.03em; color:{DIM}; }}
+    .step {{ white-space:nowrap; display:flex; align-items:center; gap:8px; padding:0 12px; height:64px; font-family:{DISPLAY}; font-weight:800; font-size:15px; text-transform:uppercase; letter-spacing:0.03em; color:{DIM}; }}
     .step .n {{ width:26px; height:26px; border-radius:13px; border:2px solid {DIM}; display:flex; align-items:center; justify-content:center; font-family:{BODY}; font-size:11px; font-weight:600; box-sizing:border-box; }}
     .step.done {{ color:{INK}; }}
     .step.done .n {{ background:{INK}; border-color:{INK}; color:{BG}; }}
@@ -485,7 +485,281 @@ def fix(html):
         return tag[:-1] + ' style="' + '; '.join(x.strip().rstrip(';') for x in styles) + '">'
     return re.sub(r'<[a-zA-Z][^>]*>', merge, html)
 
-SCREENS = {"FlatDraw": screen_draw, "Join": screen_join, "Wishes": screen_wishes, "Group": screen_group,
+
+# ---------- new screens, 3 Sept evening ----------
+
+def bar_flat(step, right_extra=""):
+    steps = []
+    for i, s in enumerate(["Draw your flat", "Send it to your group"], 1):
+        cls = "done" if i < step else ("now" if i == step else "")
+        steps.append(f'<div class="step {cls}"><span class="n">0{i}</span>{s}</div>')
+    return (f'<div class="bar"><div class="brand">(Re)<b>Configure</b> / Flat</div>'
+            f'<div class="steps">{"".join(steps)}</div>'
+            f'<div class="row" style="gap:6px"><div class="chip on">Model</div><div class="chip">Plan</div><div class="chip">Diagram</div></div>'
+            f'<div class="row" style="gap:8px">{right_extra}<div class="ghost">Units</div><div class="ghost">Open</div><div class="ghost">?</div></div></div>')
+
+def journey(here):
+    names = ["Draw your flat", "Send it", "Your wishes", "The group", "Your flat in it", "Vote"]
+    out = []
+    for i, n in enumerate(names):
+        on = i <= here
+        out.append(f'''<div class="row rise" {d(i, .1, .8)} style="gap:10px; flex-shrink:0">
+<div style="width:14px; height:14px; border-radius:7px; background:{ACC if i==here else (INK if on else "transparent")}; border:2px solid {INK if on else DIM}; box-sizing:border-box"></div>
+<span class="h" style="color:{INK if on else DIM}">{n}</span></div>''')
+        if i < len(names)-1:
+            out.append(f'<div style="flex-grow:1; height:2px; background:{INK if i < here else LINE}; min-width:24px"></div>')
+    return f'<div class="row" style="gap:10px">{"".join(out)}</div>'
+
+def screen_landing():
+    body = f'''<div class="root">
+<div class="disc" style="left:-180px; top:-140px; width:560px; height:560px; background:{YEL}"></div>
+<div class="disc" style="right:-90px; bottom:-120px; width:340px; height:340px; background:{BLUE}; opacity:.9"></div>
+<div style="position:absolute; left:0; right:0; top:0; height:10px; background:{ACC}"></div>
+<div style="padding:64px 64px 0; box-sizing:border-box; height:{H}px; display:flex; flex-direction:column">
+  <div class="row" style="justify-content:space-between">
+    <div class="brand" style="font-size:26px">(Re)<b>Configure</b></div>
+    <div class="h">ETH Zürich · MAS DFAB · Shrey Tatamiya</div>
+  </div>
+  <div style="flex-grow:1; display:flex; align-items:center; gap:80px; padding-bottom:40px">
+    <div style="width:620px">
+      <div class="t blur" style="font-size:88px; line-height:0.88">Draw the flat<br>you want<br>to live in.</div>
+      <div class="p rise" {d(2)} style="font-size:18px; line-height:1.5; margin-top:28px; max-width:460px">
+        Then the building arranges itself around everybody's flats. You and your
+        neighbours decide together how much is shared, and where it goes.</div>
+    </div>
+    <div style="width:400px; display:flex; flex-direction:column; gap:14px">
+      <div class="btn rise" {d(3)} style="height:76px; font-size:26px"><span>Start a flat</span><span>→</span></div>
+      <div class="btn2 rise" {d(4)} style="height:64px; font-size:20px"><span>Join a group</span><span>→</span></div>
+      <div class="btn2 rise" {d(5)} style="height:64px; font-size:20px"><span>Open a file</span><span>→</span></div>
+      <div class="s rise" {d(6)} style="margin-top:6px">Already sent your flat? <a>Go to your group</a></div>
+    </div>
+  </div>
+  <div style="padding:22px 0 34px; border-top:3px solid {INK}">
+    <div class="h" style="margin-bottom:14px">How it goes</div>
+    {journey(0)}
+  </div>
+</div>
+{note(760, 560, "The whole journey on the first screen, so a resident knows what they are in for. This is also the user-journey slide.", 300)}
+</div>'''
+    return HEAD + body + TAIL
+
+def flat_column(state="drawn"):
+    if state == "empty":
+        nums = f'''<div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; opacity:.35">
+        <div class="num"><span class="v">—</span><span class="l">area</span></div>
+        <div class="num"><span class="v">—</span><span class="l">storeys</span></div>
+        <div class="num"><span class="v">—</span><span class="l">glazing</span></div></div>'''
+        title = '<div class="t" style="font-size:34px; color:'+DIM+'">Untitled</div>'
+        note_line = f'<div class="p" style="color:{MUTE}">Drag a room onto the grid to start. Nothing is checked until you do.</div>'
+        send = f'<div class="btn2" style="opacity:.4"><span>Send it to your group</span><span>→</span></div>'
+    else:
+        nums = f'''<div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px">
+        <div class="num"><span class="v">70<small style="font-size:15px"> m²</small></span><span class="l">area</span></div>
+        <div class="num"><span class="v">1</span><span class="l">storey</span></div>
+        <div class="num"><span class="v">3.6<small style="font-size:15px"> m</small></span><span class="l">glazing</span></div></div>'''
+        title = '<div class="t" style="font-size:34px">Unit 6</div>'
+        note_line = f'<div class="row"><div class="chip acc">1 must fix</div><div class="s">no way in yet · <a>show me</a></div></div>'
+        send = f'<div class="btn"><span>Send it to your group</span><span>→</span></div>'
+    return f'''<div style="width:340px; display:flex; flex-direction:column; gap:14px">
+  <div class="card rise" {d(0)} style="gap:12px">
+    <div class="row" style="justify-content:space-between"><span class="h">Your flat</span><span class="h" style="font-size:14px">–</span></div>
+    {title}{nums}{note_line}
+  </div>
+  <div class="card rise" {d(1)} style="gap:12px">
+    <div class="h">Your group</div>
+    <div class="p"><b>room1</b> · you are <b>Ana</b> <span class="s">· change</span></div>
+    {send}
+    <div class="s">Your neighbours see it within seconds. It becomes Flat 6 and Unit 6.</div>
+  </div>
+  <div class="card rise" {d(2)} style="gap:6px; background:transparent; border-top-style:dashed">
+    <div class="row" style="justify-content:space-between"><span class="h" style="color:{INK}">More</span><span class="h" style="font-size:14px">+</span></div>
+    <div class="s">Design number · colour · save the files · replace an older version</div>
+  </div>
+</div>'''
+
+def grid_svg(w, h, ghost=False):
+    dots = []
+    for i in range(-7, 8):
+        for j in range(-7, 8):
+            x = w/2 + (i - j) * 26; y = h/2 + (i + j) * 13
+            dots.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="1.4" fill="{DIM}"/>')
+    edge = [(w/2 + (i-j)*26, h/2 + (i+j)*13) for (i, j) in ((-7,-7),(7,-7),(7,7),(-7,7))]
+    e = " ".join(f"{a:.0f},{b:.0f}" for a, b in edge)
+    gh = ""
+    if ghost:
+        p = [(w/2 + (i-j)*26, h/2 + (i+j)*13) for (i, j) in ((-3,-3),(1,-3),(1,1),(-3,1))]
+        gp = " ".join(f"{a:.0f},{b:.0f}" for a, b in p)
+        gh = (f'<polygon points="{gp}" fill="{ACC}" fill-opacity=".08" stroke="{ACC}" stroke-width="2" stroke-dasharray="8 6"/>'
+              f'<text x="{w/2-30:.0f}" y="{h/2-8:.0f}" font-family="Jost, sans-serif" font-weight="600" font-size="13" letter-spacing="1.4" fill="{ACC}">DROP A ROOM HERE</text>')
+    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}"><polygon points="{e}" fill="none" stroke="{INK}" stroke-width="1.5"/>{"".join(dots)}{gh}</svg>'
+
+def palette_col():
+    groups = [("Rooms", [("Living Room", "7×5", ACC), ("Kitchen", "4×4", YEL), ("Bedroom, small", "5×4", BLUE), ("Bedroom, large", "6×5", BLUE), ("Bathroom", "4×4", DIM), ("WC", "2×3", DIM)]),
+              ("Circulation & outdoor", [("Hall", "1×1", INK), ("Outdoor", "1×1", "#3f7d54")]),
+              ("Structure & access", [("Stair, straight", "2×8", DIM), ("Entrance", "exterior edge", ACC)])]
+    out = []
+    k = 0
+    for name, items in groups:
+        out.append(f'<div class="h" style="margin-top:14px">{name}</div>')
+        cells = "".join(f'''<div class="rise" {d(k+i, .05, .2)} style="display:flex; align-items:center; gap:8px; padding:8px; border:1.5px solid {LINE}">
+<div style="width:16px; height:16px; background:{c}"></div><div><div class="p" style="font-size:12px; font-weight:500; line-height:1.2">{n}</div><div class="s" style="font-size:10px">{s}</div></div></div>''' for i, (n, s, c) in enumerate(items))
+        k += len(items)
+        out.append(f'<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">{cells}</div>')
+    return f'''<div style="width:260px; display:flex; flex-direction:column; gap:6px; padding-right:6px">
+<div class="h" style="color:{INK}">Place</div>
+<div class="s">Drag a tile onto the grid. Press ? for every shortcut.</div>
+{"".join(out)}
+<div class="h" style="margin-top:16px">Floors</div>
+<div class="row" style="justify-content:space-between; padding:10px 12px; background:{INK}; color:{BG}"><span class="h" style="color:{BG}">Floor 0</span><span>◉</span></div>
+<div class="btn2" style="height:38px; font-size:14px; margin-top:6px"><span>+ Add floor</span><span></span></div>
+</div>'''
+
+def screen_flat_empty():
+    body = f'''<div class="root">{bar_flat(1)}
+<div class="main" style="gap:20px">
+  {palette_col()}
+  <div style="flex-grow:1; display:flex; align-items:center; justify-content:center; position:relative">
+    {grid_svg(700, 560, ghost=True)}
+  </div>
+  {flat_column("empty")}
+</div>
+{note(300, 690, "First run: no error before the resident has done anything. The numbers are dashes, the check line is a hint, Send is asleep until there is something to send.", 320)}
+{note(690, 690, "One ghost tile shows where the first room goes. It fades once anything is placed.", 230)}
+</div>'''
+    return HEAD + body + TAIL
+
+def screen_flat_draw2():
+    body = f'''<div class="root">{bar_flat(1)}
+<div class="main" style="gap:20px">
+  {palette_col()}
+  <div style="flex-grow:1; display:flex; align-items:center; justify-content:center; position:relative">
+    <svg width="700" height="560" viewBox="0 0 700 560" class="draw">
+      <g stroke="{INK}" fill="none" stroke-width="2.5">
+        <polygon points="350,120 570,230 350,340 130,230" pathLength="1" style="--d:.1s"/>
+        <line x1="240" y1="175" x2="460" y2="285" pathLength="1" style="--d:.5s"/>
+        <line x1="350" y1="120" x2="350" y2="340" pathLength="1" style="--d:.6s"/>
+      </g>
+      <polygon points="350,340 460,285 530,320 420,375" fill="{YEL}" fill-opacity=".55" stroke="{INK}" stroke-width="2" stroke-dasharray="7 5"/>
+      <line x1="350" y1="120" x2="460" y2="175" stroke="{ACC}" stroke-width="6"/>
+      <line x1="130" y1="230" x2="240" y2="285" stroke="{ACC}" stroke-width="6"/>
+      <g font-family="Jost, sans-serif" font-weight="600" font-size="11" letter-spacing="1.4" fill="{MUTE}">
+        <text x="255" y="200">LIVING / 24 M²</text><text x="255" y="290">BEDROOM / 14 M²</text>
+        <text x="370" y="205">KITCHEN</text><text x="380" y="300">BATH</text><text x="430" y="345" fill="{INK}">BALCONY</text>
+        <text x="130" y="430">RED EDGE = GLAZING · YELLOW = OPEN AIR</text>
+      </g>
+    </svg>
+    <div style="position:absolute; right:0; bottom:0; display:flex; gap:8px; align-items:flex-end">
+      <div class="card" style="padding:10px 14px; gap:6px"><div class="h">View</div>
+        <div class="row" style="gap:6px"><div class="chip on">Cutaway</div><div class="chip">Solid</div><div class="chip">Frame</div></div></div>
+      <div class="card" style="padding:10px; gap:4px; align-items:center"><div class="h">North 0°</div>
+        <svg width="54" height="54" viewBox="0 0 54 54"><circle class="ring" cx="27" cy="27" r="22" fill="none" stroke="{LINE}" stroke-width="1" stroke-dasharray="2 5"/><circle cx="27" cy="27" r="16" fill="none" stroke="{INK}" stroke-width="1.5"/><polygon points="27,8 31,27 23,27" fill="{ACC}"/><polygon points="27,46 31,27 23,27" fill="{INK}"/></svg></div>
+    </div>
+  </div>
+  {flat_column()}
+</div>
+{note(300, 96, "One view cluster in one corner: cutaway, solid, frame, north. Not three places.", 250)}
+{note(690, 96, "The column is the only place anything leaves this app. The top bar only brings things in: Units, Open.", 250)}
+{note(300, 690, "“More” holds the design number, the colour and the file checkboxes. One click, not four decisions up front.", 250)}
+</div>'''
+    return HEAD + body + TAIL
+
+
+def bar_flat2(step, strip=True):
+    steps = []
+    for i, s in enumerate(["Draw your flat", "Send it"], 1):
+        cls = "done" if i < step else ("now" if i == step else "")
+        steps.append(f'<div class="step {cls}"><span class="n">0{i}</span>{s}</div>')
+    st = ""
+    if strip:
+        st = (f'<div class="row" style="gap:13px; padding:0 14px; border-left:1px solid {LINE}; height:64px; align-items:center">'
+              f'<div class="num"><span class="v" style="font-size:22px">70<small style="font-size:11px"> m²</small></span><span class="l">area</span></div>'
+              f'<div class="num"><span class="v" style="font-size:22px">1</span><span class="l">storey</span></div>'
+              f'<div class="num"><span class="v" style="font-size:22px">3.6<small style="font-size:11px"> m</small></span><span class="l">glazing</span></div>'
+              f'<div class="chip acc" style="white-space:nowrap">1 must fix</div></div>')
+    return (f'<div class="bar" style="gap:0"><div class="brand" style="padding:0 18px 0 4px; font-size:18px">(Re)<b>Configure</b></div>'
+            f'<div class="steps">{"".join(steps)}</div>{st}<div style="flex-grow:1"></div>'
+            f'<div class="row" style="gap:5px; padding:0 16px 0 14px; border-left:1px solid {LINE}"><div class="chip on">Model</div><div class="chip">Plan</div><div class="chip">Diagram</div>'
+            f'<div class="ghost">Units</div><div class="ghost">Open</div><div class="ghost">?</div></div></div>')
+
+def screen_step1():
+    body = f"""<div class="root">{bar_flat2(1)}
+<div class="main" style="gap:20px">
+  {palette_col()}
+  <div style="flex-grow:1; display:flex; align-items:center; justify-content:center; position:relative">
+    <svg width="880" height="620" viewBox="0 0 880 620" class="draw">
+      <g stroke="{INK}" fill="none" stroke-width="2.5">
+        <polygon points="440,120 720,260 440,400 160,260" pathLength="1" style="--d:.1s"/>
+        <line x1="300" y1="190" x2="580" y2="330" pathLength="1" style="--d:.5s"/>
+        <line x1="440" y1="120" x2="440" y2="400" pathLength="1" style="--d:.6s"/>
+      </g>
+      <polygon points="440,400 580,330 670,375 530,445" fill="{YEL}" fill-opacity=".55" stroke="{INK}" stroke-width="2" stroke-dasharray="7 5"/>
+      <line x1="440" y1="120" x2="580" y2="190" stroke="{ACC}" stroke-width="6"/>
+      <line x1="160" y1="260" x2="300" y2="330" stroke="{ACC}" stroke-width="6"/>
+      <g font-family="Jost, sans-serif" font-weight="600" font-size="11" letter-spacing="1.4" fill="{MUTE}">
+        <text x="320" y="220">LIVING / 24 M²</text><text x="320" y="335">BEDROOM / 14 M²</text>
+        <text x="465" y="225">KITCHEN</text><text x="475" y="345">BATH</text><text x="545" y="415" fill="{INK}">BALCONY</text>
+        <text x="160" y="510">RED EDGE = GLAZING · YELLOW = OPEN AIR</text>
+      </g>
+    </svg>
+    <div style="position:absolute; right:0; bottom:0; display:flex; gap:8px; align-items:flex-end">
+      <div class="card" style="padding:10px 14px; gap:6px"><div class="h">View</div>
+        <div class="row" style="gap:6px"><div class="chip on">Cutaway</div><div class="chip">Solid</div><div class="chip">Frame</div></div></div>
+      <div class="card" style="padding:10px; gap:4px; align-items:center"><div class="h">North 0°</div>
+        <svg width="54" height="54" viewBox="0 0 54 54"><circle class="ring" cx="27" cy="27" r="22" fill="none" stroke="{LINE}" stroke-width="1" stroke-dasharray="2 5"/><circle cx="27" cy="27" r="16" fill="none" stroke="{INK}" stroke-width="1.5"/><polygon points="27,8 31,27 23,27" fill="{ACC}"/><polygon points="27,46 31,27 23,27" fill="{INK}"/></svg></div>
+    </div>
+  </div>
+</div>
+{note(300, 690, "No right panel. The numbers live as a thin strip in the bar and stay live while you draw. The check chip is red until the flat holds together.", 280)}
+{note(620, 690, "The drawing gets the whole middle. One panel on screen, never two.", 200)}
+{note(870, 690, "“02 Send” lights up once the flat has a way in. Clicking it is the whole of step two.", 230)}
+</div>"""
+    return HEAD + body + TAIL
+
+def screen_step2():
+    body = f"""<div class="root">{bar_flat2(2, strip=False)}
+<div class="main" style="gap:60px; align-items:center; padding:32px 64px">
+  <div style="flex-grow:1; display:flex; flex-direction:column; align-items:center; gap:18px">
+    <div class="h">Your flat, as your neighbours will see it</div>
+    <svg width="620" height="440" viewBox="0 0 620 440" class="draw">
+      <g stroke="{INK}" fill="none" stroke-width="2.5">
+        <polygon points="310,70 540,185 310,300 80,185" pathLength="1" style="--d:.2s"/>
+        <line x1="195" y1="127" x2="425" y2="242" pathLength="1" style="--d:.6s"/>
+        <line x1="310" y1="70" x2="310" y2="300" pathLength="1" style="--d:.7s"/>
+        <polygon points="310,300 310,340 80,225 80,185" pathLength="1" fill="{PANEL2}" style="--d:.9s"/>
+        <polygon points="310,300 310,340 540,225 540,185" pathLength="1" fill="{PANEL2}" style="--d:1s"/>
+      </g>
+      <polygon points="310,300 425,242 500,280 385,338" fill="{YEL}" fill-opacity=".55" stroke="{INK}" stroke-width="2" stroke-dasharray="7 5"/>
+      <line x1="310" y1="70" x2="425" y2="127" stroke="{ACC}" stroke-width="6"/>
+      <line x1="80" y1="185" x2="195" y2="242" stroke="{ACC}" stroke-width="6"/>
+    </svg>
+    <div class="row rise" {d(2)} style="gap:36px">
+      <div class="num"><span class="v">70<small style="font-size:15px"> m²</small></span><span class="l">area</span></div>
+      <div class="num"><span class="v">1</span><span class="l">storey</span></div>
+      <div class="num"><span class="v">3.6<small style="font-size:15px"> m</small></span><span class="l">glazing</span></div>
+      <div class="num"><span class="v">4</span><span class="l">rooms</span></div>
+      <div class="row"><div class="chip">All checks pass</div></div>
+    </div>
+  </div>
+  <div style="width:420px; display:flex; flex-direction:column; gap:16px">
+    <div class="t blur" style="font-size:56px">Send it to<br>your group.</div>
+    <div class="card rise" {d(2)} style="gap:16px; padding:24px">
+      <div class="field"><span class="h">Your group</span><div class="input" style="font-size:22px">room1</div></div>
+      <div class="field"><span class="h">Your name</span><div class="input" style="font-size:22px">Ana</div></div>
+      <div class="btn" style="height:64px; font-size:24px"><span>Send it</span><span>→</span></div>
+      <div class="s">It becomes Flat 6 and Unit 6. Your neighbours see it within seconds.</div>
+    </div>
+    <div class="card rise" {d(3)} style="gap:6px; background:transparent; border-top-style:dashed">
+      <div class="row" style="justify-content:space-between"><span class="h" style="color:{INK}">More</span><span class="h" style="font-size:14px">+</span></div>
+      <div class="s">Design number · colour · save the files · replace an older version</div>
+    </div>
+  </div>
+</div>
+{note(60, 730, "Step two is its own screen. The palette is gone, the flat is shown whole, and there is one thing to do.", 320)}
+{note(640, 96, "The group fields sit next to the button that uses them, not in a sidebar three steps away.", 260)}
+</div>"""
+    return HEAD + body + TAIL
+
+SCREENS = {"Landing": screen_landing, "FlatEmpty": screen_flat_empty, "FlatDraw": screen_step1, "FlatSend": screen_step2, "Join": screen_join, "Wishes": screen_wishes, "Group": screen_group,
            "YourFlat": screen_yourflat, "Vote": screen_vote, "Architect": screen_architect}
 
 if __name__ == "__main__":
@@ -494,8 +768,8 @@ if __name__ == "__main__":
         fname = "Main.dc.html" if name == "Group" else f"{name}.dc.html"
         with open(fname, "w") as f: f.write(fix(fn()))
     gap, rgap = 80, 140
-    rows = [["FlatDraw.dc.html"], ["Join.dc.html", "Wishes.dc.html", "Main.dc.html"], ["YourFlat.dc.html", "Vote.dc.html", "Architect.dc.html"]]
-    titles = {"FlatDraw.dc.html": "Flat app · Draw your flat", "Join.dc.html": "Building app · 01 Join", "Wishes.dc.html": "Building app · 02 Your wishes", "Main.dc.html": "Building app · 03 The group", "YourFlat.dc.html": "Building app · 04 Your flat", "Vote.dc.html": "Building app · 05 Vote", "Architect.dc.html": "Building app · the Architect drawer"}
+    rows = [["Landing.dc.html", "FlatEmpty.dc.html", "FlatDraw.dc.html", "FlatSend.dc.html"], ["Join.dc.html", "Wishes.dc.html", "Main.dc.html"], ["YourFlat.dc.html", "Vote.dc.html", "Architect.dc.html"]]
+    titles = {"Landing.dc.html": "Flat app · 00 Landing", "FlatEmpty.dc.html": "Flat app · 01 Empty, first run", "FlatDraw.dc.html": "Flat app · 01 Draw your flat", "FlatSend.dc.html": "Flat app · 02 Send it to your group", "Join.dc.html": "Building app · 01 Join", "Wishes.dc.html": "Building app · 02 Your wishes", "Main.dc.html": "Building app · 03 The group", "YourFlat.dc.html": "Building app · 04 Your flat", "Vote.dc.html": "Building app · 05 Vote", "Architect.dc.html": "Building app · the Architect drawer"}
     boards = [{"file": f, "x": c*(W+gap), "y": r*(H+rgap), "w": W, "h": H, "title": titles[f]} for r, row in enumerate(rows) for c, f in enumerate(row)]
     canvas = {"artboards": boards,
               "annotations": [

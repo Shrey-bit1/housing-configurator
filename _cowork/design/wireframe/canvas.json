@@ -1,12 +1,36 @@
 {
   "artboards": [
     {
-      "file": "FlatDraw.dc.html",
+      "file": "Landing.dc.html",
       "x": 0,
       "y": 0,
       "w": 1280,
       "h": 820,
-      "title": "Flat app \u00b7 Draw your flat"
+      "title": "Flat app \u00b7 00 Landing"
+    },
+    {
+      "file": "FlatEmpty.dc.html",
+      "x": 1360,
+      "y": 0,
+      "w": 1280,
+      "h": 820,
+      "title": "Flat app \u00b7 01 Empty, first run"
+    },
+    {
+      "file": "FlatDraw.dc.html",
+      "x": 2720,
+      "y": 0,
+      "w": 1280,
+      "h": 820,
+      "title": "Flat app \u00b7 01 Draw your flat"
+    },
+    {
+      "file": "FlatSend.dc.html",
+      "x": 4080,
+      "y": 0,
+      "w": 1280,
+      "h": 820,
+      "title": "Flat app \u00b7 02 Send it to your group"
     },
     {
       "file": "Join.dc.html",
