@@ -3888,7 +3888,7 @@ without Netlify.
 | `GET` | `…/flats/{id}` | the stored text, byte for byte, `content-type: application/json`; 404 if absent. |
 | `PUT` | `…/flats/{id}?resident=…&label=…` | body = the `dwelling-unit` JSON as Export writes it. `parseUnit` checks only `format`, `storeys[].cells` as `[int,int]`; `measure` derives `bbox [minX,minZ,maxX,maxZ]`, `floors`, `areaCells`, `preview` (carried across a republish). Existing id, same resident → version+1, `changed: true`, 200; existing id, DIFFERENT resident → 409 unless `?replace=1` (run 0024, `store.ts:180`, body `{error, resident: <owner>}`); new → version 1, 201. `label` falls back to the unit's `name`. |
 | `GET`/`PUT` | `…/flats/{id}/preview` | Run 0024. GET returns the flat's JPEG (`content-type: image/jpeg`); PUT takes the JPEG as the raw body, 404 if the flat itself does not exist yet. Base64 under a key that is a SIBLING of the flat's own (`{code}/flats/{id}.preview`, not a child of it — see Storage layout). Sets `preview: true` on the flat's summary. |
-| `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[]); each present key replaced whole. Returns `{name, …record}`. |
+| `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[], and since run 0030 `shareM2`/`extraM2` whole ints ≥0 or null); each present key replaced whole. Returns `{name, …record}`. |
 | `GET`/`PUT` | `…/building` | PUT stores `{genome, summary, by, at: now}` and sets `changed = false` on every flat; GET returns it or `null`. |
 | `GET` | `…/export` | Run 0023 (`store.ts:185-195`). The session state plus `bodies: {id: <flat text>}` (every flat blob, as a STRING so the bytes survive; `null` if a blob is missing) and `exportedAt`. The only call that reads every blob; for the end of a session, never for polling. |
 | `OPTIONS` | anything | 204, `access-control-allow-origin: *`, methods `GET, PUT, OPTIONS`, headers `content-type`. Every other response carries the same CORS headers, errors included. |
@@ -3952,6 +3952,22 @@ second module needs the same answer.
 **Proof.** `scripts/store-roundtrip.mjs <base-url>` (plain Node, no deps):
 fresh session per run, publishes `public/units/flat-2-single-storey.json`
 (37484 bytes) as Ana and `public/units/flat-3-terrace.json` (33388 bytes) as
+**The two square-metre answers (run 0030).** `Resident` carries `shareM2` and
+`extraM2`, both `number | null`: how many square metres of shared space this
+resident thinks each person should pay for, and how many they offered to pay for
+beyond that share after the vote settled. Whole numbers, zero or more, or null
+when never answered, with **no upper bound in the store** because the slider's
+range belongs to the building app and a limit here would move in two
+repositories at once. Before this the store dropped both keys silently, which
+run 0056 of the building app measured against the live store, and the effect
+there was a median taken over one answer. The old `share`, a fraction 0..1,
+STAYS accepted and is marked in the type as the pre-0056 reading of the same
+question, because records already written carry it; the store reads a record
+back as it found it and does not backfill, which
+`store.test.ts`'s ETag-race case now asserts. `sessionView`
+(`src/session/store.ts:365`) spreads each record whole, so both keys reach the
+poll and `/export` with no further change.
+
 Ben, republishes flat-2 (version 2), sets counts/share/ballot (Ben in two
 partial bodies), reads the state and checks the summaries (194 / 168 cells,
 bbox `0,0,15,14` / `0,0,14,12`), reads both flats back byte-identical, writes
