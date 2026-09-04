@@ -41,6 +41,19 @@ import {
 } from "./core/projectIO";
 import { buildUnitExport, type DwellingUnitFile } from "./core/unitExport";
 import { unitStats } from "./core/unitStats";
+import {
+  flatPhase,
+  canSend,
+  showsDropHint,
+  checksRun,
+  showsLanding,
+  UNTITLED,
+  DASH,
+  EMPTY_HINT,
+  NO_WAY_IN,
+  type FlatPhase,
+} from "./core/flatState";
+import { JOURNEY, journeyMarks } from "./core/journey";
 import { slugifyUnitName } from "./library/ids";
 import { projectNameFor, unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
 import { parseUnitLibraryIndex, type UnitManifestEntry } from "./library/manifest";
@@ -93,7 +106,6 @@ const graphLegend = document.getElementById("graph-legend") as HTMLElement;
 const graphToggleTouch = document.getElementById("graph-toggle-touch") as HTMLInputElement;
 const graphToggleDepth = document.getElementById("graph-toggle-depth") as HTMLInputElement;
 const graphRelayoutBtn = document.getElementById("graph-relayout") as HTMLButtonElement;
-const checkBtn = document.getElementById("check-layout") as HTMLButtonElement;
 const validationPanel = document.getElementById("validation-panel") as HTMLElement;
 // Declared up here rather than beside the file-drop handlers below, because
 // `clearValidation` reaches for it and can run during the ?project= load.
@@ -140,11 +152,12 @@ const f0 = floors.active;
 let history: History | undefined;
 // Every mutating action calls this, entrances and doors included — a wider
 // net than `floors.onLayoutChange` (wired to the room STORE alone), so the
-// save column's three numbers (run 0026, `refreshFlatCard` below) piggyback
-// on the SAME single point rather than adding a second, narrower hook.
+// flat's figures, its check chip, the empty state's drop hint and step 02's
+// gate (run 0027, `refreshFlatFigures` below) all piggyback on the SAME
+// single point rather than adding a second, narrower hook.
 const commitHistory = () => {
   history?.commit();
-  refreshFlatCard();
+  refreshFlatFigures();
 };
 
 // ---- Interaction ----
@@ -657,20 +670,22 @@ saveOpenBtn.addEventListener("click", (e) => {
   setSaveOpenOpen(!saveOpenMenu.classList.contains("open"));
 });
 document.addEventListener("click", () => setSaveOpenOpen(false));
-// One Save item, and Open project beside it. The three separate items (Export
-// project, Export unit, and the dialog's own Save to library action) are
-// retired: the save column writes any combination of the three, so a second
-// route to a subset of them is only a way to forget one. The column is
-// always visible (run 0026), so "Save…" now opens "More" — where those
-// choices live — and refreshes the proposed number, rather than opening a
-// dialog that no longer exists.
-document.getElementById("menu-save")!.addEventListener("click", () => {
-  setSaveOpenOpen(false);
-  setMoreOpen(true);
-});
+// The menu reads "Open" since run 0027 and holds no save path at all: step
+// 02's red button is the only thing that sends, and "More" beside it is the
+// only thing that writes files. What is left here are the two ways to bring
+// something IN, which is what the bar is for.
 document.getElementById("menu-import")!.addEventListener("click", () => {
   setSaveOpenOpen(false);
   fileInput.click();
+});
+// Start over goes back to the landing WITHOUT touching the flat. A menu item
+// that quietly destroyed an afternoon's work would be the worst thing in the
+// app; the landing's own primary door reads "Back to your flat" while there
+// is something to come back to, and "Open a file" from there still replaces
+// it through the usual import confirm.
+document.getElementById("menu-start-over")!.addEventListener("click", () => {
+  setSaveOpenOpen(false);
+  showLanding();
 });
 
 // ---- North compass + orientation-aware windows ----
@@ -916,11 +931,13 @@ function runCheck(): void {
   validated = true;
 }
 
-// Check Layout both opens the sheet and closes it again. Escape is NOT a second
-// way out: it already arbitrates drag-abort, selection-clear and plan-view exit
-// (see the keydown handler), and giving it a fourth meaning would make which one
-// fires depend on state the user cannot see.
-checkBtn.addEventListener("click", () => (validated ? clearValidation() : runCheck()));
+// The Check Layout button left the top bar in run 0027. The check chip is the
+// way in now (`refreshFlatFigures` wires both copies of it to `runCheck`), and
+// the report closes from its own ✕, which `renderValidationPanel` has always
+// carried. Escape is still NOT a second way out: it already arbitrates
+// drag-abort, selection-clear and plan-view exit (see the keydown handler),
+// and giving it a fourth meaning would make which one fires depend on state
+// the user cannot see.
 // A stale report is worse than none: drop it as soon as any floor's layout
 // changes (validation spans the whole dwelling now).
 floors.onLayoutChange = () => clearValidation();
@@ -1002,16 +1019,28 @@ saveColumnToggle.addEventListener("click", () => {
   saveColumnToggle.setAttribute("aria-expanded", String(open));
 });
 
-// ---- "Your flat": name, three live numbers, the check line (run 0026) ----
-// The wireframe's card shows what the CURRENT design already is, not what a
-// save is about to write, so this reads straight from `floors` — the same
-// source `buildUnitExport`/`validate` already read for Check Layout and for
-// the unit build below — rather than waiting for a save.
-const flatNameEl = document.getElementById("flat-name") as HTMLElement;
-const flatAreaCnt = document.getElementById("flat-area-cnt") as HTMLElement;
-const flatStoreysEl = document.getElementById("flat-storeys") as HTMLElement;
-const flatGlazingEl = document.getElementById("flat-glazing") as HTMLElement;
-const flatCheckEl = document.getElementById("flat-check") as HTMLElement;
+// ---- The flat's own figures (run 0026 in the save column; run 0027 in the
+// top bar while drawing and under the drawing while sending) ----
+// They read what the CURRENT design already is, not what a save is about to
+// write, straight from `floors` — the same source `buildUnitExport` and
+// `validate` read for the layout report and for the unit build below.
+//
+// TWO places render them, one per step, and never both at once: the bar's
+// strip (step 01) and the read-out under the drawing (step 02). One call
+// writes both, so they cannot drift.
+const figBar = document.getElementById("tb-figures") as HTMLElement;
+const figAreaEl = document.getElementById("fig-area") as HTMLElement;
+const figStoreysEl = document.getElementById("fig-storeys") as HTMLElement;
+const figGlazingEl = document.getElementById("fig-glazing") as HTMLElement;
+const figCheckEl = document.getElementById("fig-check") as HTMLButtonElement;
+const readoutEl = document.getElementById("flat-readout") as HTMLElement;
+const frNameEl = document.getElementById("fr-name") as HTMLElement;
+const frAreaEl = document.getElementById("fr-area") as HTMLElement;
+const frStoreysEl = document.getElementById("fr-storeys") as HTMLElement;
+const frGlazingEl = document.getElementById("fr-glazing") as HTMLElement;
+const frRoomsEl = document.getElementById("fr-rooms") as HTMLElement;
+const frCheckEl = document.getElementById("fr-check") as HTMLButtonElement;
+const dropHintEl = document.getElementById("drop-hint") as HTMLElement;
 
 /** Where each animated element's tween currently is, and its in-flight
  *  frame handle, so a second call retargets instead of restarting: found
@@ -1033,6 +1062,18 @@ function animateCount(el: HTMLElement, to: number): void {
   const state = countState.get(el) ?? { shown: 0, raf: 0 };
   cancelAnimationFrame(state.raf);
   const from = state.shown;
+  // A hidden tab runs no animation frames at all, so a tween started there
+  // would never write its own result and the number would sit at whatever it
+  // last showed until the next edit (found live: an area stuck on a dash
+  // while the storeys and glazing beside it were right). Write it straight
+  // out instead; there is nobody watching it move.
+  if (document.hidden) {
+    el.textContent = String(target);
+    state.shown = target;
+    state.raf = 0;
+    countState.set(el, state);
+    return;
+  }
   if (from === target) {
     el.textContent = String(target);
     state.raf = 0;
@@ -1058,47 +1099,280 @@ function animateCount(el: HTMLElement, to: number): void {
   countState.set(el, state);
 }
 
-/** Recomputed on every layout change (`floors.onLayoutChange`, below) and
- *  once at startup: the exact figures a save would write right now, read
- *  through `buildUnitExport` — the SAME function the save itself calls —
- *  so the card can never show a number the save disagrees with. A gate
- *  failure (no entrance yet, a disconnected floor) shows 0/0/0 and the
- *  gate's own reason as the check line; it is not an error, just an
- *  unfinished flat. */
-function refreshFlatCard(): void {
-  flatNameEl.textContent = unitNameFor(saveDesignNumber());
-  const built = buildUnitExport(floors, "", "#000000");
-  const stats = built.ok ? unitStats(built.file.storeys) : { areaM2: 0, storeys: 0, glazingM: 0 };
-  animateCount(flatAreaCnt, stats.areaM2);
-  flatStoreysEl.textContent = String(stats.storeys);
-  flatGlazingEl.textContent = String(stats.glazingM);
+/** How many modules are placed across every floor, of any kind. The one
+ *  input the empty-state rule needs: a resident who has dropped a single
+ *  hall tile has started, and the grid should stop hinting at them. */
+function placedRooms(): number {
+  return floors.floors.reduce((n, f) => n + f.store.instances.size, 0);
+}
 
-  flatCheckEl.replaceChildren();
-  if (!built.ok) {
-    const note = document.createElement("span");
-    note.className = "s";
-    note.textContent = built.reason;
-    flatCheckEl.appendChild(note);
+/** How many of those are ROOMS, which is what step 02's fourth figure
+ *  claims to count. Circulation, outdoor and stairs are placed the same
+ *  way but are not rooms, and a 1x1 hall tile counting as one would make
+ *  a four-room flat read as twenty-nine (found live). The three tests are
+ *  `unitExport.ts`'s own `kindOf`, restated rather than imported, since
+ *  that function is internal to the export. */
+function habitableRooms(): number {
+  return floors.floors.reduce(
+    (n, f) =>
+      n +
+      [...f.store.instances.values()].filter(
+        (i) =>
+          i.def.cluster !== "outdoor" && i.def.cluster !== "circulation" && i.def.category !== "stair"
+      ).length,
+    0
+  );
+}
+
+/** The phase the whole chrome reads, recomputed here and nowhere else
+ *  (run 0027). Kept as the last answer so a caller that only wants to ask
+ *  "can this be sent yet?" does not have to build the unit again. */
+let phase: FlatPhase = "empty";
+
+/**
+ * Recomputed on every mutating action (`commitHistory`, above) and once at
+ * startup: the phase, the three figures, the check chip, the drop hint and
+ * the step-02 gate, all from ONE build of the unit through
+ * `buildUnitExport`, the same function the save itself calls, so nothing on
+ * screen can disagree with what a send would write.
+ *
+ * Before anything is placed the figures read dashes, the name reads
+ * "Untitled" and the chip is a hint rather than a fault: an untouched grid
+ * has no fault to report. From the first placed room the numbers and the
+ * check line behave exactly as they did before run 0027, including the
+ * gate's own reason when the unit cannot be built yet.
+ */
+function refreshFlatFigures(): void {
+  const rooms = placedRooms();
+  const built = buildUnitExport(floors, "", "#000000");
+  phase = flatPhase(rooms, built.ok);
+  const stats = built.ok ? unitStats(built.file.storeys) : { areaM2: 0, storeys: 0, glazingM: 0 };
+  const empty = phase === "empty";
+
+  // A figure is only shown when the unit BUILDS, since `unitStats` reading
+  // that one build is the only source any of these numbers have. Before the
+  // first room there is nothing to measure; while the flat has no way in
+  // there is no unit to measure either, and run 0026 showed 0 m² there,
+  // which reads as a measurement rather than as the absence of one. A dash
+  // says the true thing in both cases, and the chip beside it says which.
+  const measured = built.ok;
+  const storeys = measured ? String(stats.storeys) : DASH;
+  const glazing = measured ? String(stats.glazingM) : DASH;
+  // The area is the one figure that counts up, matching the wireframe (only
+  // its area carries the counting class).
+  for (const el of [figAreaEl, frAreaEl]) {
+    if (!measured) el.textContent = DASH;
+    else animateCount(el, stats.areaM2);
+  }
+  figStoreysEl.textContent = storeys;
+  figGlazingEl.textContent = glazing;
+  frStoreysEl.textContent = storeys;
+  frGlazingEl.textContent = glazing;
+  frRoomsEl.textContent = empty ? DASH : String(habitableRooms());
+  figBar.classList.toggle("figures-empty", !measured);
+  readoutEl.classList.toggle("figures-empty", !measured);
+
+  // The check chip, in both places. It is the only way into the layout
+  // report since Check Layout left the bar (run 0027), so it stays
+  // pressable in every state; the empty phase is the one exception, where
+  // there is nothing to report and it reads as the hint the wireframe
+  // asks for.
+  let label: string;
+  let cls: string;
+  let title: string;
+  if (!checksRun(phase)) {
+    // A hint, carrying no fault: it drops the pill outline entirely and
+    // reads as the muted sentence FlatEmpty.dc.html shows in its card.
+    label = EMPTY_HINT;
+    cls = "chip chip-hint";
+    title = EMPTY_HINT;
+  } else if (!built.ok) {
+    label = "1 must fix";
+    cls = "chip chip-acc";
+    title = built.reason;
+  } else {
+    const hard = validate(
+      computeDwellingGraph(floors.floors),
+      floors.orientationPreference
+    ).filter((v) => v.severity === "hard");
+    label = hard.length ? `${hard.length} must fix` : "All checks pass";
+    cls = hard.length ? "chip chip-acc" : "chip chip-ok";
+    title = hard.length ? `${hard[0].description} — open the layout report` : "Open the layout report";
+  }
+  for (const chip of [figCheckEl, frCheckEl]) {
+    chip.className = cls;
+    chip.textContent = label;
+    chip.title = title;
+    chip.disabled = !checksRun(phase);
+  }
+
+  dropHintEl.classList.toggle("show", showsDropHint(phase));
+  syncStepTabs();
+  syncSaveDialog();
+}
+
+/** "Show me" and the chip are the same door into the layout report, which
+ *  is the report Check Layout used to open from the bar. */
+figCheckEl.addEventListener("click", () => runCheck());
+frCheckEl.addEventListener("click", () => runCheck());
+
+// ---- Two steps, one panel at a time (run 0027) ------------------------------
+// `body[data-step]` is the whole switch; style.css shows and hides against it,
+// and nothing moves in the DOM, so the scene is never rebuilt by a step change.
+// Step 02 is locked while `canSend` says the flat has no way in, and pressing
+// it anyway says why rather than doing nothing.
+
+type Step = "draw" | "send";
+const stepDrawBtn = document.getElementById("step-draw") as HTMLButtonElement;
+const stepSendBtn = document.getElementById("step-send") as HTMLButtonElement;
+let step: Step = "draw";
+
+function setStep(next: Step): void {
+  if (next === "send" && !canSend(phase)) {
+    showToast("warn", NO_WAY_IN);
     return;
   }
-  const hard = validate(computeDwellingGraph(floors.floors), floors.orientationPreference).filter(
-    (v) => v.severity === "hard"
-  );
-  const chip = document.createElement("span");
-  chip.className = hard.length ? "chip chip-acc" : "chip chip-ok";
-  chip.textContent = hard.length ? `${hard.length} must fix` : "checks pass";
-  flatCheckEl.appendChild(chip);
-  if (hard.length) {
-    const rest = document.createElement("span");
-    rest.className = "s";
-    rest.textContent = hard[0].description + " · ";
-    const showMe = document.createElement("a");
-    showMe.textContent = "show me";
-    showMe.addEventListener("click", () => runCheck());
-    rest.appendChild(showMe);
-    flatCheckEl.appendChild(rest);
+  step = next;
+  document.body.dataset.step = next;
+  syncStepTabs();
+  if (next === "send") {
+    // The flat is shown whole and centred on this screen, so the camera is
+    // framed on arrival. `resetToExtent` is the same framing Frame does.
+    resetToExtent();
+    void openSaveDialog(); // the proposed number may be stale by now
   }
 }
+
+/** The tabs read the current step and the gate, and nothing else. Called on
+ *  every mutating action through `refreshFlatFigures`, so an entrance placed
+ *  in step 01 lights step 02 up at once. */
+function syncStepTabs(): void {
+  const open = canSend(phase);
+  stepDrawBtn.setAttribute("aria-selected", String(step === "draw"));
+  stepSendBtn.setAttribute("aria-selected", String(step === "send"));
+  stepDrawBtn.classList.toggle("done", step === "send");
+  // `aria-disabled` rather than `disabled`: a disabled button fires no click
+  // at all, so the one resident who most needs to hear why the step is shut
+  // would press it and get silence (found live). It stays pressable and
+  // answers; `setStep` is what actually refuses.
+  stepSendBtn.setAttribute("aria-disabled", String(!open));
+  stepSendBtn.title = open ? "" : NO_WAY_IN;
+  // A flat that loses its way in while step 02 is up (an entrance deleted
+  // through undo, say) drops back rather than stranding a resident on a
+  // screen whose one button cannot work.
+  if (step === "send" && !open) setStep("draw");
+}
+
+stepDrawBtn.addEventListener("click", () => setStep("draw"));
+stepSendBtn.addEventListener("click", () => setStep("send"));
+
+// ---- The landing (run 0027) -------------------------------------------------
+// It covers the editor rather than replacing it, so the scene behind it is
+// already warm by the time a resident picks a door.
+
+/** Where the building app lives. ONE constant: the landing's "Go to your
+ *  group" is the only handoff between the two apps that a resident drives,
+ *  and it carries the group CODE rather than any flat data, because the
+ *  store (docs/store.md) is the shared thing both apps read. Sending the
+ *  key and letting the far side fetch is the database-mediated exchange
+ *  the `interoperability` skill's own decision matrix points at for two
+ *  tools that already share a store. */
+const BUILDING_APP_URL = "http://localhost:5182/";
+
+const landingEl = document.getElementById("landing") as HTMLElement;
+const landingDoors = document.getElementById("landing-doors") as HTMLElement;
+const landingJoinForm = document.getElementById("landing-join-form") as HTMLFormElement;
+const landingStartLabel = document.getElementById("landing-start-label") as HTMLElement;
+const landingCode = document.getElementById("landing-code") as HTMLInputElement;
+const landingName = document.getElementById("landing-name") as HTMLInputElement;
+const landingWhy = document.getElementById("landing-join-why") as HTMLElement;
+const landingGroupLink = document.getElementById("landing-group") as HTMLAnchorElement;
+
+function showLanding(): void {
+  landingEl.hidden = false;
+  landingDoors.hidden = false;
+  landingJoinForm.hidden = true;
+  // Nothing is destroyed on the way here, so the primary door says what it
+  // will really do: open an empty grid the first time, and hand back an
+  // afternoon's work every time after that.
+  landingStartLabel.textContent = isEmptyProject() ? "Start a flat" : "Back to your flat";
+  landingCode.value = session.code;
+  landingName.value = session.resident;
+  landingWhy.textContent = "";
+  landingGroupLink.href = session.code
+    ? `${BUILDING_APP_URL}?session=${encodeURIComponent(session.code)}`
+    : BUILDING_APP_URL;
+}
+
+function hideLanding(): void {
+  landingEl.hidden = true;
+}
+
+/** The journey strip, rendered from src/core/journey.ts rather than written
+ *  into the landing's markup, so the building app can render the same six
+ *  steps from the same array. */
+function renderJourney(): void {
+  const strip = document.getElementById("journey-strip") as HTMLElement;
+  const marks = journeyMarks("draw");
+  const parts: HTMLElement[] = [];
+  JOURNEY.forEach((s, i) => {
+    if (i > 0) {
+      const rule = document.createElement("div");
+      rule.className = "journey-rule";
+      parts.push(rule);
+    }
+    const el = document.createElement("div");
+    el.className = `journey-step ${marks[i]}`;
+    const dot = document.createElement("span");
+    dot.className = "journey-dot";
+    const label = document.createElement("span");
+    label.className = "journey-label";
+    label.textContent = s.label;
+    el.append(dot, label);
+    parts.push(el);
+  });
+  strip.replaceChildren(...parts);
+}
+
+document.getElementById("landing-start")!.addEventListener("click", () => {
+  hideLanding();
+  setStep("draw");
+});
+document.getElementById("landing-open")!.addEventListener("click", () => {
+  // The same picker the bar's Open menu uses. The landing hides only once a
+  // file actually loads, which `readAndImport` reports through `importProjectText`.
+  fileInput.click();
+});
+document.getElementById("landing-join")!.addEventListener("click", () => {
+  landingDoors.hidden = true;
+  landingJoinForm.hidden = false;
+  landingCode.focus();
+});
+document.getElementById("landing-join-back")!.addEventListener("click", () => {
+  landingJoinForm.hidden = true;
+  landingDoors.hidden = false;
+});
+landingJoinForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  // The SAME two values the send panel's own fields hold, written through
+  // the same `writeSession`, so joining here and typing there leave state
+  // that cannot be told apart. `whyPublishDisabled` is reused as the one
+  // definition of "these two are usable".
+  const next = { resident: landingName.value, code: normalizeCode(landingCode.value) };
+  const why = whyPublishDisabled(next);
+  if (why !== null) {
+    landingWhy.textContent = why;
+    return;
+  }
+  session = next;
+  writeSession(sessionStorageArea, session);
+  saveResidentInput.value = session.resident;
+  saveCodeInput.value = session.code;
+  syncSessionUI();
+  syncSaveDialog();
+  hideLanding();
+  setStep("draw");
+});
 const saveWhatInputs: Record<OutputKind, HTMLInputElement> = {
   project: document.getElementById("save-what-project") as HTMLInputElement,
   unit: document.getElementById("save-what-unit") as HTMLInputElement,
@@ -1132,34 +1406,11 @@ const saveReplaceInput = document.getElementById("save-replace") as HTMLInputEle
 const tbSession = document.getElementById("tb-session") as HTMLElement;
 const PUBLISH_NOTE = savePublishNote.textContent ?? "";
 
-// The session fields fold into one line once both are already set (run 0025,
-// UX pass — "reveal complexity gradually"), re-decided on every dialog open,
-// never mid-edit: "change" unfolds for the rest of this dialog-open session.
-const saveSessionSummary = document.getElementById("save-session-summary") as HTMLElement;
-const saveSessionSummaryText = document.getElementById("save-session-summary-text") as HTMLElement;
-const saveSessionFields = document.getElementById("save-session-fields") as HTMLElement;
-const saveSessionChange = document.getElementById("save-session-change") as HTMLButtonElement;
-
-function unfoldSessionFields(): void {
-  saveSessionSummary.hidden = true;
-  saveSessionFields.hidden = false;
-}
-/** Fold only when both fields are already usable — `whyPublishDisabled` is
- *  the one place "usable" is already defined, so this reuses it rather than
- *  re-deriving the same condition. */
-function syncSessionFold(): void {
-  if (whyPublishDisabled(session) === null) {
-    saveSessionSummaryText.textContent = `${session.code} · ${session.resident.trim()}`;
-    saveSessionSummary.hidden = false;
-    saveSessionFields.hidden = true;
-  } else {
-    unfoldSessionFields();
-  }
-}
-saveSessionChange.addEventListener("click", () => {
-  unfoldSessionFields();
-  saveResidentInput.focus();
-});
+// Run 0025 folded these two fields behind a one-line summary once both were
+// set, which earned its place while they sat at the top of a save dialog
+// full of other things. On step 02 they ARE the screen, next to the button
+// that uses them (FlatSend.dc.html), so run 0027 retired the fold and both
+// fields stay open.
 
 /** localStorage, or null where the browser refuses it (a sandboxed frame). */
 const sessionStorageArea = (() => {
@@ -1215,11 +1466,19 @@ function saveDesignNumber(): number {
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
-/** Names line, proposed colour, and the Save button's enabled state, all
- *  re-derived from the two inputs. Nothing ticked is not a save. */
+/** Names line, proposed colour, and the Send button's enabled state, all
+ *  re-derived from the inputs. Nothing ticked is not a save, and a flat with
+ *  no way in cannot be sent at all (run 0027's one rule, the same one that
+ *  gates step 02, so the button and the tab can never disagree). */
 function syncSaveDialog(): void {
   const n = saveDesignNumber();
-  flatNameEl.textContent = unitNameFor(n);
+  // The flat's name lives here rather than in `refreshFlatFigures` because
+  // the design number is proposed ASYNCHRONOUSLY (the manifest and the
+  // group's own flats are both fetched): the figures are drawn long before
+  // the number lands, and this is the one function that runs again when it
+  // does (found live, where the read-out said "Unit 1" beside a line
+  // promising "Flat 6 and Unit 6").
+  frNameEl.textContent = phase === "empty" ? UNTITLED : unitNameFor(n);
   const sel = readSaveSelection();
   // A disabled Publish box keeps the remembered choice rather than forgetting it.
   saveSelection = { ...sel, publish: saveWhatInputs.publish.disabled ? saveSelection.publish : sel.publish };
@@ -1227,10 +1486,10 @@ function syncSaveDialog(): void {
   if (sel.project) parts.push(projectNameFor(n));
   if (needsUnitBuild(sel)) parts.push(unitNameFor(n));
   saveNamesLine.textContent = parts.length
-    ? `Writes ${parts.join(" and ")}` + (numberCountsSession ? ` — next free in the library and ${session.code}` : "")
+    ? `It becomes ${parts.join(" and ")}` + (numberCountsSession ? `, next free in the library and ${session.code}` : "")
     : "Nothing selected";
   if (!saveColorTouched) saveColorInput.value = defaultUnitColor(unitNameFor(n));
-  saveGoBtn.disabled = isEmptySelection(sel);
+  saveGoBtn.disabled = isEmptySelection(sel) || !canSend(phase);
 }
 
 /** The library manifest, or an empty one when it cannot be read. The dialog
@@ -1269,18 +1528,17 @@ async function readSessionFlatNames(): Promise<{ id: string; name: string }[]> {
 let numberCountsSession = false;
 
 /**
- * Refresh the (always-visible, run 0026) save column's proposed number and
- * session-derived state: the NEXT FREE NUMBER, the lowest positive integer
- * neither the library manifest nor (with a session set) the session's own
- * flats hold (src/library/naming.ts). Named for what it did before this run
- * — open the dialog — since the call sites (startup, "More" opening) are
- * the same "this is now stale, freshen it" moments a dialog-open used to be.
+ * Refresh the send panel's proposed number and session-derived state: the
+ * NEXT FREE NUMBER, the lowest positive integer neither the library manifest
+ * nor (with a group set) the group's own flats hold (src/library/naming.ts).
+ * Named for what it did before run 0026 — open the dialog — since its call
+ * sites (startup, opening "More", arriving on step 02) are the same "this is
+ * now stale, freshen it" moments a dialog-open used to be.
  */
 async function openSaveDialog(): Promise<void> {
   for (const kind of ["project", "unit", "library", "publish"] as OutputKind[])
     saveWhatInputs[kind].checked = saveSelection[kind];
-  syncSessionUI(); // and off again if the session fields are still empty
-  syncSessionFold(); // folded if both are already set, open otherwise
+  syncSessionUI(); // and off again if the group fields are still empty
   syncSaveDialog();
   const entries = await readManifestEntries();
   const sessionFlats = await readSessionFlatNames();
@@ -1850,7 +2108,7 @@ function restoreState(snapshot: string): void {
   floors.setActive(Math.min(prevActive, newCount - 1));
   renderSidebar();
   syncNorthUI(); // north is in the snapshot — reflect the restored angle on the dial
-  refreshFlatCard(); // an undo/redo/import changes the flat as much as any edit does
+  refreshFlatFigures(); // an undo/redo/import changes the flat as much as any edit does
 }
 
 function updateHistoryButtons(): void {
@@ -1926,10 +2184,17 @@ const resizeObserver = new ResizeObserver(() => ctx.handleResize());
 resizeObserver.observe(canvas);
 window.addEventListener("resize", () => ctx.handleResize());
 
-// The save column is always visible (run 0026), so its own state needs one
-// startup read rather than waiting for a first "open".
+// The send panel's own state needs one startup read rather than waiting for
+// a first "open", and the figures, the drop hint and the step gate all come
+// from the same first pass.
 void openSaveDialog();
-refreshFlatCard();
+refreshFlatFigures();
+renderJourney();
+setStep("draw");
+// The landing decides itself, from the URL alone (src/core/flatState.ts). A
+// link that already names a project or a group belongs to someone coming
+// back, and opens straight into the editor.
+if (showsLanding(location.search)) showLanding();
 
 // ---- Render loop ----
 /** Timestamp of the previous frame, for a real delta rather than an assumed

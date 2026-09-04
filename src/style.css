@@ -1407,13 +1407,13 @@ button.primary:hover {
    the result block below them reports one line per output and is why the
    dialog stays open after Save. */
 /* ============================================================
-   The save column (run 0026): the brief's "always visible" right-hand
-   column, replacing the old `<dialog>` — the same underlying save
-   (src/core/savePlan.ts, unchanged) in the brief's order and skin: the
-   flat's name and three numbers with the check line, the group, one red
-   button, a folded More. Positioned absolutely over the viewport's right
-   edge (like the Units panel, `unitBrowser.ts`) rather than a flex
-   sibling of the canvas, so no resize/camera-aspect code changes.
+   The send panel (run 0026 as the save column, rebuilt for step 02 in run
+   0027 to `_cowork/design/wireframe/FlatSend.dc.html`): the headline, the
+   two group fields, one red button, a folded More. It only exists on step
+   02, so the drawing has the whole screen in step 01. Positioned
+   absolutely over the viewport's right edge (like the Units panel,
+   `unitBrowser.ts`) rather than as a flex sibling of the canvas, so no
+   resize or camera-aspect code changes.
    ============================================================ */
 #save-column {
   position: absolute;
@@ -1421,47 +1421,63 @@ button.primary:hover {
   right: 16px;
   /* Stops clear of #view-controls (bottom:16px/right:16px too, the Display
      card + compass — an editor tool, left untouched): 230px covers its
-     tallest state (four toggle buttons open) plus the compass row and a
+     tallest state (five toggle buttons open) plus the compass row and a
      margin, so the two never fight for the same corner. */
   bottom: 230px;
-  width: 320px;
+  width: 400px;
   z-index: 20; /* under the Units panel's 45, over the 3D view */
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* Vertical scroll only — nothing inside should ever force the column
-     wider than its own 320px (found live: two side-by-side text inputs
-     with no explicit width did exactly that; fixed below). */
+  /* Vertical scroll only — nothing inside should ever force the panel
+     wider than its own width (found live in run 0026: two side-by-side
+     text inputs with no explicit width did exactly that; fixed below). */
   overflow-x: hidden;
   overflow-y: auto;
 }
 
-/* The column's own header: always visible, minimizes the three cards
-   below it without moving or resizing the column itself (found live: the
-   column has no way to get out of a resident's way otherwise). */
+/* The panel's own header. It read "Save" until run 0027, which made it the
+   third control on screen claiming to save something; it is a chevron and
+   nothing else now, and the red button below is the only thing that
+   sends. Collapsing hides the panel's body without moving or resizing the
+   panel's own box, so the space it leaves stays click-through to the 3D
+   view. */
 .save-column-toggle {
   flex: 0 0 auto;
   align-self: flex-end;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
   background: var(--card);
   border-top: 3px solid var(--ink);
   box-shadow: 0 1px 0 var(--line-paper);
-  padding: 8px 14px;
+  padding: 0;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 18px;
   color: var(--ink);
   cursor: pointer;
 }
 .sc-caret {
+  display: block;
   transition: transform var(--dur-tap) var(--ease-out);
+  transform: rotate(-90deg);
 }
 .save-column-toggle[aria-expanded="false"] .sc-caret {
-  transform: rotate(-90deg);
+  transform: rotate(90deg);
+}
+
+/* The step-02 headline, the wireframe's 56px display type. */
+.send-headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 46px;
+  line-height: 0.92;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
 }
 .save-column-body {
   display: flex;
@@ -1516,97 +1532,62 @@ button.primary:hover {
   align-items: flex-end;
 }
 
-/* "Your flat": name, three numbers, the check line. */
-.flat-name {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: 30px;
-  line-height: 0.95;
-  letter-spacing: 0.005em;
-  text-transform: uppercase;
-}
-.flat-numbers {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-.flat-numbers .num {
+/* One number with its label, the wireframe's `.num` (run 0026 as part of
+   the save column's flat card; promoted to a free-standing class in run
+   0027, since the same three figures now render in the top bar while a
+   resident draws and under the drawing when they send). */
+.num {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.flat-numbers .v {
+.num .v {
   font-family: var(--font-display);
   font-weight: 900;
   font-size: 26px;
   line-height: 1;
+  white-space: nowrap;
 }
-.flat-numbers .v small {
+.num .v small {
   font-size: 13px;
   font-family: var(--font-body);
   font-weight: 600;
 }
-.flat-numbers .l {
+.num .l {
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 9px;
   color: var(--meta);
   text-transform: uppercase;
   letter-spacing: 0.14em;
+  white-space: nowrap;
 }
-.flat-check {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.flat-check .s {
-  font-size: 12px;
-  color: var(--meta);
-}
-.flat-check a {
-  color: var(--accent);
-  cursor: pointer;
-  border-bottom: 1px solid var(--accent);
+/* Nothing placed yet: the numbers read as dashes and stand back, so an
+   untouched grid never looks like a flat measuring zero (run 0027,
+   FlatEmpty.dc.html). One class, set from `flatPhase`. */
+.figures-empty .v,
+.figures-empty .l {
+  color: var(--dim);
 }
 
-/* "Your group": the fold, and the one red button. */
+/* "Your group": the two fields the send needs, side by side and always
+   open. Run 0025 folded them behind a one-line summary once both were
+   set, which made sense while they sat at the top of a save dialog full
+   of other things; on step 02 they ARE the screen, and the wireframe
+   (FlatSend.dc.html) shows both open next to the button that uses them,
+   so run 0027 retired the fold. */
 .save-session-fields {
   display: flex;
-  gap: 16px;
+  flex-direction: column;
+  gap: 14px;
 }
 .save-session-fields > label {
   flex: 1;
   min-width: 0;
 }
-
-/* The folded one-line summary (run 0025, UX pass — "reveal complexity
-   gradually"): replaces the two open text fields once both are set. */
-.save-session-summary {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  color: var(--text);
-}
-.save-session-change {
-  background: none;
-  border: 0;
-  padding: 0;
-  color: var(--meta);
-  font-family: var(--font-body);
-  font-size: 11px;
-  text-decoration: underline;
-  cursor: pointer;
-}
-.save-session-change:hover {
-  color: var(--text);
-}
-/* Both carry an explicit `display` above, which otherwise ties the default
+/* The explicit `display` above otherwise ties the default
    `[hidden]{display:none}` rule in specificity and can lose it to cascade
    order; this wins regardless of order. */
-.save-session-summary[hidden],
 .save-session-fields[hidden] {
   display: none;
 }
@@ -1910,6 +1891,18 @@ button.primary:hover {
   gap: 1px;
   min-width: 0;
 }
+/* The brand and the controls hold their width: the ONE thing in the bar
+   that gives way when the window narrows is the strip's own hint, which
+   ellipses and can be re-read by hovering. Found live in run 0027, where
+   without this the numbers strip first squeezed `.tb-left` down to its
+   22px mark and then pushed Open and ? off the right edge. */
+.tb-left,
+.tb-right {
+  flex-shrink: 0;
+}
+.tb-name {
+  white-space: nowrap;
+}
 /* The brand (the brief): "(Re)" plain, "Configure" red, " / Flat" plain —
    Big Shoulders Display, matching the wireframe's `.brand`/`.brand b`. */
 .tb-name {
@@ -1935,33 +1928,37 @@ button.primary:hover {
 }
 
 /* The two steps (the brief): done = a filled ink disc, current = a red
-   disc that breathes. A read of where a resident stands, alongside the
-   existing view/tool controls rather than replacing them (run 0026) —
-   the wireframe's bar has room for nothing else because it is a
-   wireframe; this app's Units/Check Layout/Save stay exactly as they
-   were, only re-skinned. */
+   disc that breathes under a red underline, ahead = grey. Since run 0027
+   they are real tabs that switch the screen beneath them, so they are
+   buttons carrying `aria-selected`, and 02 sits `disabled` until the flat
+   has a way in (`canSend`, src/core/flatState.ts). */
 .tb-steps {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  align-items: stretch;
+  gap: 0;
   flex-shrink: 0;
+  align-self: stretch;
 }
 .tb-step {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  padding: 0 14px;
+  background: none;
+  border: 0;
+  cursor: pointer;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--dim);
   white-space: nowrap;
 }
 .tb-step .n {
-  width: 18px;
-  height: 18px;
-  border-radius: 9px;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
   border: 2px solid var(--dim);
   display: flex;
   align-items: center;
@@ -1971,6 +1968,7 @@ button.primary:hover {
   font-weight: 600;
   box-sizing: border-box;
 }
+/* A step already walked through: readable, filled ink, no pulse. */
 .tb-step.done {
   color: var(--ink);
 }
@@ -1979,17 +1977,56 @@ button.primary:hover {
   border-color: var(--ink);
   color: var(--bg);
 }
-.tb-step.now {
+/* The step on screen. */
+.tb-step[aria-selected="true"] {
   color: var(--ink);
+  box-shadow: inset 0 -5px 0 var(--accent);
 }
-.tb-step.now .n {
+.tb-step[aria-selected="true"] .n {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--bg);
   animation: tb-breathe 2.4s ease-in-out infinite;
 }
+/* Locked: greyed, and it says why when pressed rather than doing nothing
+   silently (main.ts's step handler). `aria-disabled` rather than the
+   `disabled` attribute, since a disabled button fires no click at all and
+   the resident pressing a locked step is exactly who needs the reason. */
+.tb-step[aria-disabled="true"] {
+  color: var(--dim);
+}
+.tb-step[aria-disabled="true"] .n {
+  background: none;
+  border-color: var(--dim);
+  color: var(--dim);
+  animation: none;
+}
 @keyframes tb-breathe {
   50% { transform: scale(1.18); }
+}
+
+/* The flat's three numbers and its check chip, in the bar while drawing
+   (run 0027, FlatDraw.dc.html). Hidden in step 02, where the same figures
+   sit under the drawing instead. */
+.tb-figures {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  border-left: 1px solid var(--line-paper);
+  align-self: stretch;
+  /* The one thing in the bar that gives way when the window narrows: the
+     numbers hold, the hint inside ellipses (`.chip-hint`). */
+  flex-shrink: 1;
+}
+.tb-figures .v {
+  font-size: 20px;
+}
+.tb-figures .v small {
+  font-size: 10px;
+}
+.tb-spacer {
+  flex: 1;
 }
 
 /* Which group this resident is in (run 0023; wording, run 0026). Muted
@@ -2570,4 +2607,372 @@ button.primary:hover {
 .chip-acc {
   border-color: var(--accent);
   color: var(--accent);
+}
+/* The check chip is the only way into the layout report since run 0027
+   took Check Layout out of the bar, so it is a button in both states. */
+button.chip {
+  cursor: pointer;
+  background: none;
+}
+button.chip:hover {
+  background: var(--plate);
+}
+button.chip:disabled {
+  cursor: default;
+}
+button.chip:disabled:hover {
+  background: none;
+}
+/* The empty state's hint wears no pill: nothing has gone wrong, so
+   nothing should look like a badge. It also gives way first when the bar
+   runs short of room, since it is the one thing on the strip a resident
+   can re-read by hovering. */
+.chip-hint {
+  border-color: transparent;
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  color: var(--meta);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+.tb-figures {
+  min-width: 0;
+}
+
+/* ============================================================
+   Two steps, one panel at a time (run 0027, `FlatDraw.dc.html` and
+   `FlatSend.dc.html`). `body[data-step]` is the only switch: step 01 has
+   the palette and the drawing and no right-hand panel, step 02 has the
+   flat shown whole and the send panel. Everything below is show/hide;
+   no element moves in the DOM between steps, so nothing is rebuilt and
+   the scene never reloads.
+   ============================================================ */
+body[data-step="draw"] #save-column,
+body[data-step="draw"] #flat-readout,
+body[data-step="draw"] #send-caption {
+  display: none;
+}
+body[data-step="send"] #sidebar,
+body[data-step="send"] .tb-figures,
+body[data-step="send"] #bottom-left,
+body[data-step="send"] #drop-hint {
+  display: none;
+}
+
+/* The flat's figures under the drawing in step 02, centred with the
+   drawing above them. */
+#flat-readout {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  gap: 28px;
+  padding: 14px 22px;
+  background: var(--card);
+  border-top: 3px solid var(--ink);
+  box-shadow: 0 1px 0 var(--line-paper);
+}
+#flat-readout .fr-name {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 26px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+#send-caption {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+
+/* The empty state's one ghost tile (FlatEmpty.dc.html): a dashed red
+   diamond where the first room goes. Rotated and squashed rather than
+   drawn as an SVG polygon, which keeps it one element and lets it sit on
+   the same isometric angle the grid reads at. Never takes a pointer
+   event, so a drag lands straight through it onto the grid below. */
+#drop-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190px;
+  height: 190px;
+  margin: -95px 0 0 -95px;
+  z-index: 3;
+  display: none;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  background: rgba(214, 52, 28, 0.06);
+  transform: rotate(45deg) scale(1, 0.58);
+  pointer-events: none;
+}
+#drop-hint.show {
+  display: grid;
+}
+#drop-hint span {
+  transform: scale(1, 1.72) rotate(-45deg);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* ============================================================
+   The landing (run 0027, `Landing.dc.html`): the first screen, over the
+   editor rather than instead of it.
+   ============================================================ */
+#landing {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background-color: var(--bg);
+  background-image: var(--grain);
+  background-repeat: repeat;
+  background-size: 180px 180px;
+  overflow: auto;
+}
+#landing[hidden] {
+  display: none;
+}
+/* The brief's two discs and the red rule, the only decoration on the
+   screen. Yellow and blue are the brief's own two remaining colours, and
+   they appear here and nowhere else in this app. */
+.landing-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 10px;
+  background: var(--accent);
+}
+.landing-disc {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.landing-disc-a {
+  left: -180px;
+  top: -140px;
+  width: 560px;
+  height: 560px;
+  background: var(--yellow);
+}
+.landing-disc-b {
+  right: -90px;
+  bottom: -120px;
+  width: 340px;
+  height: 340px;
+  background: var(--blue);
+  opacity: 0.9;
+}
+.landing-inner {
+  position: relative;
+  z-index: 1;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 56px 64px 0;
+  display: flex;
+  flex-direction: column;
+}
+.landing-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+.landing-brand {
+  font-size: 26px;
+}
+.landing-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 80px;
+  padding: 40px 0;
+  flex-wrap: wrap;
+}
+.landing-copy {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+.landing-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 78px;
+  line-height: 0.88;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+  animation: blurin 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes blurin {
+  from { opacity: 0; filter: blur(14px); letter-spacing: 0.06em; }
+  to { opacity: 1; filter: blur(0); }
+}
+.landing-lead {
+  max-width: 460px;
+  margin: 28px 0 0;
+  font-size: 18px;
+  line-height: 1.5;
+}
+.landing-doors,
+.landing-join {
+  width: 400px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.landing-doors[hidden],
+.landing-join[hidden] {
+  display: none;
+}
+.landing-primary {
+  height: 76px;
+  font-size: 24px;
+}
+/* The two other doors: the brief's outlined-black secondary button. */
+.landing-door {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 16px;
+  background: none;
+  border: 2px solid var(--ink);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--dur-tap) var(--ease-out), color var(--dur-tap) var(--ease-out);
+}
+.landing-door:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+.landing-aside {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--meta);
+}
+.landing-aside a {
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+.landing-join label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.landing-join input {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  padding: 8px 2px;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  caret-color: var(--accent);
+}
+.landing-join-why {
+  margin: 0;
+  min-height: 15px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.landing-back {
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--meta);
+  font-family: var(--font-body);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The journey, rendered from src/core/journey.ts. The current step's dot
+   is red and filled, the ones ahead are hollow and dim, and a rule runs
+   between them. */
+.landing-journey {
+  padding: 22px 0 34px;
+  border-top: 3px solid var(--ink);
+}
+.journey {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.journey-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.journey-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  box-sizing: border-box;
+  border: 2px solid var(--dim);
+  background: transparent;
+}
+.journey-label {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.journey-step.now .journey-dot {
+  background: var(--accent);
+  border-color: var(--ink);
+}
+.journey-step.now .journey-label,
+.journey-step.done .journey-label {
+  color: var(--ink);
+}
+.journey-step.done .journey-dot {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.journey-rule {
+  flex: 1;
+  min-width: 20px;
+  height: 2px;
+  background: var(--line-paper);
 }
