@@ -5,6 +5,10 @@ node_modules/
 dist/
 .vite/
 
+# Where scripts/gen-flat.mjs writes. A generated flat enters the library by a
+# deliberate copy into public/units/, never by being generated.
+build/
+
 # Local / editor / tooling
 *.local
 .claude/

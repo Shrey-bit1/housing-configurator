@@ -71,6 +71,56 @@
       "storeys": 2,
       "areaM2": 37.8,
       "savedAt": "2026-08-16T10:40:42.904Z"
+    },
+    {
+      "id": "unit-8",
+      "name": "Flat 08 — one room, corner",
+      "color": "#ff922b",
+      "file": "unit-8.json",
+      "preview": "unit-8.jpg",
+      "storeys": 1,
+      "areaM2": 38.88,
+      "savedAt": "2026-09-04T16:27:53.316Z"
+    },
+    {
+      "id": "unit-9",
+      "name": "Flat 09 — two rooms, hall between",
+      "color": "#9775fa",
+      "file": "unit-9.json",
+      "preview": "unit-9.jpg",
+      "storeys": 1,
+      "areaM2": 51.48,
+      "savedAt": "2026-09-04T16:27:53.316Z"
+    },
+    {
+      "id": "unit-10",
+      "name": "Flat 10 — two rooms, off the living room",
+      "color": "#4dabf7",
+      "file": "unit-10.json",
+      "preview": "unit-10.jpg",
+      "storeys": 1,
+      "areaM2": 56.88,
+      "savedAt": "2026-09-04T16:27:53.316Z"
+    },
+    {
+      "id": "unit-11",
+      "name": "Flat 11 — three rooms, deep hall",
+      "color": "#f783ac",
+      "file": "unit-11.json",
+      "preview": "unit-11.jpg",
+      "storeys": 1,
+      "areaM2": 70.2,
+      "savedAt": "2026-09-04T16:27:53.316Z"
+    },
+    {
+      "id": "unit-12",
+      "name": "Flat 12 — four rooms, maisonette",
+      "color": "#38d9a9",
+      "file": "unit-12.json",
+      "preview": "unit-12.jpg",
+      "storeys": 2,
+      "areaM2": 110.88,
+      "savedAt": "2026-09-04T16:27:53.316Z"
     }
   ]
 }
