@@ -76,6 +76,17 @@ export interface UnitBrowserOptions {
    *  portable as `onOpen`. Resolve to apply, reject to leave the card alone;
    *  the browser refreshes itself either way. Cards are read-only without it. */
   onRename?: (entry: UnitManifestEntry, newName: string) => Promise<void>;
+  /** OPTIONAL. When given, each card grows a Delete control. Same contract as
+   *  `onRename`: the module knows nothing about how a delete is persisted, so
+   *  removing the file, the preview and the manifest row is the host's job.
+   *  Resolve to accept, reject to leave the card alone; either way the browser
+   *  refreshes. Cards carry no Delete control without it. */
+  onDelete?: (entry: UnitManifestEntry) => Promise<void>;
+  /** OPTIONAL. The id of the library entry whose copy is currently open in the
+   *  editor, or null. Deleting that one is refused before anything is asked or
+   *  sent, because the file the editor was opened from would vanish underneath
+   *  it. The browser cannot know this by itself, so the host supplies it. */
+  openUnitId?: () => string | null;
   /** Where to attach the panel. Default `document.body`. The panel positions
    *  absolutely, so the mount should be a positioning context. */
   mount?: HTMLElement;
@@ -100,6 +111,36 @@ export function isMine(resident: string, me: string): boolean {
  *  is spec-stable. Pure, no DOM. */
 export function sortMineFirst<T extends { resident: string }>(items: readonly T[], me: string): T[] {
   return [...items].sort((a, b) => Number(isMine(b.resident, me)) - Number(isMine(a.resident, me)));
+}
+
+/**
+ * The confirm shown before a card is deleted, naming the flat.
+ *
+ * Pure for the same reason `takeoverConfirmText` in `src/session/session.ts` is
+ * pure: `window.confirm` returns `false` under scripting without ever
+ * displaying (the automation trap run 0010 found), so a test that called the
+ * real dialog would only ever prove the decline path. Keeping the wording here
+ * lets a plain vitest case pin the sentence a resident actually reads.
+ */
+export function deleteConfirmText(name: string): string {
+  return `Delete "${name}" from the library? This cannot be undone.`;
+}
+
+/**
+ * Why this delete may not go ahead, or null when it may.
+ *
+ * One reason today: the flat whose copy is open in the editor. Deleting it
+ * would pull the file out from under the thing on screen, and the editor holds
+ * a copy rather than the entry, so nothing else would notice. Refusing here
+ * means the resident is told before a dialog is raised or a request is sent.
+ */
+export function deleteRefusal(
+  entry: { id: string; name: string },
+  openUnitId: string | null
+): string | null {
+  if (openUnitId !== null && openUnitId === entry.id)
+    return `"${entry.name}" is the flat you have open. Open something else first, then delete it.`;
+  return null;
 }
 
 export interface UnitBrowser {
@@ -280,7 +321,8 @@ const CSS = `
 }
 .ulb-meta { padding: 0 10px 9px 28px; font-size: 10px; color: var(--meta, #6b665c); }
 .ulb-actions { display: flex; gap: 6px; margin: 0 10px 10px; }
-.ulb-openbtn, .ulb-renamebtn {
+.ulb-notice { grid-column: 1 / -1; margin: 0 0 4px; }
+.ulb-openbtn, .ulb-renamebtn, .ulb-deletebtn {
   padding: 7px 10px;
   background: transparent;
   border: 1px solid var(--ink, #161616);
@@ -294,8 +336,12 @@ const CSS = `
 }
 .ulb-openbtn { flex: 1; }
 .ulb-renamebtn { color: var(--meta, #6b665c); border-color: var(--line-paper, #c9c5bb); }
+/* The one control on a card that destroys something, so it carries the brief's
+   red rather than the quiet meta grey the Rename control uses. */
+.ulb-deletebtn { color: var(--accent, #d6341c); border-color: var(--accent, #d6341c); }
 .ulb-openbtn:hover, .ulb-renamebtn:hover { background: var(--ink, #161616); color: var(--panel-ink, #edece8); }
-.ulb-openbtn:disabled, .ulb-renamebtn:disabled { opacity: 0.5; cursor: default; }
+.ulb-deletebtn:hover { background: var(--accent, #d6341c); color: var(--panel-ink, #edece8); }
+.ulb-openbtn:disabled, .ulb-renamebtn:disabled, .ulb-deletebtn:disabled { opacity: 0.5; cursor: default; }
 `;
 
 function ensureStyles(doc: Document): void {
@@ -382,6 +428,23 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
     grid.appendChild(p);
   }
 
+  /**
+   * A message that does NOT wipe the grid.
+   *
+   * `status` above replaces the grid's whole contents, which is right when a
+   * fetch failed and there is nothing left to show. A refused delete is the
+   * opposite case: the library is fine, the resident just chose the one card
+   * they cannot delete yet, and taking every card away to tell them so would
+   * lose the thing they need to act on.
+   */
+  function notice(grid: HTMLElement, msg: string): void {
+    grid.querySelector(".ulb-notice")?.remove();
+    const p = document.createElement("p");
+    p.className = "ulb-status ulb-notice";
+    p.textContent = msg;
+    grid.prepend(p);
+  }
+
   function card(entry: UnitManifestEntry): HTMLElement {
     const c = document.createElement("article");
     c.className = "ulb-card";
@@ -447,6 +510,24 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
           .finally(() => (renameBtn.disabled = false));
       });
       actions.appendChild(renameBtn);
+    }
+    if (opts.onDelete) {
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "ulb-deletebtn";
+      deleteBtn.textContent = "Delete";
+      deleteBtn.addEventListener("click", () => {
+        const refusal = deleteRefusal(entry, opts.openUnitId?.() ?? null);
+        if (refusal) return notice(libGrid, refusal);
+        if (!window.confirm(deleteConfirmText(entry.name))) return;
+        deleteBtn.disabled = true;
+        opts
+          .onDelete!(entry)
+          .then(() => refreshLibrary())
+          .catch((err: Error) => notice(libGrid, `Could not delete ${entry.id}: ${err.message}`))
+          .finally(() => (deleteBtn.disabled = false));
+      });
+      actions.appendChild(deleteBtn);
     }
     c.appendChild(actions);
     return c;

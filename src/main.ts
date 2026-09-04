@@ -1827,7 +1827,21 @@ function isEmptyProject(): boolean {
 /** Validate, confirm, then load — keeping the app's state intact on any failure.
  *  Returns true when a project was actually loaded (the unit browser closes
  *  itself only then; a declined confirm leaves it open). */
+/**
+ * The id of the library entry whose copy is currently open, or null.
+ *
+ * The editor holds a COPY of a library flat and deliberately forgets where it
+ * came from, so that saving it later adds a new entry rather than overwriting
+ * one (see `onOpen` below). That is right for saving and wrong for deleting:
+ * the library's Delete control has to refuse the flat on screen, and nothing
+ * else in the app knows which one that is. So this records it, set only after a
+ * library open succeeds and cleared here, at the one function every project
+ * replacement goes through, which means any other import drops it.
+ */
+let openLibraryUnitId: string | null = null;
+
 function importProjectText(text: string): boolean {
+  openLibraryUnitId = null;
   let parsed;
   try {
     parsed = parseProject(text);
@@ -1951,7 +1965,23 @@ const unitBrowser = createUnitBrowser({
         showToast("info", `Renamed ${entry.id} to "${newName}".`);
       }
     : undefined,
-  onOpen: (file) => {
+  // Delete is DEV-ONLY beside Rename and saving, and for the same reason: the
+  // manifest and the two files live on disk and only the dev server can remove
+  // them. Without the sink the control is simply absent rather than broken.
+  onDelete: import.meta.env.DEV
+    ? async (entry) => {
+        const res = await fetch("/__library/delete", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id: entry.id }),
+        });
+        const r = (await res.json()) as { ok: boolean; error?: string; removed?: string[] };
+        if (!r.ok) throw new Error(r.error ?? "unknown error");
+        showToast("info", `Deleted "${entry.name}" and ${r.removed?.length ?? 0} of its files.`);
+      }
+    : undefined,
+  openUnitId: () => openLibraryUnitId,
+  onOpen: (file, source) => {
     file
       .text()
       .then((text) => {
@@ -1969,7 +1999,12 @@ const unitBrowser = createUnitBrowser({
         // the opened design later creates a NEW entry (ids suffix, never
         // overwrite). The panel closes only when something actually loaded —
         // declining the replace-confirm keeps it open.
-        if (importProjectText(JSON.stringify(src))) unitBrowser.close();
+        if (importProjectText(JSON.stringify(src))) {
+          // AFTER the import, which clears this: a library card's open is the
+          // one path that sets it, so the Delete control can refuse this flat.
+          if ("areaM2" in source) openLibraryUnitId = source.id;
+          unitBrowser.close();
+        }
       })
       .catch((err: Error) => showToast("error", `Could not read ${file.name}: ${err.message}`));
   },
