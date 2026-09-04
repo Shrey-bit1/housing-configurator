@@ -1,37 +1,95 @@
 {
   "id": "unit-8",
-  "name": "Flat 08 — one room, corner",
+  "name": "Flat 08 — one bedroom, corner",
   "color": "#ff922b",
-  "targetM2": [35, 45],
-  "grid": { "cols": 22, "rows": 20 },
+  "targetM2": [
+    35,
+    45
+  ],
+  "grid": {
+    "cols": 22,
+    "rows": 20
+  },
   "northAngle": 0,
-  "reference": "Plan 3, Zwischenbaechen building C, 2.5 rooms at 53.5 m2, with the Zimmer removed",
-  "wetRooms": ["kitchen", "bath"],
+  "reference": "Plan 3, Zwischenbaechen building C, 2.5 rooms at 53.5 m2, trimmed to one bedroom",
+  "wetRooms": [
+    "kitchen",
+    "bath"
+  ],
   "storeys": [
     {
-      "origin": { "cx": 2, "cz": 2 },
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
       "rows": [
         {
           "slots": [
-            { "key": "living", "type": "living" },
-            { "key": "balcony", "fill": "outdoor", "w": 5, "d": 5 }
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "living",
+              "type": "living"
+            }
           ]
         },
-        { "slots": [{ "key": "entree", "fill": "circulation", "w": 8, "d": 2 }] },
         {
           "slots": [
-            { "key": "kitchen", "type": "kitchen" },
-            { "key": "bath", "type": "bathroom_full" }
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 9,
+              "d": 2
+            },
+            {
+              "key": "loggia",
+              "fill": "outdoor",
+              "w": 4,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            }
           ]
         }
       ]
     }
   ],
   "doors": [
-    ["entree", "living"],
-    ["entree", "kitchen"],
-    ["entree", "bath"],
-    ["living", "balcony"]
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "bed1"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "entree",
+      "bath"
+    ],
+    [
+      "living",
+      "loggia"
+    ]
   ],
-  "entrance": { "key": "entree", "side": "west" }
+  "entrance": {
+    "key": "entree",
+    "side": "west"
+  }
 }

@@ -1,7 +1,7 @@
 {
   "format": "dwelling-unit",
   "version": 1,
-  "name": "Flat 08 — one room, corner",
+  "name": "Flat 08 — one bedroom, corner",
   "color": "#ff922b",
   "cellSize": 0.6,
   "northAngle": 0,
@@ -149,134 +149,6 @@
           4
         ],
         [
-          0,
-          7
-        ],
-        [
-          0,
-          8
-        ],
-        [
-          0,
-          9
-        ],
-        [
-          0,
-          10
-        ],
-        [
-          1,
-          7
-        ],
-        [
-          1,
-          8
-        ],
-        [
-          1,
-          9
-        ],
-        [
-          1,
-          10
-        ],
-        [
-          2,
-          7
-        ],
-        [
-          2,
-          8
-        ],
-        [
-          2,
-          9
-        ],
-        [
-          2,
-          10
-        ],
-        [
-          3,
-          7
-        ],
-        [
-          3,
-          8
-        ],
-        [
-          3,
-          9
-        ],
-        [
-          3,
-          10
-        ],
-        [
-          4,
-          7
-        ],
-        [
-          4,
-          8
-        ],
-        [
-          4,
-          9
-        ],
-        [
-          4,
-          10
-        ],
-        [
-          5,
-          7
-        ],
-        [
-          5,
-          8
-        ],
-        [
-          5,
-          9
-        ],
-        [
-          5,
-          10
-        ],
-        [
-          6,
-          7
-        ],
-        [
-          6,
-          8
-        ],
-        [
-          6,
-          9
-        ],
-        [
-          6,
-          10
-        ],
-        [
-          7,
-          7
-        ],
-        [
-          7,
-          8
-        ],
-        [
-          7,
-          9
-        ],
-        [
-          7,
-          10
-        ],
-        [
           7,
           0
         ],
@@ -298,19 +170,27 @@
         ],
         [
           8,
-          4
+          0
         ],
         [
-          9,
-          4
+          8,
+          1
         ],
         [
-          9,
+          8,
+          2
+        ],
+        [
+          8,
           3
         ],
         [
+          8,
+          4
+        ],
+        [
           9,
-          2
+          0
         ],
         [
           9,
@@ -318,11 +198,35 @@
         ],
         [
           9,
-          0
+          2
+        ],
+        [
+          9,
+          3
+        ],
+        [
+          9,
+          4
         ],
         [
           10,
           0
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          10,
+          2
+        ],
+        [
+          10,
+          3
+        ],
+        [
+          10,
+          4
         ],
         [
           11,
@@ -345,38 +249,154 @@
           4
         ],
         [
-          10,
-          1
-        ],
-        [
-          10,
-          2
-        ],
-        [
-          10,
-          3
-        ],
-        [
-          10,
-          4
-        ],
-        [
-          8,
-          3
-        ],
-        [
-          8,
-          2
-        ],
-        [
-          8,
-          1
-        ],
-        [
-          8,
+          12,
           0
         ],
         [
+          12,
+          1
+        ],
+        [
+          12,
+          2
+        ],
+        [
+          12,
+          3
+        ],
+        [
+          12,
+          4
+        ],
+        [
+          0,
+          7
+        ],
+        [
+          0,
+          8
+        ],
+        [
+          0,
+          9
+        ],
+        [
+          0,
+          10
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          1,
+          10
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          2,
+          9
+        ],
+        [
+          2,
+          10
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          3,
+          10
+        ],
+        [
+          4,
+          7
+        ],
+        [
+          4,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          8
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          6,
+          9
+        ],
+        [
+          6,
+          10
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          9
+        ],
+        [
+          7,
+          10
+        ],
+        [
           0,
           5
         ],
@@ -425,6 +445,14 @@
           5
         ],
         [
+          8,
+          5
+        ],
+        [
+          8,
+          6
+        ],
+        [
           7,
           6
         ],
@@ -438,6 +466,38 @@
         ],
         [
           1,
+          5
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          10,
+          6
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          12,
+          5
+        ],
+        [
+          12,
+          6
+        ],
+        [
+          10,
           5
         ]
       ],
@@ -509,31 +569,36 @@
         "room",
         "room",
         "room",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
-        "outdoor",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
         "circulation",
         "circulation",
         "circulation",
@@ -549,9 +614,49 @@
         "circulation",
         "circulation",
         "circulation",
-        "circulation"
+        "circulation",
+        "circulation",
+        "circulation",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor"
       ],
       "cellRooms": [
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
         "living",
         "living",
         "living",
@@ -619,31 +724,6 @@
         "bathroom_full",
         "bathroom_full",
         "bathroom_full",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_single",
-        "outdoor_single",
-        "outdoor_single",
-        "outdoor_single",
-        "outdoor_single",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
-        "outdoor_double",
         "circulation_double",
         "circulation_double",
         "circulation_double",
@@ -656,10 +736,20 @@
         "circulation_double",
         "circulation_double",
         "circulation_double",
+        "circulation_single",
+        "circulation_single",
         "circulation_double",
         "circulation_double",
         "circulation_double",
-        "circulation_double"
+        "circulation_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double"
       ],
       "openCeilings": [],
       "edges": [
@@ -685,7 +775,7 @@
             1
           ],
           "side": "W",
-          "class": "blank"
+          "class": "glazed"
         },
         {
           "cell": [
@@ -693,7 +783,7 @@
             2
           ],
           "side": "W",
-          "class": "blank"
+          "class": "glazed"
         },
         {
           "cell": [
@@ -761,155 +851,19 @@
         },
         {
           "cell": [
-            0,
-            7
-          ],
-          "side": "W",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            0,
-            8
-          ],
-          "side": "W",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            0,
-            9
-          ],
-          "side": "W",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            0,
-            10
-          ],
-          "side": "S",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            0,
-            10
-          ],
-          "side": "W",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            1,
-            10
-          ],
-          "side": "S",
-          "class": "glazed"
-        },
-        {
-          "cell": [
-            2,
-            10
-          ],
-          "side": "S",
-          "class": "glazed"
-        },
-        {
-          "cell": [
-            3,
-            10
-          ],
-          "side": "S",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            4,
-            10
-          ],
-          "side": "S",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            5,
-            10
-          ],
-          "side": "S",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            6,
-            10
-          ],
-          "side": "S",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            7,
-            7
-          ],
-          "side": "E",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            7,
-            8
-          ],
-          "side": "E",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            7,
-            9
-          ],
-          "side": "E",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            7,
-            10
-          ],
-          "side": "S",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            7,
-            10
-          ],
-          "side": "E",
-          "class": "blank"
-        },
-        {
-          "cell": [
             7,
             0
           ],
           "side": "N",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
             8,
-            4
+            0
           ],
-          "side": "S",
-          "class": "open"
-        },
-        {
-          "cell": [
-            9,
-            4
-          ],
-          "side": "S",
-          "class": "open"
+          "side": "N",
+          "class": "blank"
         },
         {
           "cell": [
@@ -917,7 +871,7 @@
             0
           ],
           "side": "N",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
@@ -925,7 +879,7 @@
             0
           ],
           "side": "N",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
@@ -933,71 +887,183 @@
             0
           ],
           "side": "N",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
-            11,
+            12,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
             0
           ],
           "side": "E",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
-            11,
+            12,
             1
           ],
           "side": "E",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
-            11,
+            12,
             2
           ],
           "side": "E",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
-            11,
+            12,
             3
           ],
           "side": "E",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
-            11,
-            4
-          ],
-          "side": "S",
-          "class": "open"
-        },
-        {
-          "cell": [
-            11,
+            12,
             4
           ],
           "side": "E",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
-            10,
-            4
+            0,
+            7
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            8
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            9
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            10
           ],
           "side": "S",
-          "class": "open"
+          "class": "blank"
         },
         {
           "cell": [
-            8,
-            0
+            0,
+            10
           ],
-          "side": "N",
-          "class": "open"
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            1,
+            10
+          ],
+          "side": "S",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            2,
+            10
+          ],
+          "side": "S",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            3,
+            10
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            4,
+            10
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            5,
+            10
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            6,
+            10
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            7
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            8
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            9
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            10
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            10
+          ],
+          "side": "E",
+          "class": "blank"
         },
         {
           "cell": [
@@ -1017,19 +1083,59 @@
         },
         {
           "cell": [
-            7,
-            5
+            8,
+            6
           ],
-          "side": "E",
+          "side": "S",
           "class": "blank"
         },
         {
           "cell": [
-            7,
+            9,
+            6
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            10,
+            6
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            11,
+            6
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            12,
+            5
+          ],
+          "side": "E",
+          "class": "open"
+        },
+        {
+          "cell": [
+            12,
+            6
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            12,
             6
           ],
           "side": "E",
-          "class": "blank"
+          "class": "open"
         }
       ],
       "height": 3
@@ -1042,8 +1148,18 @@
       "color": "#d8d4cb"
     },
     {
+      "id": "bedroom_large",
+      "name": "Bedroom — Large",
+      "color": "#274a9e"
+    },
+    {
       "id": "circulation_double",
       "name": "Circulation — Double",
+      "color": "#141414"
+    },
+    {
+      "id": "circulation_single",
+      "name": "Circulation — Single",
       "color": "#141414"
     },
     {
@@ -1060,11 +1176,6 @@
       "id": "outdoor_double",
       "name": "Outdoor — Double",
       "color": "#2e6b4f"
-    },
-    {
-      "id": "outdoor_single",
-      "name": "Outdoor — Single",
-      "color": "#2e6b4f"
     }
   ],
   "sourceProject": {
@@ -1078,129 +1189,17 @@
         "rows": 20,
         "instances": [
           {
+            "type": "bedroom_large",
+            "cx": 2,
+            "cz": 2,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
             "type": "living",
-            "cx": 2,
+            "cx": 8,
             "cz": 2,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 9,
-            "cz": 2,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 11,
-            "cz": 2,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_single",
-            "cx": 13,
-            "cz": 2,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 9,
-            "cz": 3,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 11,
-            "cz": 3,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_single",
-            "cx": 13,
-            "cz": 3,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 9,
-            "cz": 4,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 11,
-            "cz": 4,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_single",
-            "cx": 13,
-            "cz": 4,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 9,
-            "cz": 5,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 11,
-            "cz": 5,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_single",
-            "cx": 13,
-            "cz": 5,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 9,
-            "cz": 6,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_double",
-            "cx": 11,
-            "cz": 6,
-            "rotation": 0,
-            "mirrored": false,
-            "doubleHeight": false
-          },
-          {
-            "type": "outdoor_single",
-            "cx": 13,
-            "cz": 6,
             "rotation": 0,
             "mirrored": false,
             "doubleHeight": false
@@ -1238,6 +1237,14 @@
             "doubleHeight": false
           },
           {
+            "type": "circulation_single",
+            "cx": 10,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
             "type": "circulation_double",
             "cx": 2,
             "cz": 8,
@@ -1264,6 +1271,46 @@
           {
             "type": "circulation_double",
             "cx": 8,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_single",
+            "cx": 10,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 11,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 13,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 11,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 13,
             "cz": 8,
             "rotation": 0,
             "mirrored": false,
@@ -1295,6 +1342,15 @@
         ],
         "doors": [
           {
+            "cx": 8,
+            "cz": 7,
+            "side": "north",
+            "swing": {
+              "hinge": "a",
+              "into": "B"
+            }
+          },
+          {
             "cx": 4,
             "cz": 7,
             "side": "north",
@@ -1322,12 +1378,12 @@
             }
           },
           {
-            "cx": 8,
-            "cz": 3,
-            "side": "east",
+            "cx": 12,
+            "cz": 6,
+            "side": "south",
             "swing": {
               "hinge": "a",
-              "into": "B"
+              "into": "A"
             }
           }
         ]

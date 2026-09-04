@@ -74,13 +74,13 @@
     },
     {
       "id": "unit-8",
-      "name": "Flat 08 — one room, corner",
+      "name": "Flat 08 — one bedroom, corner",
       "color": "#ff922b",
       "file": "unit-8.json",
       "preview": "unit-8.jpg",
       "storeys": 1,
-      "areaM2": 38.88,
-      "savedAt": "2026-09-04T16:27:53.316Z"
+      "areaM2": 44.28,
+      "savedAt": "2026-09-04T17:20:21.384Z"
     },
     {
       "id": "unit-9",
