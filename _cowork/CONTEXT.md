@@ -172,7 +172,31 @@ Fonts link; `--accent` #d6341c, `--bg` #ece6d8, plus `--blue`/`--yellow`/
 whose "Yours" badge is red now, not ink, and whose cards animate in.
 PROJECT_STATE §2, §10, §11, §12, new §13.
 
-**Last updated:** 2026-09-03
+Run 0027 gave the flat app a landing screen and split the editor into the
+two steps the bar already named. The landing (built to
+`_cowork/design/wireframe/Landing.dc.html`) carries the headline, three
+doors and the six-step journey; it covers the editor rather than replacing
+it, and it is skipped when the URL already names a project or a group. Join
+a group asks for a code and a name inline and writes them through the same
+`writeSession` the send panel uses. Go to your group links to
+`BUILDING_APP_URL` (one constant in main.ts) carrying `?session=<code>`,
+which is the only handoff a resident drives between the two apps. The
+editor is now one panel at a time: step 01 has the palette, the drawing and
+the flat's three numbers plus its check chip as a strip in the top bar,
+with no right-hand panel at all; step 02 has no palette, the flat framed
+whole with its figures beneath it, and the send panel at the right. Step 02
+stays shut until the flat has a way in and says why when pressed. Before
+anything is placed the numbers read dashes, the name reads "Untitled", the
+check line is a hint rather than a fault and one ghost tile sits on the
+grid. Two new pure modules carry the rules and the model:
+`src/core/flatState.ts` (the phase every part of the chrome reads, and the
+landing's skip decision) and `src/core/journey.ts` (the six steps, exported
+for the building app to render too). The redundancy cull: Save / Open is
+now Open, Check Layout moved into the check chip, Frame View joined the
+view cluster in the corner, and the panel's Save toggle is a chevron.
+Nothing was deleted. PROJECT_STATE §2, §11, new §14.
+
+**Last updated:** 2026-09-04
 
 ## What this project is
 
@@ -251,7 +275,9 @@ rules engine and the export format are the mature parts, the UI is not.
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 198 cases in fifteen files as of run 0026 (`store.test.ts` 18 to
+  a second over 223 cases in seventeen files as of run 0027 (the new
+  `flatState.test.ts` at 17 and `journey.test.ts` at 6, plus 2 in
+  `session.test.ts` for the landing's join); 198 in fifteen as of run 0026 (`store.test.ts` 18 to
   21, `sameResident` and the plot round trip; `unitBrowser.test.ts` 6 to 7; the
   new `unitStats.test.ts` at 4, the save column's live numbers, pure); 190 in
   fourteen as of run 0025 (177 in thirteen as

@@ -71,7 +71,9 @@ work-in-progress research artifact, not a production app.
 | Wiring / render loop / view-mode orchestration, **dev-only `?project=` loader + `window.__app` capture handle** | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
 | **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. `sameResident(a, b)` (run 0026: trimmed, case-insensitive) is the ownership check's rule; a building run's optional `plot` (run 0026, opaque) rides alongside `genome`/`summary`. See §12. |
 | **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
-| **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by the save column's "Your flat" card (`refreshFlatCard`, `main.ts`). See §11. |
+| **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by `refreshFlatFigures` (`main.ts`), which writes the bar's strip in step 01 and the read-out under the drawing in step 02. See §11, §14. |
+| **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, and `showsLanding(search)`. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
+| **The journey, as data** (run 0027) | `src/core/journey.ts` | `JOURNEY`, six ordered steps across the two apps, with `journeyIndex(id)` and `journeyMarks(currentId)` → `done` / `now` / `ahead`. The landing renders it and the building app is expected to render the same array, which is why it is exported data rather than markup. Pure, no DOM; `journey.test.ts` pins the order and the marks. See §14. |
 | **The session settings + the publish call** (who, which group, the fourth output, and the takeover confirm, runs 0023-0026) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, `publishUnit(fetchLike, base, settings, id, label, text, replace?)` which PUTs the unit bytes and never throws, `takeoverConfirmText(owner)` and `decideTakeover(r, replaceTicked, confirmed)` (run 0025: the post-409 decision — retry, decline with its exact line, or proceed — pulled out so `window.confirm` never has to be driven in a test). Pure; `session.test.ts` drives it with a Map and a stub. Its OWN strings say "group", never "session" or "room" (run 0026, words only — the module, the type, the storage key and every `/api/session/…` path keep their names). See §10, §11, §12. |
 
 **Concave-corner wall logic** (part of `buildBoundaryWalls`): walls are inset to
@@ -3684,6 +3686,10 @@ residents in the BUILDING app's own panel (out of scope — this run touches
 only the flat app) and ownership-aware defaults on Replace.
 
 **The dialog becomes a column, always visible (run 0026, the brief).**
+Read this next paragraph as run 0026's own state: run 0027 kept the panel
+and its save but moved it onto step 02 alone, took the flat's own numbers
+out of it, and retired the fold and the "Save" toggle described below. §14
+is the current account; what follows is how it got there.
 `_cowork/design/DESIGN-BRIEF-3sep.md` and its wireframe
 (`_cowork/design/wireframe/FlatDraw.dc.html`) wanted the whole save UI
 beside the editor, not behind a click. `#save-dialog` (a native `<dialog>`,
@@ -3955,7 +3961,13 @@ assertion in `savePlan.test.ts`'s `outputLabel` test now pin "Group"/"group"
 wording where they pinned "Session"/"session" before), slow 26 passed + 1
 expected fail, `tsc`/`npm run build` clean, both
 fixture baselines still 12 and 7, `scripts/store-roundtrip.mjs` 28 checks
-(26 through run 0025) against `netlify dev`.
+(26 through run 0025) against `netlify dev`. As of run 0027: **fast 223
+passed in 17 files** (the new `flatState.test.ts` at 17 and
+`journey.test.ts` at 6, plus 2 in `session.test.ts` for a landing join
+writing exactly what the send panel reads back; no other file changed
+count), slow 26 passed + 1 expected fail, `tsc`/`npm run build` clean,
+both fixture baselines still 12 and 7, and the store contract untouched:
+run 0027 changed no file under `src/session/` beyond that test.
 
 ---
 
@@ -4059,3 +4071,104 @@ for each. Not checked: a narrow/mobile viewport
 to a small screen, not this run's business) and an actual dark-mode
 preference (`prefers-color-scheme`) — this app has always been one fixed
 theme, paper-and-ink, and the brief does not ask for a second one.
+
+---
+
+## 14. The landing, the two steps and the empty state (run 0027)
+
+**Source of truth:** `_cowork/design/DESIGN-BRIEF-3sep.md`'s "The screens"
+section, and the four wireframe screens it was written from
+(`_cowork/design/wireframe/Landing.dc.html`, `FlatEmpty.dc.html`,
+`FlatDraw.dc.html`, `FlatSend.dc.html`). Shrey ran run 0026's build and
+found two things: the app dropped a first-time resident onto an empty grid
+with an error about a missing entrance before they had done anything, and
+saving was claimed by three controls at once. Two rules answer both. **One
+thing, one place**: nothing that saves or sends appears twice. **One panel
+at a time**: the two steps already named in the bar became real screens, so
+the palette and the send panel are never on screen together.
+
+**Two rules, one place each** (`src/core/flatState.ts`, pure, 79 lines,
+`flatState.test.ts` 17 cases). `flatPhase(placedRooms, unitBuilds)` returns
+`empty` before anything is placed, `unready` once something is placed but
+`buildUnitExport` still refuses it, and `ready` when the build succeeds.
+Everything the chrome asks follows from that one value: `canSend` gates BOTH
+step 02's tab and the Send button, so they cannot disagree; `showsDropHint`
+puts the ghost tile on the grid; `checksRun` decides whether the layout
+rules are worth running at all. `showsLanding(search)` is the second rule
+and the only thing that decides whether the landing appears. Framed by
+`design-automation`'s §2.1 production rules: one IF-THEN over one state
+value, read in four places, changed in one.
+
+**The landing** (`#landing` in index.html, wired in main.ts). It covers the
+editor rather than replacing it, so the three.js scene is already warm when
+a door is picked and no router or second entry point exists. Four doors:
+*Start a flat* hides it; *Join a group* swaps the doors for two fields that
+normalise the code, refuse through the SAME `whyPublishDisabled` the send
+panel uses, and write through the SAME `writeSession`, so joining here and
+typing there leave state that cannot be told apart (pinned in
+`session.test.ts`); *Open a file* is the existing picker; *Go to your
+group* links to `BUILDING_APP_URL` (one constant, `main.ts`) carrying
+`?session=<code>`. It hands over the KEY, not the flat: the store is the
+shared thing both apps read, which is the database-mediated exchange
+`interoperability`'s own decision matrix (§3.1, §3.7) points at for two
+tools that already share one. A resident returns to the landing through
+Open → **Start over**, which destroys nothing; the landing's primary door
+then reads "Back to your flat" while there is something to come back to.
+
+**Two steps** (`body[data-step]`, `setStep`/`syncStepTabs` in main.ts). The
+bar's two tabs switch the screen under them and are clickable both ways.
+Step 01 has the palette, the drawing filling everything else, and the
+flat's three numbers plus the check chip as a strip inside the bar, live as
+the resident draws. Step 02 has no palette: the flat is framed whole
+(`resetToExtent`, the same framing Frame does), its figures sit under it
+with a fourth, the room count, and the send panel is at the right. Step 02
+is shut while `canSend` is false and carries `aria-disabled` rather than
+`disabled`, because a disabled button fires no click and the resident
+pressing a locked step is exactly the one who needs to hear why (found
+live). A flat that LOSES its way in while step 02 is up drops back to step
+01 rather than stranding a resident on a screen whose one button cannot
+work. Nothing moves in the DOM between steps, so the scene is never rebuilt
+and the canvas only resizes.
+
+**The empty state** (FlatEmpty.dc.html). With nothing placed the three
+numbers read `—`, the name reads "Untitled", the check chip drops its pill
+and reads "Drag a room onto the grid to start. Nothing is checked until you
+do." as plain muted text, Send is asleep, and one dashed red diamond on the
+grid reads "Drop a room here" (`#drop-hint`, a DOM overlay rotated onto the
+isometric angle, `pointer-events: none` so a drag lands through it). A
+figure is now shown ONLY when the unit builds: run 0026 showed `0 m²` for a
+flat with rooms but no way in, which reads as a measurement rather than as
+the absence of one, so that case reads dashes too and the chip beside it
+says which case it is. `unitStats` over one build stays the only source any
+number has.
+
+**Where every moved control went.** `Save / Open` → `Open`, holding
+`Open project` and `Start over` and no save path at all. `Check Layout` →
+the check chip, in the bar in step 01 and under the drawing in step 02,
+which opens the same `runCheck()` report; the report still closes from its
+own ✕. `Frame View` → `#view-controls`, beside Cutaway, Seeds, Structure
+and Interface, so cutaway, the layers, framing and the compass are one
+cluster in one corner. The save column's `SAVE` toggle → a chevron that
+collapses the panel. `Model / Plan / Diagram`, `Units` and `?` stayed. No
+control was deleted, and a search of the live DOM for "save" returns one
+hit, the palette's orientation note ("Saved with the project, never in the
+unit export"), which describes where a setting is stored.
+
+**Retired:** run 0025's fold over the two group fields. On step 02 they ARE
+the screen, next to the button that uses them (FlatSend.dc.html), so both
+stay open and `syncSessionFold`/`unfoldSessionFields` are gone.
+
+**Verified live** against `netlify dev`, at 1440×900, in the Browser pane:
+the landing's own computed values (title Big Shoulders Display 78px, ink
+`rgb(22,22,22)`; the primary door red `rgb(214,52,28)`; the discs yellow
+`rgb(242,180,28)` and blue `rgb(29,79,163)`; the ground `rgb(236,230,216)`);
+a join writing `{"resident":"Ana","code":"room-42"}` under
+`reconfigure.session` and refusing `room 42` with the store's own wording
+before writing anything; the empty state's dashes, hint and ghost tile; a
+placed room with no entrance leaving step 02 shut and answering with the
+reason when pressed; `?project=flat-2-single-storey.json` skipping the
+landing and reading 70 m² / 1 / 3.6 m with "All checks pass"; step 02
+framing the flat, hiding the palette and the bar strip, and reading
+"Unit 6 · 70 m² · 1 · 3.6 m · 7 rooms"; and a real send answering
+"Sent to run0027 as Unit 6 · open Units to see your group" with the store's
+poll showing the flat at version 1 with its preview.
