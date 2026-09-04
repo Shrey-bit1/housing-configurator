@@ -68,6 +68,24 @@ export interface Resident {
   share: number | null;
   /** Ordered ballot of shared-space type names, first is most wanted. */
   ballot: string[];
+  /**
+   * How many square metres of shared space this resident thinks EACH PERSON
+   * should pay for. A whole number of square metres, zero or more, or null when
+   * never answered. The building app takes the median over every resident's
+   * answer, which is why it has to travel: before run 0030 the store dropped
+   * this key without a word and that median was taken over one answer.
+   *
+   * There is no upper bound here on purpose. How high the slider goes is the
+   * building app's business, and a bound written into the store would have to be
+   * changed in two repositories at once.
+   */
+  shareM2: number | null;
+  /**
+   * How many square metres this resident offered to pay for BEYOND that share,
+   * after the vote settled. Same units, same rules, same reason for no upper
+   * bound.
+   */
+  extraM2: number | null;
 }
 
 export interface BuildingRun {
@@ -235,7 +253,10 @@ async function route(req: Request, kv: KV): Promise<Response> {
     const patch = parseResidentPatch(await req.json().catch(() => fail(400, "body must be JSON")));
     let record!: Resident;
     await updateIndex(kv, indexKey, (index) => {
-      record = { ...(index.residents[who] ?? { counts: {}, share: null, ballot: [] }), ...patch };
+      record = {
+        ...(index.residents[who] ?? { counts: {}, share: null, ballot: [], shareM2: null, extraM2: null }),
+        ...patch,
+      };
       index.residents[who] = record;
     });
     return json({ name: who, ...record });
@@ -432,6 +453,18 @@ function parseResidentPatch(body: unknown): Partial<Resident> {
     const b = body.ballot;
     if (!Array.isArray(b) || !b.every((t) => typeof t === "string")) return fail(400, "ballot must be a list of strings");
     patch.ballot = b as string[];
+  }
+  // The two square-metre answers (run 0030). Same shape as the three above:
+  // present or absent, and checked whole when present. No upper bound, because
+  // the slider's range belongs to the building app and a limit written here
+  // would have to move in two repositories at once.
+  for (const key of ["shareM2", "extraM2"] as const) {
+    if (!(key in body)) continue;
+    const v = body[key];
+    if (v !== null && !(typeof v === "number" && Number.isInteger(v) && v >= 0)) {
+      return fail(400, `${key} must be a whole number of square metres ≥ 0, or null`);
+    }
+    patch[key] = v as number | null;
   }
   return patch;
 }
