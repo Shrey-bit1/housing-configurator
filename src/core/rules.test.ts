@@ -99,19 +99,63 @@ function firedOn(graph: DwellingGraph, ruleId: string): string[] {
 }
 
 /** A minimal dwelling that satisfies the presence rules (P1 bathroom, P2
- *  kitchen) and is fully reachable, so a test about one rule is not drowned in
- *  unrelated findings. Entry is the living room. */
+ *  kitchen, P4 bedroom) and is fully reachable, so a test about one rule is not
+ *  drowned in unrelated findings. Entry is the living room.
+ *
+ *  The bedroom joined it in run 0029 with P4. Without one every case in this
+ *  file would carry a standing P4, which is exactly the noise this helper
+ *  exists to keep out. */
 function baseFlat(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const living = node("0/living", "living", { isEntry: true, cells: rect(0, 0, 3, 2) });
   const kitchen = node("0/kitchen", "kitchen", { cells: rect(4, 0, 6, 2) });
   const bath = node("0/bath", "bathroom_small", { cells: rect(7, 0, 8, 2) });
+  const bed = node("0/bed", "bedroom_large", { cells: rect(0, 3, 3, 5) });
   return {
-    nodes: [living, kitchen, bath],
-    edges: [door("0/living", "0/kitchen"), door("0/living", "0/bath")],
+    nodes: [living, kitchen, bath, bed],
+    edges: [door("0/living", "0/kitchen"), door("0/living", "0/bath"), door("0/living", "0/bed")],
   };
 }
 
 // ---- The pack --------------------------------------------------------------
+
+describe("P4 — a dwelling needs a bedroom", () => {
+  it("fires on a flat with a living room, a kitchen and a bath but nowhere to sleep", () => {
+    const { nodes, edges } = baseFlat();
+    const noBed = nodes.filter((n) => n.id !== "0/bed");
+    const kept = edges.filter((e) => e.b !== "0/bed");
+    const found = validate(graphOf(noBed, kept)).filter((v) => v.ruleId === "P4");
+    expect(found).toHaveLength(1);
+    expect(found[0].severity).toBe("hard");
+    // It is a whole-dwelling finding, so it points at no node in particular,
+    // the same shape P1 and P2 use.
+    expect(found[0].nodeIds).toEqual([]);
+  });
+
+  it("is silent as soon as one bedroom exists", () => {
+    const { nodes, edges } = baseFlat();
+    expect(ids(graphOf(nodes, edges))).not.toContain("P4");
+  });
+
+  it("counts a small bedroom too, and does not care how many", () => {
+    const { nodes, edges } = baseFlat();
+    const second = node("0/bed2", "bedroom_small", { cells: rect(4, 3, 6, 5) });
+    expect(ids(graphOf([...nodes, second], [...edges, door("0/living", "0/bed2")])))
+      .not.toContain("P4");
+  });
+
+  it("is not satisfied by a living room, which is the studio this project refuses", () => {
+    const living = node("0/living", "living", { isEntry: true, cells: rect(0, 0, 3, 2) });
+    const kitchen = node("0/kitchen", "kitchen", { cells: rect(4, 0, 6, 2) });
+    const bath = node("0/bath", "bathroom_small", { cells: rect(7, 0, 8, 2) });
+    const graph = graphOf(
+      [living, kitchen, bath],
+      [door("0/living", "0/kitchen"), door("0/living", "0/bath")]
+    );
+    expect(ids(graph)).toContain("P4");
+    // And it is the ONLY presence rule firing: the flat has both of the others.
+    expect(ids(graph).filter((r) => r.startsWith("P"))).toEqual(["P4"]);
+  });
+});
 
 describe("E1 — no entrance", () => {
   it("fires when nothing is an entry root", () => {

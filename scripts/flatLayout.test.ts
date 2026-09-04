@@ -149,6 +149,32 @@ describe("packing a storey", () => {
     expect(packed.cells.size).toBe(1);
   });
 
+  it("keeps a gap out of the flat and out of the rooms", () => {
+    // A gap is space the flat is not in. It is what lets a row start further
+    // in or stop short, which is the only way rows of left-aligned slots make
+    // an L with a re-entrant corner rather than a plain staircase.
+    const packed = packStorey({
+      origin: { cx: 2, cz: 2 },
+      rows: [
+        { slots: [{ key: "living", type: "living" }, { gap: true, w: 3, d: 5 }] },
+        { slots: [{ gap: true, w: 4, d: 4 }, { key: "kitchen", type: "kitchen" }] },
+      ],
+    });
+    expect(packed.gaps).toHaveLength(15 + 16);
+    expect(packed.voids).toHaveLength(0);
+    // The gap in row 1 pushes the kitchen east: rows are left-aligned, so
+    // without it the kitchen would start at the flat's own west edge.
+    expect(packed.placements.find((p) => p.type === "kitchen")).toEqual({
+      type: "kitchen",
+      cx: 6,
+      cz: 7,
+      rotation: 0,
+    });
+    expect(packed.cells.get("kitchen")!.has(cellKey(6, 7))).toBe(true);
+    expect(packed.cells.get("kitchen")!.has(cellKey(2, 7))).toBe(false);
+    expect(packed.bounds).toEqual({ minX: 2, minZ: 2, maxX: 11, maxZ: 10 });
+  });
+
   it("refuses the same room key twice", () => {
     expect(() =>
       packStorey({
@@ -186,6 +212,37 @@ describe("doors read out of the geometry", () => {
       { cx: 3, cz: 8, side: "south", between: ["hall", "kitchen"] },
       { cx: 7, cz: 8, side: "south", between: ["hall", "bath"] },
       { cx: 11, cz: 8, side: "south", between: ["hall", "bed2"] },
+    ]);
+  });
+
+  it("keeps its edge bookkeeping apart between storeys on the same coordinates", () => {
+    // Both storeys of a maisonette are drawn on the same grid, so the landing
+    // upstairs sits on the same cells as the hall downstairs. Before run 0029
+    // the ground-floor door claimed the physical edge and the first-floor door
+    // was refused on a boundary it plainly shared. The storey index is what
+    // tells the two apart.
+    //
+    // The geometry is the tight case on purpose: a 2 by 2 hall over a 4 by 4
+    // stair shares exactly ONE possible anchor, so the second door has nowhere
+    // else to go.
+    const set = (cells: [number, number][]) => new Set(cells.map(([x, z]) => cellKey(x, z)));
+    const hall = set([[0, 0], [1, 0], [0, 1], [1, 1]]);
+    const stair = set(
+      [0, 1, 2, 3].flatMap((x) => [2, 3, 4, 5].map((z) => [x, z] as [number, number]))
+    );
+    const all = new Map([["hall_lo", hall], ["hall_up", hall], ["stair", stair]]);
+    const edges: [string, string][] = [["hall_lo", "stair"], ["hall_up", "stair"]];
+
+    expect(doorAnchors(hall, stair, "south")).toEqual([{ cx: 0, cz: 1 }]);
+
+    // Without the storey index the two doors fight over that one anchor.
+    expect(() => deriveDoors(all, edges)).toThrow(/share no straight boundary/);
+
+    // With it, both bind, at the same place on their own floor.
+    const doors = deriveDoors(all, edges, (k) => (k === "hall_lo" ? 0 : 1));
+    expect(doors).toEqual([
+      { cx: 0, cz: 1, side: "south", between: ["hall_lo", "stair"] },
+      { cx: 0, cz: 1, side: "south", between: ["hall_up", "stair"] },
     ]);
   });
 
