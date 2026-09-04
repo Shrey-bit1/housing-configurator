@@ -16,54 +16,71 @@
     />
   </head>
   <body>
-    <!-- Top bar (handoff Part 2, 1a; the brief's skin and two steps, run
-         0026). Every control here existed before; they are regrouped, not
-         added. The segmented control replaces the separate Diagram and Top
-         View buttons, so their mutual exclusivity, which the code always
-         enforced, is finally visible. The brand and the two steps read the
-         brief's language (`_cowork/design/wireframe/FlatDraw.dc.html`)
-         alongside those controls, not instead of them — this app still
-         needs Units/Check Layout/Save where the wireframe (having nothing
-         else to show) does not. -->
+    <!-- Top bar, rebuilt to `_cowork/design/wireframe/FlatDraw.dc.html` and
+         `FlatSend.dc.html` (run 0027). The two steps are real tabs now, not
+         a read-out: they switch the screen under them, and 02 stays grey
+         until the flat has a way in. The three numbers and the check chip
+         live here as a strip while a resident draws, so step 01 needs no
+         right-hand panel at all.
+
+         The bar carries only what brings something IN (Units, Open, help)
+         plus the view switcher. Check Layout left it for the check chip
+         below; Frame View left it for the view cluster in the corner; Save
+         left it for the send panel in step 02. Nothing was deleted, and
+         nothing that saves or sends appears here twice. -->
     <header id="topbar">
       <div class="tb-left">
         <span class="tb-mark" aria-hidden="true"><i></i></span>
         <span class="tb-project">
-          <span class="tb-name">(Re)<b>Configure</b> / Flat</span>
+          <span class="tb-name">(Re)<b>Configure</b></span>
           <span class="tb-meta" id="tb-meta">0.6 m grid</span>
         </span>
-        <!-- The flat app is one screen, always: drawing and sending are not
-             a sequence the resident finishes, so "Draw" is always the
-             current (breathing) step and "Send" stays the plain, upcoming
-             one — matching the wireframe's own FlatDraw.dc.html exactly
-             (only step 01 carries `.step.now`; nothing carries `.done`). -->
-        <div class="tb-steps" aria-hidden="true">
-          <span class="tb-step now"><span class="n">01</span>Draw</span>
-          <span class="tb-step"><span class="n">02</span>Send</span>
-        </div>
-        <!-- Which group this resident is in, and who they are, so it is
-             visible without opening Save. Set from the save column's two
-             group fields (run 0023), or by ?session= in the URL. -->
-        <span id="tb-session" class="tb-session" title="Set under Save…">No group</span>
       </div>
-      <div class="tb-centre">
+      <!-- Two tabs, clickable both ways so neither is a trap. `aria-selected`
+           carries which screen is up; `#step-send` also carries `disabled`
+           while the flat has no way in (src/core/flatState.ts's one rule). -->
+      <div class="tb-steps" role="tablist" aria-label="Step">
+        <button id="step-draw" class="tb-step" type="button" role="tab" aria-selected="true">
+          <span class="n">01</span>Draw your flat
+        </button>
+        <button id="step-send" class="tb-step" type="button" role="tab" aria-selected="false">
+          <span class="n">02</span>Send it
+        </button>
+      </div>
+      <!-- The flat's three numbers and its check chip, live while drawing.
+           The chip is the way into the layout report now that Check Layout
+           has left the bar, so it is a button in both its states. -->
+      <div class="tb-figures" id="tb-figures">
+        <div class="num">
+          <span class="v"><span id="fig-area">—</span><small> m²</small></span>
+          <span class="l">area</span>
+        </div>
+        <div class="num">
+          <span class="v" id="fig-storeys">—</span>
+          <span class="l">storey(s)</span>
+        </div>
+        <div class="num">
+          <span class="v"><span id="fig-glazing">—</span><small> m</small></span>
+          <span class="l">glazing</span>
+        </div>
+        <button id="fig-check" class="chip" type="button" title="Open the layout report"></button>
+      </div>
+      <div class="tb-spacer"></div>
+      <div class="tb-right">
+        <span id="tb-session" class="tb-session" title="Set under step 02">No group</span>
         <div id="view-segments" role="group" aria-label="View mode">
           <button id="model-view-toggle" type="button" class="active">Model</button>
           <button id="top-view-toggle" type="button">Plan</button>
           <button id="view-toggle" type="button">Diagram</button>
         </div>
-      </div>
-      <div class="tb-right">
         <button id="units-btn" type="button">Units</button>
-        <button id="check-layout" type="button">Check Layout</button>
-        <button id="reset-view" type="button">Frame View</button>
         <div class="tb-menu">
           <button id="saveopen-btn" type="button" aria-haspopup="true" aria-expanded="false">
-            Save / Open <span class="tb-caret" aria-hidden="true">▾</span>
+            Open <span class="tb-caret" aria-hidden="true">▾</span>
           </button>
           <div id="saveopen-menu" role="menu">
-            <button id="menu-save" type="button" role="menuitem">Save…</button>
             <button id="menu-import" type="button" role="menuitem">Open project</button>
+            <button id="menu-start-over" type="button" role="menuitem">Start over</button>
           </div>
         </div>
         <button id="shortcuts-btn" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
@@ -74,6 +91,26 @@
       <main id="viewport">
         <canvas id="scene"></canvas>
         <canvas id="graph-canvas"></canvas>
+        <!-- The empty state's one ghost tile (run 0027, FlatEmpty.dc.html):
+             a dashed diamond on the grid saying where the first room goes.
+             It is drawn in the DOM rather than in the scene because it is
+             chrome rather than geometry, and it never takes a pointer event,
+             so a drag can land straight through it. `showsDropHint` in
+             src/core/flatState.ts is the only thing that decides it. -->
+        <div id="drop-hint" aria-hidden="true"><span>Drop a room here</span></div>
+        <!-- Step 02's read-out (FlatSend.dc.html): the flat shown whole with
+             its numbers underneath. Same figures as the bar's strip, which
+             is hidden in this step, so a resident reads them in exactly one
+             place at a time. -->
+        <p id="send-caption">Your flat, as your neighbours will see it</p>
+        <div id="flat-readout">
+          <span class="fr-name" id="fr-name">Untitled</span>
+          <div class="num"><span class="v"><span id="fr-area">—</span><small> m²</small></span><span class="l">area</span></div>
+          <div class="num"><span class="v" id="fr-storeys">—</span><span class="l">storey(s)</span></div>
+          <div class="num"><span class="v"><span id="fr-glazing">—</span><small> m</small></span><span class="l">glazing</span></div>
+          <div class="num"><span class="v" id="fr-rooms">—</span><span class="l">rooms</span></div>
+          <button id="fr-check" class="chip" type="button" title="Open the layout report"></button>
+        </div>
         <div id="view-mode-toggles">
           <button id="graph-relayout" type="button">Re-layout</button>
         </div>
@@ -139,6 +176,11 @@
             <button id="seeds-toggle" type="button" title="Outline each elastic room's authored seed rectangle">Seeds</button>
             <button id="structure-toggle" type="button" title="The fixed layer: wet rooms and stairs as built, everything else a bare plate">Structure</button>
             <button id="interface-toggle" type="button" title="The binding level: perimeter, wet cells, stair, balconies, entrance — the rest as one open plate">Interface</button>
+            <!-- Frame View left the top bar in run 0027 and joined this
+                 cluster, so cutaway, the layers, framing and the compass are
+                 one group in one corner. It is an action rather than a
+                 toggle, so it never carries `.active`. -->
+            <button id="reset-view" type="button" title="Frame the whole flat in the view">Frame</button>
           </div>
           <div id="compass-row">
             <div id="north-badge" title="North" aria-hidden="true">
@@ -162,67 +204,44 @@
         <div id="selection-readout"><span id="selection-text"></span></div>
         <div id="drop-overlay"><span>Drop project file to import</span></div>
         <div id="toast"></div>
-        <!-- The save column (run 0026, the brief): ALWAYS visible beside the
-             editor, replacing the old `<dialog>` — the same underlying save
-             (src/core/savePlan.ts, unchanged) in the brief's order: the
-             flat's name and three numbers with the check line, the group,
-             one red button, a folded More holding the files and the library
-             (run 0019's three outputs plus run 0023's publish and run 0024's
-             Replace — nothing new, only relocated). Positioned over the
-             viewport's right edge; see #save-column in style.css. -->
+        <!-- The send panel, step 02 only (run 0027, FlatSend.dc.html). It was
+             run 0026's always-visible save column; the flat's own numbers
+             have moved out of it (to the bar in step 01 and under the drawing
+             here), so what is left is the one thing this screen is for. The
+             save itself is run 0019's `runSave` through run 0026's publish
+             path, untouched: only where it is reached from changed.
+
+             The header is a chevron and nothing else. It used to read "Save",
+             which was the third control claiming to save; the red button
+             below is the only one now. -->
         <aside id="save-column">
-          <button type="button" id="save-column-toggle" class="save-column-toggle" aria-expanded="true" aria-controls="save-column-body" title="Minimize">
-            <span>Save</span><span class="sc-caret" aria-hidden="true">▾</span>
+          <button type="button" id="save-column-toggle" class="save-column-toggle" aria-expanded="true" aria-controls="save-column-body" title="Collapse this panel">
+            <span class="sc-caret" aria-hidden="true">›</span>
           </button>
           <div id="save-column-body" class="save-column-body">
-          <section class="card" id="flat-card">
-            <p class="card-label">Your flat</p>
-            <h2 class="flat-name" id="flat-name">Flat 1</h2>
-            <div class="flat-numbers">
-              <div class="num">
-                <span class="v"><span id="flat-area-cnt">0</span><small> m²</small></span>
-                <span class="l">area</span>
-              </div>
-              <div class="num">
-                <span class="v" id="flat-storeys">0</span>
-                <span class="l">storey(s)</span>
-              </div>
-              <div class="num">
-                <span class="v"><span id="flat-glazing">0</span><small> m</small></span>
-                <span class="l">glazing</span>
-              </div>
-            </div>
-            <div class="flat-check" id="flat-check"></div>
-          </section>
+          <h2 class="send-headline">Send it to<br />your group.</h2>
 
           <section class="card" id="group-card">
-            <p class="card-label">Your group</p>
             <!-- The group (run 0023): who is publishing and into which group.
                  Remembered in localStorage, never in a project file; the code
                  is lowercased on the way in to match the store. Both must be
-                 filled before Send actually reaches the store (whyPublishDisabled).
-                 FOLDED once both are set (run 0025, UX pass — "reveal
-                 complexity gradually"): starts on a one-line summary instead
-                 of two open text fields; "change" reveals them again. Shown
-                 open the first time, before anything is set, since there is
-                 nothing yet to fold. -->
-            <p id="save-session-summary" class="save-session-summary" hidden>
-              <span id="save-session-summary-text"></span>
-              <button type="button" id="save-session-change" class="save-session-change">change</button>
-            </p>
+                 filled before Send reaches the store (whyPublishDisabled).
+                 Both fields stay open here, which retires run 0025's fold:
+                 this screen exists to send, so the two things a send needs
+                 are never one click away. -->
             <div id="save-session-fields" class="save-session-fields">
-              <label>Your name
-                <input id="save-resident" type="text" autocomplete="off" spellcheck="false" placeholder="who is publishing" />
-              </label>
-              <label>Group code
+              <label>Your group
                 <input id="save-session" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
+              </label>
+              <label>Your name
+                <input id="save-resident" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
               </label>
             </div>
             <button id="save-go" class="btn-send" type="button">
-              <span>Send it to your group</span><span aria-hidden="true">→</span>
+              <span>Send it</span><span aria-hidden="true">→</span>
             </button>
-            <p class="group-hint">Your neighbours see it within seconds.</p>
             <p id="save-names" class="save-names"></p>
+            <p class="group-hint">Your neighbours see it within seconds.</p>
             <div id="save-results" role="status" aria-live="polite"></div>
           </section>
 
@@ -284,6 +303,68 @@
           </div>
         </aside>
       </main>
+    </div>
+    <!-- The landing (run 0027, Landing.dc.html). It covers the editor rather
+         than replacing it, so the scene behind it is already warm by the time
+         a resident picks a door. `showsLanding` in src/core/flatState.ts is
+         the only thing that decides whether it appears: a URL that already
+         names a project or a group skips it. The journey strip below is
+         rendered from src/core/journey.ts, never written out here. -->
+    <div id="landing" hidden>
+      <div class="landing-rule" aria-hidden="true"></div>
+      <div class="landing-disc landing-disc-a" aria-hidden="true"></div>
+      <div class="landing-disc landing-disc-b" aria-hidden="true"></div>
+      <div class="landing-inner">
+        <div class="landing-head">
+          <span class="tb-name landing-brand">(Re)<b>Configure</b></span>
+          <span class="card-label">ETH Zürich · MAS DFAB · Shrey Tatamiya</span>
+        </div>
+        <div class="landing-body">
+          <div class="landing-copy">
+            <h1 class="landing-title">Draw the flat<br />you want<br />to live in.</h1>
+            <p class="landing-lead">
+              Then the building arranges itself around everybody's flats. You and your
+              neighbours decide together how much is shared, and where it goes.
+            </p>
+          </div>
+          <div class="landing-doors" id="landing-doors">
+            <button id="landing-start" class="btn-send landing-primary" type="button">
+              <span id="landing-start-label">Start a flat</span><span aria-hidden="true">→</span>
+            </button>
+            <button id="landing-join" class="landing-door" type="button">
+              <span>Join a group</span><span aria-hidden="true">→</span>
+            </button>
+            <button id="landing-open" class="landing-door" type="button">
+              <span>Open a file</span><span aria-hidden="true">→</span>
+            </button>
+            <p class="landing-aside">
+              Already sent your flat? <a id="landing-group" href="#">Go to your group</a>
+            </p>
+          </div>
+          <!-- "Join a group" swaps the doors for these two fields rather than
+               opening a prompt: a prompt cannot be styled, cannot be tested,
+               and returns nothing under scripting (the trap run 0010 found).
+               They write through the same `writeSession` the send panel's own
+               fields use, so both routes leave identical state. -->
+          <form class="landing-join" id="landing-join-form" hidden>
+            <label>Your group
+              <input id="landing-code" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
+            </label>
+            <label>Your name
+              <input id="landing-name" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
+            </label>
+            <p class="landing-join-why" id="landing-join-why"></p>
+            <button id="landing-join-go" class="btn-send" type="submit">
+              <span>Join</span><span aria-hidden="true">→</span>
+            </button>
+            <button id="landing-join-back" class="landing-back" type="button">back</button>
+          </form>
+        </div>
+        <div class="landing-journey">
+          <p class="card-label">How it goes</p>
+          <div class="journey" id="journey-strip"></div>
+        </div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

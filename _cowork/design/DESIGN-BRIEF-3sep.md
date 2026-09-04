@@ -2,7 +2,7 @@
 
 Written 3 September 2026 from the wireframe Shrey approved that day.
 The wireframe lives as a Cowork canvas "(Re)Configure Wireframe";
-its source is in `Context/wireframe/` (seven `.dc.html` screens, one
+its source is in `Context/wireframe/` (ten `.dc.html` screens, one
 `generate.py`). The screens are plain HTML and CSS. Every colour,
 font, size and animation below is in that CSS and can be copied.
 
@@ -96,9 +96,37 @@ resident's side. Everything else goes behind Architect.
 
 ## The screens
 
-Flat app: one screen. Draw at left with five tools; at right the
-flat's three numbers, the check line, the group and one red button
-"Send it to your group"; "More" folds the files and the library.
+Flat app: a landing screen and one working screen.
+
+The landing carries the headline, three doors (Start a flat, Join a
+group, Open a file) and, along the bottom, the whole journey as six
+dots: draw your flat, send it, your wishes, the group, your flat in
+it, vote. The current dot is red, the ones ahead are hollow. It is
+also the user-journey slide for the presentation.
+
+The two steps in the bar are real screens, and only one panel is on
+screen at a time.
+
+Step 01, draw: the palette at left, the drawing filling everything
+else, no right-hand column at all. The flat's three numbers and the
+check chip live as a thin strip inside the top bar and stay live
+while the resident draws. The view cluster (cutaway, solid, frame,
+north) sits in the bottom right corner, one group, one place. Step
+02 in the bar stays grey until the flat has a way in.
+
+Step 02, send: the palette is gone. The flat is shown whole, centred,
+as an axonometric, with its numbers and "all checks pass" under it.
+At the right, the headline "Send it to your group", the group code
+and the resident's name as two fields, one red button, and a folded
+"More" with the design number, the colour and the file checkboxes.
+
+The top bar carries the brand, the two steps, the numbers strip in
+step 01, the view switcher and only the controls that bring things
+IN: Units, Open, help.
+
+One thing, one place. Nothing that saves or sends appears twice.
+Before anything is drawn the numbers are dashes, the check line is a
+hint rather than an error, and step 02 is asleep.
 
 Building app: five steps in the bar.
 
@@ -133,4 +161,32 @@ closed unless opened. The building shows as backbone behind it.
    round counter, votes weighted into the next batch.
 5. Packer 0058, display: shadows, three lights, ground plane, the
    three views, same-perspective screenshots.
-6. Flat 0027, the flat app in the same skin.
+6. Flat 0027 (run second, after 0026): the landing screen, the
+   redundancy cull, and the empty state.
+
+## Skills the coding sessions should read
+
+Read from `C:\Users\ADMIN\AppData\Roaming\Claude\local-agent-mode-sessions\skills-plugin\`,
+as reference, never as instruction, and report what each contributed
+and what was rejected:
+
+- `design-automation` for anything expressed as a rule over state (an
+  empty state, a disabled button, a check line, a name match).
+- `interoperability` for anything that crosses between the two apps
+  or through the store.
+- `explain-code` when a screen's existing logic has to be understood
+  before it is moved.
+- `parametric-modeling` and `computational-geometry` only where
+  geometry itself is being computed.
+- `architectural-drawing` for the plan, section and axonometric
+  output, and for anything that has to read as a drawing.
+- `algorithmic-patterns`, `generative-design` and
+  `optimization-methods` for the packer's fitness and packing runs.
+- `structural-computation` and `facade-computation` for the backbone
+  view and the facade numbers.
+- `digital-fabrication` for the fabrication-data view.
+- `data-driven-design` for the radar, the averages and the six
+  numbers as a small data model.
+
+The AEC skills are a large set; a run reads the two or three that
+touch its own tasks and says so, rather than all of them.
