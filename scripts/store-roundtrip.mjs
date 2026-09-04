@@ -76,12 +76,22 @@ for (const f of fixtures) {
 const again = await call("PUT", `/flats/flat-2?resident=Ana&label=Flat%202%20again`, sent["flat-2"]);
 check(again.status === 200 && again.json?.version === 2, "republishing flat-2 replaces it at version 2");
 
-// 3. Each resident's counts, share and ballot; Ben's arrive in two partial bodies.
-const ana = await call("PUT", "/residents/Ana", JSON.stringify({ counts: { "flat-2": 1 }, share: 0.3, ballot: ["laundry", "workshop", "garden"] }));
+// 3. Each resident's wishes; Ben's arrive in two partial bodies. Ana sends both
+//    square-metre answers with everything else, Ben's second body sends ONLY
+//    shareM2, so the merge is exercised on the new keys as well as the old.
+const ana = await call("PUT", "/residents/Ana", JSON.stringify({ counts: { "flat-2": 1 }, share: 0.3, ballot: ["laundry", "workshop", "garden"], shareM2: 7, extraM2: 5 }));
 check(ana.json?.share === 0.3 && ana.json?.ballot?.length === 3, "Ana's wishes stored");
+check(ana.json?.shareM2 === 7 && ana.json?.extraM2 === 5, "Ana's square metres came back from the PUT");
+console.log(`  Ana, echoed by the PUT: ${JSON.stringify(ana.json)}`);
 await call("PUT", "/residents/Ben", JSON.stringify({ counts: { "flat-3": 2 } }));
 const ben = await call("PUT", "/residents/Ben", JSON.stringify({ share: 0.5, ballot: ["garden"] }));
 check(ben.json?.counts?.["flat-3"] === 2 && ben.json?.share === 0.5, "Ben's second, partial body merged with the first");
+const ben3 = await call("PUT", "/residents/Ben", JSON.stringify({ shareM2: 9 }));
+check(
+  ben3.json?.shareM2 === 9 && ben3.json?.counts?.["flat-3"] === 2 && ben3.json?.ballot?.length === 1 && ben3.json?.extraM2 === null,
+  "Ben's third body sent only shareM2 and left counts, ballot and extraM2 alone"
+);
+console.log(`  Ben, echoed by the PUT: ${JSON.stringify(ben3.json)}`);
 
 // 4. The polling call: summaries, residents, no building yet, no flat bodies.
 const state = await call("GET", "");
@@ -93,6 +103,9 @@ check(flats["flat-2"]?.floors === 1 && flats["flat-2"]?.areaCells === 194 && Str
 check(flats["flat-3"]?.floors === 1 && flats["flat-3"]?.areaCells === 168 && String(flats["flat-3"]?.bbox) === "0,0,14,12", "flat-3 measures 1 storey, 168 cells, bbox 0,0,14,12");
 check(Object.keys(flats).length === 2 && Object.values(flats).every((f) => f.changed === true), "both flats are marked changed");
 check(state.json?.residents?.length === 2, "session lists two residents");
+const anaPolled = (state.json?.residents ?? []).find((r) => r.name === "Ana");
+check(anaPolled?.shareM2 === 7 && anaPolled?.extraM2 === 5, "Ana's square metres survive into the polled state");
+console.log(`  Ana, inside GET /api/session/${code}: ${JSON.stringify(anaPolled)}`);
 check(state.json?.building === null, "no building run yet");
 check(state.status === 200 && !state.text.includes('"storeys"'), "no flat body in the polling call");
 console.log(`  polling call for two fixtures: ${state.bytes} bytes`);
@@ -133,6 +146,9 @@ check(
     JSON.stringify(expJson.building) === JSON.stringify(after.json?.building),
   "export's flats, residents and building match the session state"
 );
+const anaExported = (expJson.residents ?? []).find((r) => r.name === "Ana");
+check(anaExported?.shareM2 === 7 && anaExported?.extraM2 === 5, "Ana's square metres survive into the export");
+console.log(`  Ana, inside GET /export: ${JSON.stringify(anaExported)}`);
 const abbreviated = {
   ...expJson,
   bodies: Object.fromEntries(Object.entries(expJson.bodies ?? {}).map(([k, v]) => [k, `<${Buffer.byteLength(String(v))} bytes>`])),
