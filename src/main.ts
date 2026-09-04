@@ -1895,7 +1895,13 @@ function importProjectText(text: string): boolean {
 
 function readAndImport(file: File): void {
   const reader = new FileReader();
-  reader.onload = () => importProjectText(String(reader.result ?? ""));
+  reader.onload = () => {
+    // A file opened FROM the landing dismisses it, and only once something
+    // actually loaded: a file that fails to parse, or a replace-confirm the
+    // resident declines, leaves them on the landing with their doors rather
+    // than dropping them into an editor they did not ask for (run 0027).
+    if (importProjectText(String(reader.result ?? ""))) hideLanding();
+  };
   reader.onerror = () => showToast("error", "Could not read that file.");
   reader.readAsText(file);
 }
