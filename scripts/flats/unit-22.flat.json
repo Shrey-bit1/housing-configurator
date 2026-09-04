@@ -1,0 +1,117 @@
+{
+  "id": "unit-22",
+  "name": "Flat 22 — three rooms, deep hall",
+  "color": "#ffd43b",
+  "targetM2": [
+    70,
+    85
+  ],
+  "grid": {
+    "cols": 26,
+    "rows": 26
+  },
+  "northAngle": 0,
+  "reference": "Plan 9, Volkswohnung WHG 3, with a grown living room",
+  "wetRooms": [
+    "kitchen",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "loggia",
+              "fill": "outdoor",
+              "w": 17,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "void": true,
+              "w": 4,
+              "d": 5
+            },
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "diele",
+              "fill": "circulation",
+              "w": 17,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            },
+            {
+              "key": "bed2",
+              "type": "bedroom_small"
+            },
+            {
+              "gap": true,
+              "w": 4,
+              "d": 4
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "diele",
+      "living"
+    ],
+    [
+      "diele",
+      "bed1"
+    ],
+    [
+      "diele",
+      "kitchen"
+    ],
+    [
+      "diele",
+      "bath"
+    ],
+    [
+      "diele",
+      "bed2"
+    ],
+    [
+      "living",
+      "loggia"
+    ]
+  ],
+  "entrance": {
+    "key": "diele",
+    "side": "east"
+  }
+}

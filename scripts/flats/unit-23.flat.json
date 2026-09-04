@@ -1,0 +1,176 @@
+{
+  "id": "unit-23",
+  "name": "Flat 23 — three rooms, maisonette",
+  "color": "#ff6b6b",
+  "targetM2": [
+    70,
+    85
+  ],
+  "grid": {
+    "cols": 24,
+    "rows": 24
+  },
+  "northAngle": 0,
+  "reference": "Plan 4, Zwischenbaechen D, over two storeys at three rooms",
+  "wetRooms": [
+    "kitchen",
+    "wc",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "gap": true,
+              "w": 5,
+              "d": 5
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 14,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "stack": [
+                {
+                  "key": "wcp",
+                  "fill": "circulation",
+                  "w": 2,
+                  "d": 1
+                },
+                {
+                  "key": "wc",
+                  "type": "wc"
+                }
+              ]
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            },
+            {
+              "key": "stair",
+              "type": "stair_spiral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "bed2",
+              "type": "bedroom_large"
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "landing",
+              "fill": "circulation",
+              "w": 14,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "terrace",
+              "fill": "outdoor",
+              "w": 3,
+              "d": 4
+            },
+            {
+              "gap": true,
+              "w": 7,
+              "d": 4
+            },
+            {
+              "void": true,
+              "w": 4,
+              "d": 4,
+              "stairwell": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "entree",
+      "bath"
+    ],
+    [
+      "entree",
+      "stair"
+    ],
+    [
+      "wcp",
+      "wc"
+    ],
+    [
+      "landing",
+      "stair"
+    ],
+    [
+      "landing",
+      "bed1"
+    ],
+    [
+      "landing",
+      "bed2"
+    ],
+    [
+      "landing",
+      "terrace"
+    ]
+  ],
+  "entrance": {
+    "key": "entree",
+    "side": "west"
+  }
+}

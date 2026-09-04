@@ -1,0 +1,91 @@
+{
+  "id": "unit-15",
+  "name": "Flat 15 — one bedroom, stepped",
+  "color": "#ffd43b",
+  "targetM2": [
+    35,
+    45
+  ],
+  "grid": {
+    "cols": 22,
+    "rows": 20
+  },
+  "northAngle": 0,
+  "reference": "Plan 8, Volkswohnung WHG 1, stepped so each row stops short of the last",
+  "wetRooms": [
+    "kitchen",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "bed1",
+              "type": "bedroom_small",
+              "rotation": 1
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 9,
+              "d": 2
+            },
+            {
+              "gap": true,
+              "w": 2,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full_compact"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "bed1"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "entree",
+      "bath"
+    ]
+  ],
+  "entrance": {
+    "key": "entree",
+    "side": "west"
+  }
+}

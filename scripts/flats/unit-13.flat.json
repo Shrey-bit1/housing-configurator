@@ -1,0 +1,100 @@
+{
+  "id": "unit-13",
+  "name": "Flat 13 — one bedroom, patio corner",
+  "color": "#9775fa",
+  "targetM2": [
+    35,
+    45
+  ],
+  "grid": {
+    "cols": 22,
+    "rows": 20
+  },
+  "northAngle": 0,
+  "reference": "Plan 3, Zwischenbaechen C, with PREVI's re-entrant patio corner",
+  "wetRooms": [
+    "kitchen",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "living",
+              "type": "living"
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 9,
+              "d": 2
+            },
+            {
+              "key": "patio",
+              "fill": "outdoor",
+              "w": 4,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full_compact"
+            },
+            {
+              "gap": true,
+              "w": 6,
+              "d": 4
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "entree",
+      "bed1"
+    ],
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "entree",
+      "bath"
+    ],
+    [
+      "living",
+      "patio"
+    ]
+  ],
+  "entrance": {
+    "key": "entree",
+    "side": "west"
+  }
+}

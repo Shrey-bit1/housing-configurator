@@ -1,0 +1,104 @@
+{
+  "id": "unit-16",
+  "name": "Flat 16 — two rooms, inner kitchen",
+  "color": "#f783ac",
+  "targetM2": [
+    50,
+    65
+  ],
+  "grid": {
+    "cols": 24,
+    "rows": 24
+  },
+  "northAngle": 0,
+  "reference": "Oekohaus House 12's landlocked kitchen, at two rooms",
+  "wetRooms": [
+    "kitchen",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 13,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            },
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "gap": true,
+              "w": 5,
+              "d": 4
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "loggia",
+              "fill": "outdoor",
+              "w": 9,
+              "d": 2
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "bed1"
+    ],
+    [
+      "entree",
+      "bath"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "kitchen",
+      "loggia"
+    ]
+  ],
+  "entrance": {
+    "key": "entree",
+    "side": "west"
+  }
+}

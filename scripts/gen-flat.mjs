@@ -89,35 +89,55 @@ function stubDeps() {
  * A stairwell void is exempt. That one is the open well over the stair below,
  * which the app cuts and refuses to grow into, and it sits wherever the stair
  * sits, including on the flat's edge.
+ *
+ * A gap is checked the other way round. It is space the flat is not in, so it
+ * MUST reach the border; a gap that does not is a pocket an elastic room will
+ * absorb, and the notch the plan was drawn around disappears.
  */
-function checkVoidsEnclosed(layout, grid) {
+function checkEmptySpace(layout, grid) {
   const growth = layout.voids.filter((v) => !v.stairwell);
-  if (growth.length === 0) return;
+  if (growth.length === 0 && layout.gaps.length === 0) return;
   const filled = new Set();
   for (const set of layout.cells.values()) for (const k of set) filled.add(k);
   const outside = borderReachableEmpty(
     { cols: grid.cols, rows: grid.rows, inBounds: (cx, cz) => cx >= 0 && cz >= 0 && cx < grid.cols && cz < grid.rows },
     (cx, cz) => !filled.has(`${cx},${cz}`)
   );
+
   const leaks = growth.filter((v) => outside.has(`${v.cx},${v.cz}`));
   if (leaks.length)
     throw new LayoutError(
       `${leaks.length} void cell(s) reach the grid border, starting at ` +
         `${leaks[0].cx},${leaks[0].cz} — nothing will grow into them`
     );
+
+  // And the inverse for a gap. One that cannot reach the border is an enclosed
+  // pocket, which the app hands to the nearest elastic room, so the hole the
+  // plan was drawn around silently becomes floor area.
+  const swallowed = layout.gaps.filter((g) => !outside.has(`${g.cx},${g.cz}`));
+  if (swallowed.length)
+    throw new LayoutError(
+      `${swallowed.length} gap cell(s) are enclosed, starting at ` +
+        `${swallowed[0].cx},${swallowed[0].cz} — a room will grow into them ` +
+        `instead of leaving the hole you drew`
+    );
 }
 
 /** Pack every storey, derive the doors and the entrance, return a ProjectFile. */
 function buildProject(diagram) {
   const layouts = diagram.storeys.map(packStorey);
-  for (const l of layouts) checkVoidsEnclosed(l, diagram.grid);
+  for (const l of layouts) checkEmptySpace(l, diagram.grid);
 
   // Room keys are unique across the whole flat, so a door may name rooms on
   // either storey and the lookup stays flat.
   const all = new Map();
   for (const l of layouts) for (const [k, v] of l.cells) all.set(k, v);
 
-  const doors = deriveDoors(all, diagram.doors);
+  // Which storey each room is on, so deriveDoors keeps its per-edge bookkeeping
+  // apart between storeys that sit on the same grid coordinates.
+  const storeyOf = new Map();
+  layouts.forEach((l, i) => l.cells.forEach((_v, k) => storeyOf.set(k, i)));
+  const doors = deriveDoors(all, diagram.doors, (k) => storeyOf.get(k) ?? 0);
   const entrance = deriveEntrance(layouts[0].cells, diagram.entrance.key, diagram.entrance.side);
 
   // A door belongs to the storey whose cells it sits in.

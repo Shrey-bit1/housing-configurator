@@ -1,0 +1,211 @@
+{
+  "id": "unit-27",
+  "name": "Flat 27 — four rooms, upside down",
+  "color": "#9775fa",
+  "targetM2": [
+    95,
+    115
+  ],
+  "grid": {
+    "cols": 26,
+    "rows": 24
+  },
+  "northAngle": 0,
+  "reference": "Habitat 67's stacked rooms: the living floor sits above the sleeping one",
+  "wetRooms": [
+    "kitchen",
+    "wc",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "bed2",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "bed3",
+              "type": "bedroom_small",
+              "rotation": 1
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "hall",
+              "fill": "circulation",
+              "w": 16,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            },
+            {
+              "stack": [
+                {
+                  "key": "wcp",
+                  "fill": "circulation",
+                  "w": 2,
+                  "d": 1
+                },
+                {
+                  "key": "wc",
+                  "type": "wc"
+                }
+              ]
+            },
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "key": "stair",
+              "type": "stair_spiral"
+            },
+            {
+              "gap": true,
+              "w": 2,
+              "d": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "dining",
+              "type": "recreation"
+            },
+            {
+              "key": "terrace",
+              "fill": "outdoor",
+              "w": 4,
+              "d": 5
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "landing",
+              "fill": "circulation",
+              "w": 16,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "stack": [
+                {
+                  "key": "roof",
+                  "fill": "outdoor",
+                  "w": 10,
+                  "d": 2
+                },
+                {
+                  "gap": true,
+                  "w": 10,
+                  "d": 2
+                }
+              ]
+            },
+            {
+              "void": true,
+              "w": 4,
+              "d": 4,
+              "stairwell": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "hall",
+      "bed1"
+    ],
+    [
+      "hall",
+      "bed2"
+    ],
+    [
+      "hall",
+      "bed3"
+    ],
+    [
+      "hall",
+      "bath"
+    ],
+    [
+      "hall",
+      "kitchen"
+    ],
+    [
+      "hall",
+      "stair"
+    ],
+    [
+      "wcp",
+      "wc"
+    ],
+    [
+      "landing",
+      "stair"
+    ],
+    [
+      "landing",
+      "living"
+    ],
+    [
+      "landing",
+      "dining"
+    ],
+    [
+      "landing",
+      "roof"
+    ],
+    [
+      "living",
+      "dining"
+    ],
+    [
+      "dining",
+      "terrace"
+    ]
+  ],
+  "entrance": {
+    "key": "hall",
+    "side": "east"
+  }
+}

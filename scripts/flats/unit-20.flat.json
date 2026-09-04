@@ -1,0 +1,104 @@
+{
+  "id": "unit-20",
+  "name": "Flat 20 — two rooms, corner turn",
+  "color": "#9775fa",
+  "targetM2": [
+    50,
+    65
+  ],
+  "grid": {
+    "cols": 24,
+    "rows": 24
+  },
+  "northAngle": 0,
+  "reference": "Plan 3, Zwischenbaechen C, turned round a corner terrace",
+  "wetRooms": [
+    "kitchen",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 13,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            },
+            {
+              "gap": true,
+              "w": 5,
+              "d": 4
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "terrace",
+              "fill": "outdoor",
+              "w": 9,
+              "d": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "bed1"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "entree",
+      "bath"
+    ],
+    [
+      "kitchen",
+      "terrace"
+    ]
+  ],
+  "entrance": {
+    "key": "entree",
+    "side": "east"
+  }
+}
