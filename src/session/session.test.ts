@@ -77,6 +77,35 @@ describe("readSession — the localStorage key and ?session=", () => {
   });
 });
 
+describe("joining a group from the landing (run 0027)", () => {
+  /** What the landing's join form does on submit, in `main.ts`: normalise the
+   *  code, refuse through the same `whyPublishDisabled` the send panel uses,
+   *  then write through the same `writeSession`. Restated here as the three
+   *  calls rather than imported, since the form itself is DOM wiring. */
+  function join(storage: KeyValue, code: string, resident: string): string | null {
+    const next = { resident, code: normalizeCode(code) };
+    const why = whyPublishDisabled(next);
+    if (why !== null) return why;
+    writeSession(storage, next);
+    return null;
+  }
+
+  it("leaves state the send panel's own fields read back identically", () => {
+    const s = new MemoryStorage();
+    expect(join(s, "  Room-42 ", "Ana")).toBeNull();
+    // The same helper the panel reads on load, against the same one key.
+    expect(readSession(s, "")).toEqual({ resident: "Ana", code: "room-42" });
+    expect(s.map.get(SESSION_STORAGE_KEY)).toBe('{"resident":"Ana","code":"room-42"}');
+  });
+
+  it("refuses a code the store would refuse, and writes nothing", () => {
+    const s = new MemoryStorage();
+    expect(join(s, "room 42", "Ana")).toMatch(/1 to 32/);
+    expect(join(s, "room-42", "  ")).toMatch(/name/);
+    expect(s.map.size).toBe(0);
+  });
+});
+
 describe("whyPublishDisabled — publish is refused without a name or a code", () => {
   it("names the missing field, in group wording (run 0026)", () => {
     expect(whyPublishDisabled({ resident: "", code: "" })).toMatch(/name and a group code/);
