@@ -1,0 +1,37 @@
+{
+  "id": "unit-8",
+  "name": "Flat 08 — one room, corner",
+  "color": "#ff922b",
+  "targetM2": [35, 45],
+  "grid": { "cols": 22, "rows": 20 },
+  "northAngle": 0,
+  "reference": "Plan 3, Zwischenbaechen building C, 2.5 rooms at 53.5 m2, with the Zimmer removed",
+  "wetRooms": ["kitchen", "bath"],
+  "storeys": [
+    {
+      "origin": { "cx": 2, "cz": 2 },
+      "rows": [
+        {
+          "slots": [
+            { "key": "living", "type": "living" },
+            { "key": "balcony", "fill": "outdoor", "w": 5, "d": 5 }
+          ]
+        },
+        { "slots": [{ "key": "entree", "fill": "circulation", "w": 8, "d": 2 }] },
+        {
+          "slots": [
+            { "key": "kitchen", "type": "kitchen" },
+            { "key": "bath", "type": "bathroom_full" }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    ["entree", "living"],
+    ["entree", "kitchen"],
+    ["entree", "bath"],
+    ["living", "balcony"]
+  ],
+  "entrance": { "key": "entree", "side": "west" }
+}

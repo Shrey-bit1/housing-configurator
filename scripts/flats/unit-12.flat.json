@@ -1,0 +1,73 @@
+{
+  "id": "unit-12",
+  "name": "Flat 12 — four rooms, maisonette",
+  "color": "#38d9a9",
+  "targetM2": [95, 115],
+  "grid": { "cols": 24, "rows": 22 },
+  "northAngle": 0,
+  "reference": "Plan 4, Zwischenbaechen building D, 4.5 rooms at 98 m2, whose corridor is entered from the living space",
+  "wetRooms": ["kitchen", "wc", "bath"],
+  "storeys": [
+    {
+      "origin": { "cx": 2, "cz": 2 },
+      "rows": [
+        {
+          "slots": [
+            { "key": "living", "type": "living" },
+            { "key": "dining", "type": "recreation" },
+            { "key": "loggia_lo", "fill": "outdoor", "w": 2, "d": 5 }
+          ]
+        },
+        { "slots": [{ "key": "entree", "fill": "circulation", "w": 14, "d": 2 }] },
+        {
+          "slots": [
+            { "key": "kitchen", "type": "kitchen" },
+            { "stack": [
+              { "key": "wc_lobby", "fill": "circulation", "w": 2, "d": 1 },
+              { "key": "wc", "type": "wc" }
+            ] },
+            { "key": "bath", "type": "bathroom_full" },
+            { "key": "stair", "type": "stair_spiral" }
+          ]
+        }
+      ]
+    },
+    {
+      "origin": { "cx": 2, "cz": 2 },
+      "rows": [
+        {
+          "slots": [
+            { "key": "bed1", "type": "bedroom_large" },
+            { "key": "bed2", "type": "bedroom_large" },
+            { "key": "loggia_up", "fill": "outdoor", "w": 2, "d": 5 }
+          ]
+        },
+        { "slots": [{ "key": "corridor", "fill": "circulation", "w": 14, "d": 2 }] },
+        {
+          "slots": [
+            { "key": "bed3", "type": "bedroom_small" },
+            { "key": "terrace", "fill": "outdoor", "w": 5, "d": 4 },
+            { "void": true, "w": 4, "d": 4, "stairwell": true }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    ["entree", "living"],
+    ["entree", "dining"],
+    ["entree", "kitchen"],
+    ["entree", "bath"],
+    ["entree", "stair"],
+    ["wc_lobby", "wc"],
+    ["living", "dining"],
+    ["dining", "loggia_lo"],
+    ["corridor", "stair"],
+    ["corridor", "bed1"],
+    ["corridor", "bed2"],
+    ["corridor", "bed3"],
+    ["corridor", "terrace"],
+    ["corridor", "loggia_up"]
+  ],
+  "entrance": { "key": "entree", "side": "west" }
+}

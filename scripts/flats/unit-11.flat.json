@@ -1,0 +1,47 @@
+{
+  "id": "unit-11",
+  "name": "Flat 11 — three rooms, deep hall",
+  "color": "#f783ac",
+  "targetM2": [70, 85],
+  "grid": { "cols": 24, "rows": 24 },
+  "northAngle": 0,
+  "reference": "Plan 9, Volkswohnung Karlsruhe WHG 3, three rooms at 76.48 m2, Diele-served",
+  "wetRooms": ["kitchen", "wc", "bath"],
+  "storeys": [
+    {
+      "origin": { "cx": 2, "cz": 2 },
+      "rows": [
+        { "slots": [{ "key": "loggia", "fill": "outdoor", "w": 15, "d": 2 }] },
+        {
+          "slots": [
+            { "key": "living", "type": "living" },
+            { "void": true, "w": 2, "d": 5 },
+            { "key": "bed1", "type": "bedroom_large" }
+          ]
+        },
+        { "slots": [{ "key": "diele", "fill": "circulation", "w": 15, "d": 2 }] },
+        {
+          "slots": [
+            { "key": "kitchen", "type": "kitchen" },
+            { "stack": [
+              { "key": "wc_lobby", "fill": "circulation", "w": 2, "d": 1 },
+              { "key": "wc", "type": "wc" }
+            ] },
+            { "key": "bath", "type": "bathroom_full" },
+            { "key": "bed2", "type": "bedroom_small" }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    ["diele", "living"],
+    ["diele", "bed1"],
+    ["diele", "kitchen"],
+    ["diele", "bath"],
+    ["wc_lobby", "wc"],
+    ["diele", "bed2"],
+    ["living", "loggia"]
+  ],
+  "entrance": { "key": "diele", "side": "west" }
+}

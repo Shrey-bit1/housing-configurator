@@ -85,16 +85,21 @@ function stubDeps() {
  * (core/expansion.ts). A void that leaks to the outside stays empty, the room
  * stays at its seed size, and the flat quietly comes out small. This is the
  * same border flood fill the app runs, applied early enough to name the leak.
+ *
+ * A stairwell void is exempt. That one is the open well over the stair below,
+ * which the app cuts and refuses to grow into, and it sits wherever the stair
+ * sits, including on the flat's edge.
  */
 function checkVoidsEnclosed(layout, grid) {
-  if (layout.voids.length === 0) return;
+  const growth = layout.voids.filter((v) => !v.stairwell);
+  if (growth.length === 0) return;
   const filled = new Set();
   for (const set of layout.cells.values()) for (const k of set) filled.add(k);
   const outside = borderReachableEmpty(
     { cols: grid.cols, rows: grid.rows, inBounds: (cx, cz) => cx >= 0 && cz >= 0 && cx < grid.cols && cz < grid.rows },
     (cx, cz) => !filled.has(`${cx},${cz}`)
   );
-  const leaks = layout.voids.filter((v) => outside.has(`${v.cx},${v.cz}`));
+  const leaks = growth.filter((v) => outside.has(`${v.cx},${v.cz}`));
   if (leaks.length)
     throw new LayoutError(
       `${leaks.length} void cell(s) reach the grid border, starting at ` +

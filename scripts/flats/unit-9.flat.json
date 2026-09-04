@@ -1,0 +1,44 @@
+{
+  "id": "unit-9",
+  "name": "Flat 09 — two rooms, hall between",
+  "color": "#9775fa",
+  "targetM2": [50, 65],
+  "grid": { "cols": 22, "rows": 20 },
+  "northAngle": 0,
+  "reference": "Plan 3, Zwischenbaechen building C, 2.5 rooms at 53.5 m2 plus a 8.4 m2 Loggia",
+  "wetRooms": ["kitchen", "bath"],
+  "storeys": [
+    {
+      "origin": { "cx": 2, "cz": 2 },
+      "rows": [
+        {
+          "slots": [
+            { "key": "living", "type": "living" },
+            { "key": "bed1", "type": "bedroom_large" }
+          ]
+        },
+        {
+          "slots": [
+            { "key": "loggia", "fill": "outdoor", "w": 4, "d": 2 },
+            { "key": "entree", "fill": "circulation", "w": 9, "d": 2 }
+          ]
+        },
+        {
+          "slots": [
+            { "key": "loggia_s", "fill": "outdoor", "w": 5, "d": 4 },
+            { "key": "kitchen", "type": "kitchen" },
+            { "key": "bath", "type": "bathroom_full" }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    ["entree", "living"],
+    ["entree", "bed1"],
+    ["entree", "kitchen"],
+    ["entree", "bath"],
+    ["living", "loggia"]
+  ],
+  "entrance": { "key": "entree", "side": "east" }
+}

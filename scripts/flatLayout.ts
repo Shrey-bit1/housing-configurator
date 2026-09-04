@@ -48,13 +48,16 @@ export const cellKey = (cx: number, cz: number): string => `${cx},${cz}`;
  *             void beside one of them is how a 12.6 m² seed becomes a 20 m²
  *             room without a second module. It only works where the void is
  *             enclosed on every side, which `gen-flat.mjs` checks against the
- *             grid border before it trusts the result.
+ *             grid border before it trusts the result. `stairwell: true` marks
+ *             the open well over the stair on the storey below instead: the app
+ *             cuts that hole itself and blocks growth into it, so it is exempt
+ *             from the enclosure check and may sit on the flat's edge.
  */
 export type Slot =
   | { key: string; type: string; rotation?: number }
   | { stack: Slot[] }
   | { key: string; fill: "circulation" | "outdoor"; w: number; d: number }
-  | { void: true; w: number; d: number };
+  | { void: true; w: number; d: number; stairwell?: boolean };
 
 /** A horizontal strip of the flat. Every slot in it must be the same depth. */
 export interface Row {
@@ -93,8 +96,10 @@ export interface StoreyLayout {
   placements: Placement[];
   /** Room key → the absolute cells it occupies. */
   cells: Map<string, CellSet>;
-  /** Cells left deliberately empty for an elastic room to grow into. */
-  voids: Cell[];
+  /** Cells left deliberately empty. A growth void feeds an elastic room; a
+   *  stairwell void is the open well over the stair on the storey below, which
+   *  the app cuts for itself and which nothing is allowed to grow into. */
+  voids: (Cell & { stairwell: boolean })[];
   /** The storey's bounding box, for the entrance and the size report. */
   bounds: { minX: number; minZ: number; maxX: number; maxZ: number };
 }
@@ -202,7 +207,8 @@ function placeSlot(
 
   if ("void" in slot) {
     for (let x = 0; x < slot.w; x++)
-      for (let z = 0; z < slot.d; z++) out.voids.push({ cx: at.cx + x, cz: at.cz + z });
+      for (let z = 0; z < slot.d; z++)
+        out.voids.push({ cx: at.cx + x, cz: at.cz + z, stairwell: slot.stairwell === true });
     return;
   }
 
@@ -242,7 +248,7 @@ export function packStorey(plan: StoreyPlan): StoreyLayout {
   const out = {
     placements: [] as Placement[],
     cells: new Map<string, CellSet>(),
-    voids: [] as Cell[],
+    voids: [] as (Cell & { stairwell: boolean })[],
   };
   let z = plan.origin.cz;
   let widest = 0;
