@@ -58,7 +58,7 @@ There are four things in a session: **flats**, **residents**, the last
 | `PUT` | `/api/session/{code}/flats/{id}?resident=…&label=…` | the `dwelling-unit` JSON | the flat's summary; `201` created, `200` replaced, `409` refused |
 | `GET` | `/api/session/{code}/flats/{id}/preview` | none | the flat's JPEG picture |
 | `PUT` | `/api/session/{code}/flats/{id}/preview` | the JPEG bytes | `{ ok, bytes }` |
-| `PUT` | `/api/session/{code}/residents/{name}` | any of `counts`, `share`, `ballot` | that resident's whole record after the merge |
+| `PUT` | `/api/session/{code}/residents/{name}` | any of `counts`, `share`, `ballot`, `shareM2`, `extraM2` | that resident's whole record after the merge |
 | `GET` | `/api/session/{code}/building` | none | the last run, or `null` |
 | `PUT` | `/api/session/{code}/building` | `genome`, `summary`, `by` | the stored run with its `at` timestamp |
 | `GET` | `/api/session/{code}/export` | none | the session state plus every flat body, as strings |
@@ -203,33 +203,51 @@ create it.
 ### `PUT /api/session/{code}/residents/{name}` — a resident's wishes
 
 The name is the URL segment, decoded, 1 to 64 printable characters (encode
-spaces as `%20`). The body is a JSON object with any of three keys, and only
-the keys present are changed, so a body of `{ "share": 0.5 }` leaves that
+spaces as `%20`). The body is a JSON object with any of five keys, and only
+the keys present are changed, so a body of `{ "shareM2": 7 }` leaves that
 resident's counts and ballot alone. Each key that is present is checked and
 replaced whole:
 
 - `counts` maps flat ids to whole numbers ≥ 0: how many of which flat this
   resident wants.
-- `share` is a number between 0 and 1, the wished share of shared space, or
-  `null`.
+- `share` is a number between 0 and 1, or `null`. It is the pre-0056 reading of
+  the shared-space question, a fraction of floor area, and nothing should read
+  it again. It stays accepted because records already written carry it.
 - `ballot` is an ordered list of shared-space type names, most wanted first.
+- `shareM2` is how many square metres of shared space this resident thinks each
+  person should pay for, or `null` when never answered. The store checks only
+  that it is a whole number, zero or more. There is no upper bound here: how
+  high the slider goes is the building app's business, and a bound written into
+  the store would have to change in two repositories at once.
+- `extraM2` is how many square metres this resident offered to pay for beyond
+  that share, after the vote settled, or `null` when never answered. Same units
+  and the same check: a whole number, zero or more.
 
 A resident who has never been written reads as
-`{ "counts": {}, "share": null, "ballot": [] }` underneath the merge.
+`{ "counts": {}, "share": null, "ballot": [], "shareM2": null, "extraM2": null }`
+underneath the merge.
 
 ```
 PUT /api/session/room-42/residents/Ben
 content-type: application/json
 
-{ "share": 0.5, "ballot": ["garden"] }
+{ "shareM2": 7, "extraM2": 5, "ballot": ["garden"] }
 ```
 
 ```json
 200 OK
-{ "name": "Ben", "counts": { "flat-3": 2 }, "share": 0.5, "ballot": ["garden"] }
+{
+  "name": "Ben",
+  "counts": { "flat-3": 2 },
+  "share": null,
+  "ballot": ["garden"],
+  "shareM2": 7,
+  "extraM2": 5
+}
 ```
 
-Here Ben's `counts` came from an earlier body that sent only `counts`.
+Here Ben's `counts` came from an earlier body that sent only `counts`, and his
+`share` is `null` because he has never sent one.
 
 ### `PUT` and `GET /api/session/{code}/building` — the last run
 
