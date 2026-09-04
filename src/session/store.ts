@@ -64,7 +64,17 @@ export interface FlatSummary {
 export interface Resident {
   /** Flat id → how many of it this resident wants. Replaced whole when sent. */
   counts: Record<string, number>;
-  /** Wished share of shared space, 0..1, or null when never set. */
+  /**
+   * The PRE-0056 reading of the shared-space question: a wished share of floor
+   * area as a fraction, 0..1, or null when never set.
+   *
+   * Nothing should read it again. The question the building app asks is now
+   * "how many square metres of shared space should each person pay for", which
+   * is {@link shareM2}, and a fraction cannot answer it. It stays in the record
+   * and stays accepted because records already written into a live store carry
+   * it, and dropping a key is a change other people's data would have to
+   * survive.
+   */
   share: number | null;
   /** Ordered ballot of shared-space type names, first is most wanted. */
   ballot: string[];
