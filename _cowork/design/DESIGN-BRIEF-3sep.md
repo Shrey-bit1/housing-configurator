@@ -8,12 +8,35 @@ font, size and animation below is in that CSS and can be copied.
 
 Both apps get this look. They stay two apps for now.
 
+The flat app is where a resident draws one flat and sends it. It holds
+no voting, no wishes and no building; those belong to the building app.
+The building app is the residents' app AND the architect's app at the
+same time. Only the "Architect" drawer is operator-only; everything
+else on those five steps is for the people who will live there.
+
 ## The words
 
 The people who will live in one building are a **group**. A resident
 **joins** a group with a code. A flat is **sent to the group**. The
 computer **builds**. What the code calls a session is a group in
 every label a resident reads. "Room" is not used anywhere.
+
+## How the app talks
+
+Short natural sentences that explain rather than announce. Write as if
+you were explaining something to a clever person who has never seen it
+before, kindly and without hurrying.
+
+- No slogans, no punchlines, nothing that sounds like an advertisement.
+- Say what a number means in something a person can picture: square
+  metres, rooms, minutes of walking. Never leave a percentage without
+  saying what it comes to.
+- Say what is about to happen before it happens, and what happened
+  after.
+- When the group decides something rather than the resident, say so in
+  the same breath as the number.
+- A label is a sentence when it carries meaning, and a short word only
+  when it is the name of a thing.
 
 ## The ground
 
@@ -87,6 +110,55 @@ NOT in the app: the red line that sweeps down over the building on
 the group screen of the wireframe. Shrey does not want it. While a
 build runs, show the progress window that exists today, restyled.
 
+## The vote decides the shared spaces
+
+The full method is in `shared-space-method.md` beside this file, in
+plain words with a worked example. In short, and settled 4 September:
+
+Everyone is equal all the way through. One resident has one flat, one
+vote and one equal share of the bill. Flat size buys neither say nor a
+smaller share.
+
+Each resident says how many square metres of shared space every person
+should pay for. The middle answer is the one the building uses, and
+that number times the number of residents is the budget. Nothing comes
+out of anybody's flat; the rooms are built in the space the flats leave
+over. Square metres per person, never a percentage of floor area,
+because a percentage drags flat size back into a question meant to be
+equal. The slider reads "How much shared space should each of us pay
+for?", and under it two sentences: what the number buys for the whole
+group in square metres and rooms, on top of everyone's own flat; then
+that everyone pays the same and the middle answer is the one the
+building uses. With an even number of residents the median is the
+average of the two middle answers, rounded to a whole square metre. The
+answers are never normalised or clamped before the median; the slider's
+own range is the bound, and it is set beforehand.
+
+After the vote settles, a resident may offer to pay for more than their
+share. It sits on the group screen, never on the wishes screen, so it
+cannot change what the group decided. The extra joins the same pot and
+is divided by the group's ballot: it buys more shared space and never
+more say. The feed names who gave it. Each resident's
+ranked ballot becomes numbers, first choice 3, second 2, third 1,
+scaled to add up to one, and those rows are averaged across the group.
+That average is the split of the budget by kind of shared space, so
+nobody's second choice is wasted. The split is then fitted floor by
+floor against what each floor can hold, which sends a social space to
+the ground and a terrace to the roof without a rule saying so, and
+moves a share that cannot be placed to the others in proportion.
+
+Only what the plan could not host after that goes to the packer, which
+places it where the building needs it. Those rooms are marked as the
+building's own choice in the panel, so a resident can see which rooms
+the group asked for and which the building added.
+
+People decide what is built. The algorithm decides where it goes, and
+only chooses what with the remainder.
+
+The names for the written part: opinion pooling for the average, and
+iterative proportional fitting for the floor-by-floor fit, both after
+Nourian et al., EquiCity, Scientific Reports 2024.
+
 ## The six numbers
 
 On every screen that shows a building, the same six, in this order:
@@ -145,24 +217,44 @@ Building app: five steps in the bar.
 Architect: a drawer from the right with every operator control,
 closed unless opened. The building shows as backbone behind it.
 
+Every size in that drawer reads in metres on its face. The plot says
+"26.4 × 26.4 m" with "11 × 11 modules" under it in small type, not the
+other way round. Nobody outside the code knows what a module is. A
+module is 4 cells of 0.6 m, so 2.4 m; a cell is the 0.6 m grid both
+apps draw on; a bay is 8 cells, 4.8 m.
+
 ## What the runs do, in order
 
 1. Flat 0026, small: the store's building entry carries the plot;
    resident names match trimmed and case-insensitive.
-2. Packer 0055, the skin and the first two steps: fonts, colours,
+2. Packer 0055, the ballot decides (sent 4 September): the ballot
+   spends the budget first, programme by programme in share order,
+   and only the leftover goes to site score, marked as the packer's
+   own choice; Regenerate writes and reads the plot the store now
+   carries; the shared-space list reads the wireframe's way. The
+   logic runs before the skin so the later run restyles a panel
+   whose content is settled.
+3. Packer 0056, everyone equal (sent 4 September): the budget from
+   square metres per person, the whole ballot pooled with equal say,
+   the split fitted storey by storey, paying for more after the vote,
+   the panel in the app's own voice, metres in the Architect drawer,
+   and the "volume" rename.
+4. Packer 0057, the skin and the first two steps: fonts, colours,
    the bar with steps, buttons, the Wishes screen with the radar,
    the group screen as above, the Architect drawer. The current
    panel's content moves; nothing is invented.
-3. Packer 0056, the ballot decides: first choices reserve budget
-   before the general fit; Regenerate adopts the plot from the store;
-   the shared-space list reads the wireframe's way.
-4. Packer 0057, steps four and five: the card with the building
+5. Packer 0058, steps four and five: the card with the building
    view, the vote between two buildings with five checkboxes, the
    round counter, votes weighted into the next batch.
-5. Packer 0058, display: shadows, three lights, ground plane, the
+6. Packer 0059, display: shadows, three lights, ground plane, the
    three views, same-perspective screenshots.
-6. Flat 0027 (run second, after 0026): the landing screen, the
-   redundancy cull, and the empty state.
+7. Flat 0027 (done, 4 September): the landing screen, the two real
+   steps, the redundancy cull and the empty state.
+
+The journey's six steps are copied into each app, not imported across
+the two repos. The list is: draw your flat, send it, your wishes, the
+group, your flat in it, vote. This paragraph is the source both apps
+copy from; change it here first.
 
 ## Skills the coding sessions should read
 

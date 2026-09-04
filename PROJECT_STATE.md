@@ -3526,7 +3526,20 @@ As of run 0025: `unitBrowser.test.ts` new at 6 (`isMine`/`sortMineFirst`
 only — see "Whose flat is this" above); everything else in this section
 unchanged. As of run 0026: `unitBrowser.test.ts` 7 (one more for the
 case-insensitive match); the new `src/core/unitStats.ts` gets its own
-`unitStats.test.ts` at 4 (see §11).
+`unitStats.test.ts` at 4 (see §11). As of run 0028:
+`src/core/libraryClean.slow.test.ts` new at 10 (one per unit file plus one that
+the glob found anything), which walks EVERY file in `public/units/` and asserts
+zero must-fix through `computeDwellingGraph` + `validate`. It carries one named
+quarantine, `unit-5.json`, which was already rotten; see §15.
+
+**The library holds twelve committed flats as of run 0028.** The seven that
+existed before, plus `unit-8` through `unit-12`, the first generated batch
+(§15). The five were not dragged in the editor: `scripts/gen-flat.mjs` wrote
+them from bubble diagrams and each was proved against the app's own rules before
+it was copied into `public/units/`. Their previews were made the run-0024 way,
+through `window.__app.loadAndCapturePreview` and `POST /__library/preview`, and
+their manifest rows by the same arithmetic the dev sink uses, so nothing here
+took a path the browser does not already take.
 
 ---
 
@@ -4172,3 +4185,90 @@ framing the flat, hiding the palette and the bar strip, and reading
 "Unit 6 · 70 m² · 1 · 3.6 m · 7 rooms"; and a real send answering
 "Sent to run0027 as Unit 6 · open Units to see your group" with the store's
 poll showing the flat at version 1 with its preview.
+
+---
+
+## 15. The flat generator and the first library batch (`scripts/`, run 0028)
+
+Added in run 0028, whose job was five library flats and whose real content was
+the verification attached to them. Twenty flats are wanted in the end, one per
+resident of a group the building app packs, and drawing them by hand costs days.
+So the run built the thing that turns a bubble diagram into a `dwelling-unit`
+file, and then proved each result against the app's own rules rather than
+against the generator's own idea of correctness.
+
+**Two files, split by what needs testing.** `scripts/flatLayout.ts` is pure
+arithmetic with no three.js and no DOM, so `scripts/flatLayout.test.ts` pins it
+in the FAST suite at 21 cases, every number in them counted on squared paper
+first. `scripts/gen-flat.mjs` is the runner that boots the render layer and the
+rules. Neither is in `tsconfig.json`'s `include`, which is `["src", "netlify"]`,
+so `tsc` does not see them; that matches how `scripts/store-roundtrip.mjs` has
+always been treated.
+
+**No runner dependency.** The app's core is TypeScript with extensionless
+imports, which Node cannot resolve on its own, and run 0028 was forbidden a new
+dependency. The runner boots the project's own Vite in middleware mode
+(`createServer({ server: { middlewareMode: true } })`) and pulls the modules
+through `ssrLoadModule`, the same transform the dev server and vitest use. Copy
+this for any future script that needs `src/`.
+
+**The input is a bubble diagram plus a layout hint.** Rooms, the graph edges that
+must become doors, one entrance, a target area band, and rows of slots. A slot is
+one module, a `stack` of slots in one column, a `fill` patch of circulation or
+outdoor cells, or a `void`. Rows stack southwards from an origin; slots butt left
+to right inside a row. Rows may differ in width, which is how an L-shaped flat is
+described.
+
+**Two invariants keep the output from looking generated.** Every slot in a row
+must fill the row's depth, so no notches; a shortfall is an error naming the row
+and the slot. And a growth `void` must be enclosed on all four sides, checked
+with the app's own `borderReachableEmpty` (`src/core/expansion.ts`), because a
+void that reaches the grid border is never absorbed and the flat quietly comes
+out small. A void marked `stairwell: true` is exempt: that one is the open well
+over the stair below, which the app cuts and refuses to grow into, and it sits
+wherever the stair sits including on the flat's edge.
+
+**Doors are DERIVED, not authored.** `deriveDoors` finds every anchor at which a
+two-edge door would bind the named pair, takes the longest straight run and puts
+the door in its middle. That is the same test `resolveDoorSpaces`
+(`src/core/door.ts`) applies at load time, run early enough to be an error
+message. It matters because `floorManager.ts:1006` PRUNES a door that does not
+bind two live spaces, so a hand-written door that misses disappears in silence
+and surfaces much later as an unreachable room. The runner also counts doors
+written against doors the app kept and fails on any difference.
+
+**Walls, windows and stair holes are never written.** They are derived, as
+everywhere else here. The generator writes placements, one entrance and doors.
+
+**The verification is the point.** Each generated project goes through
+`parseProject`, then a real `FloorManager` with the same stubs the slow suite
+uses, then `computeDwellingGraph` and `validate`, the two functions Check Layout
+runs. The runner exits non-zero on any must-fix finding, any refused placement,
+any pruned door, or an area outside the target band. It writes to `build/units/`,
+gitignored as of this run; a flat enters `public/units/` by a deliberate copy.
+
+**The five flats.** `scripts/flats/unit-{8,9,10,11,12}.flat.json` are the
+diagrams, `public/units/unit-{8..12}.json` the files. All five carry zero
+must-fix. Areas 38.88, 51.48, 56.88, 70.20 and 110.88 m²; four one-storey and one
+maisonette. Each traces to a plan in `_cowork/outbox/0028-reference-plans.md`.
+Advisory counts are 0, 1, 1, 3 and 4 worth-a-look plus one note each. Flat 12's
+three N1 findings are the maisonette's own cost: its stair is 16 cells on each
+storey and the rule counts a stair as circulation, which puts the flat at 29 per
+cent of interior area against a 25 per cent advisory cap.
+
+**Two things the batch taught, both worth knowing before the next fifteen.** A
+hall patch and a WC lobby that touch merge into ONE circulation cluster, so a
+door between them binds a single space and the app prunes it; the fix is to drop
+the graph edge, not to move the room. And a growth void only ever works in a
+middle row, because the first and last rows of a flat face the outside on one
+side, so voids are affordable in a large flat and expensive in a small one, where
+the filler needed to enclose them eats the circulation budget.
+
+**The library has one rotten flat, quarantined.**
+`src/core/libraryClean.slow.test.ts` walks every file in `public/units/` and
+asserts zero must-fix. `unit-5.json` fails four rules (P1, H1, ST2, ST3): it is a
+four-instance scratch unit with zero doors, a retired `stair` module on floor 0
+and one bedroom on floor 1 that no stair reaches. Run 0028 was told the seven
+existing flats stay exactly as they are, so the test quarantines it by name and
+by its exact four rule ids. Fixing the flat breaks the test, which is the
+reminder to delete the quarantine.
