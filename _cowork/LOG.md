@@ -37,4 +37,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0026 | 2026-09-03 | The flat app on paper, and two small store fixes | complete | 0026-the-flat-app-on-paper.report.md |
 | 0027 | 2026-09-04 | The landing screen, and one place for everything | complete | 0027-the-landing-and-one-place-for-everything.report.md |
 | 0028 | 2026-09-04 | Five flats for the library, the first batch | complete | 0028-five-flats.report.md |
-| 0029 | 2026-09-04 | Fifteen more flats, a bedroom in every one, and a way to delete | blocked | 0029-fifteen-more.report.md |
+| 0029 | 2026-09-04 | Fifteen more flats, a bedroom in every one, and a way to delete | complete | 0029-fifteen-more.report.md |

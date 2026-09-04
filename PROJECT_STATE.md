@@ -3534,7 +3534,28 @@ the glob found anything), which walks EVERY file in `public/units/` and asserts
 zero must-fix through `computeDwellingGraph` + `validate`. It carries one named
 quarantine, `unit-5.json`, which was already rotten; see §15.
 
-**The library holds twelve committed flats as of run 0028.** The seven that
+**Delete (run 0029).** Every library card carries a Delete control beside Open
+a copy and Rename, for anybody; the architect-only version is a later run. The
+wording is a pure helper, `deleteConfirmText` in `unitBrowser.ts`, for the same
+reason `takeoverConfirmText` is one (`window.confirm` returns false under
+scripting without displaying). A second pure helper, `deleteRefusal`, refuses
+the flat whose copy is open in the editor. That needed state the app did not
+keep: the editor holds a copy and deliberately forgets which entry it came from
+so a later save adds a new entry, so `main.ts` now records `openLibraryUnitId`,
+set after a library open succeeds and cleared at the top of `importProjectText`,
+the one function every project replacement goes through. A refusal uses
+`notice()` rather than `status()`, because `status` replaces the whole grid and
+the resident needs the cards in front of them. Persistence is the host's, as
+with Rename: `POST /__library/delete` in vite.config.ts removes the row and both
+files, dev-only beside the other three sinks.
+
+**The library holds twenty-seven committed flats as of run 0029**, of which
+twenty are designed by this project (`unit-8` through `unit-27`). Run 0028 drew
+five and run 0029 drew fifteen more and redrew Flat 08.
+`src/core/libraryClean.slow.test.ts` names those twenty as well as globbing the
+folder, because a glob cannot tell a missing flat from one that was never there.
+
+**The library held twelve committed flats as of run 0028.** The seven that
 existed before, plus `unit-8` through `unit-12`, the first generated batch
 (§15). The five were not dragged in the editor: `scripts/gen-flat.mjs` wrote
 them from bubble diagrams and each was proved against the app's own rules before
@@ -4249,9 +4270,11 @@ runs. The runner exits non-zero on any must-fix finding, any refused placement,
 any pruned door, or an area outside the target band. It writes to `build/units/`,
 gitignored as of this run; a flat enters `public/units/` by a deliberate copy.
 
-**The five flats.** `scripts/flats/unit-{8,9,10,11,12}.flat.json` are the
-diagrams, `public/units/unit-{8..12}.json` the files. All five carry zero
-must-fix. Areas 38.88, 51.48, 56.88, 70.20 and 110.88 m²; four one-storey and one
+**The twenty flats.** `scripts/flats/unit-8.flat.json` through
+`unit-27.flat.json` are the diagrams and `public/units/unit-8.json` through
+`unit-27.json` the files. All twenty carry zero must-fix, five are over two
+storeys, and every one holds a bedroom (rule P4, run 0029). Run 0028's first
+five were: Areas 38.88, 51.48, 56.88, 70.20 and 110.88 m²; four one-storey and one
 maisonette. Each traces to a plan in `_cowork/outbox/0028-reference-plans.md`.
 Advisory counts are 0, 1, 1, 3 and 4 worth-a-look plus one note each. Flat 12's
 three N1 findings are the maisonette's own cost: its stair is 16 cells on each
@@ -4265,6 +4288,30 @@ the graph edge, not to move the room. And a growth void only ever works in a
 middle row, because the first and last rows of a flat face the outside on one
 side, so voids are affordable in a large flat and expensive in a small one, where
 the filler needed to enclose them eats the circulation budget.
+
+**Run 0029 added one slot kind and fixed one real bug.** A `gap` is space the
+flat is NOT in. Rows are left-aligned, so before it a row could only start at
+the flat's own west edge and the only shape available was a staircase; a gap
+lets a row start further in or stop short, which is what makes an L with a
+re-entrant corner and a stepped edge. It is checked as the exact inverse of a
+growth void: a gap MUST reach the grid border, since one that does not is an
+enclosed pocket an elastic room absorbs, taking the hole the plan was drawn
+around with it. The bug: both storeys of a maisonette are drawn on the same
+grid coordinates, and `deriveDoors` kept its used-edge set in plain plan
+coordinates, so a ground-floor door reserved the edge a first-floor door needed
+at the same place and the second failed on a boundary it plainly shared. It now
+takes a `storeyOf` function and keys that set per storey. Two people found this
+independently, and it would have broken every maisonette from here on.
+
+**Shapes the packer can and cannot make**, measured over the twenty. It makes
+the L with a re-entrant corner, the stepped edge, the deep plan with a
+landlocked kitchen, and the through-flat with rooms on two opposite facades and
+a spine between. It cannot make a closed ring or a courtyard, because a hole
+inside the outline is an enclosed pocket an elastic room absorbs; it cannot make
+a split level, because a storey is a whole storey here; and it cannot make a
+non-orthogonal outline, because every module is an axis-aligned rectangle on the
+0.6 m grid. `_cowork/outbox/0029-reference-plans-2.md` names the built projects
+each of those shapes comes from.
 
 **The library has one rotten flat, quarantined.**
 `src/core/libraryClean.slow.test.ts` walks every file in `public/units/` and
