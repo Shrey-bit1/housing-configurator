@@ -196,7 +196,28 @@ now Open, Check Layout moved into the check chip, Frame View joined the
 view cluster in the corner, and the panel's Save toggle is a chevron.
 Nothing was deleted. PROJECT_STATE §2, §11, new §14.
 
-**Last updated:** 2026-09-04
+Run 0034 handed the resident onward and gave the landing an order to
+arrive in. Step 01 now ends with one button at the bottom centre of the
+viewport reading "Send it to your group", asleep with one sentence while the
+flat has no way in and waking on the same `canSend` call that wakes step 02
+in the bar; `syncStepTabs` in main.ts makes that call once and hands the
+answer to both, and `src/chromeWiring.test.ts` pins that shape because this
+project has no jsdom. Step 02's one red button now has two moments: it is
+the send button until a publish succeeds, then it reads "Go to your group"
+and opens the building app on this resident's group, and any edit to the
+flat puts it back. The journey strip dropped done/ahead for three tones that
+say which app owns a step, so this app's two dots are ink, the building
+app's four are dim and the current one is red; `journeyTones(currentId,
+thisApp)` in `src/core/journey.ts` serves both apps and replaced
+`journeyMarks`. The landing arrives in CSS on a fixed clock: a second of
+nothing, the two discs out of their own corners over 600 ms, the headline
+line by line at 1600, 1750 and 1900 ms, the paragraph at 2200, the doors at
+2500 to 2900 and the strip at 3200, each lasting 300 ms; every keyframe has
+a `from` and no `to`, so nothing is missing if the animation never runs.
+Nothing about the repo's shape changed: no new directory, no new entry
+point, no new dependency and no new run step. PROJECT_STATE §14.
+
+**Last updated:** 2026-09-06
 
 ## What this project is
 

@@ -42,3 +42,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0031 | 2026-09-06 | The store carries the wishes and the group's messages, and a first visit starts empty | complete | 0031-wishes-messages-and-a-clean-first-visit.report.md |
 | 0032 | 2026-09-06 | Starting a group, and a code that does not exist says so | complete | 0032-starting-a-group.report.md |
 | 0033 | 2026-09-06 | One command to start, and a clear word when the store is not there | complete | 0033-one-command-to-start.report.md |
+| 0034 | 2026-09-06 | One way forward, and the landing arrives in order | complete | 0034-one-way-forward.report.md |
