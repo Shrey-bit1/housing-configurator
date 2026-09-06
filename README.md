@@ -2,6 +2,20 @@
 
 A browser-based 3D flat / housing configurator built with **TypeScript + Three.js** (bundled with Vite). Rooms, modules, stairs, and entrances are placed on a 0.6 m grid and viewed in an axonometric (isometric) projection, with a 2D bubble-diagram view of room adjacency. Part of an ongoing thesis project — this repo tracks work in progress.
 
+## How to run it
+
+```bash
+npm install
+npm run dev
+```
+
+That opens **http://localhost:8888**, which serves the app *and* the session
+store. In the building app, set the Store field to the same address.
+
+`npm run dev` is Netlify's dev server, which is the only way the store exists;
+`npm run dev:vite` is plain Vite on 5173, with no store, for working on the
+editor alone.
+
 ## Current features
 
 - **Grid system** — 0.6 m cells; per-floor grid size is adjustable (width × depth) with live re-fit of placed items.

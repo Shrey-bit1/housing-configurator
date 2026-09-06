@@ -276,14 +276,24 @@ rules engine and the export format are the mature parts, the UI is not.
 
 ## How to work with it
 
-- `npm run dev` starts Vite on port 5173. `npm run build` runs `tsc && vite build`.
+- **`npm run dev` starts Netlify's dev server on port 8888 as of run 0033**, which
+  serves the app AND the session store. That is the address to open and the one
+  the building app's Store field must point at. `npm run dev:vite` is plain Vite
+  on 5173 with no store, for working on the editor alone; a call to
+  `/api/session/...` there falls through to the SPA fallback, and the app now
+  says so in a sentence rather than printing the parser's complaint.
+  `netlify-cli` is a pinned dev dependency (27.5.0) so nothing is installed by
+  hand, and `netlify.toml` pins the command, the port and both directories.
+  `npm run build` runs `tsc && vite build` and is unaffected.
 - **Node is on PATH on the current machine** (macOS, `/usr/local/bin/node`,
   v24.19.0 as of run 0019) and `npm`/`npx` resolve without help. The earlier
   note here described a Windows machine where node lived at
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 290 cases in eighteen files as of run 0032 (nine in
+  a second over 298 cases in eighteen files as of run 0033 (eleven in
+  `session.test.ts` for the store-absent rule, less three retired with
+  `groupIsStarted`); 290 in eighteen as of run 0032 (nine in
   `store.test.ts` for starting a group and `exists`, six in `session.test.ts` for
   the code generator and the join refusal); 275 in eighteen as of run 0031 (ten more in
   `store.test.ts` for the wishes and the messages, four in `session.test.ts` for

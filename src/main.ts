@@ -87,8 +87,9 @@ import {
   landingRecall,
   inventCode,
   startGroup,
-  groupIsStarted,
   noSuchGroupText,
+  checkGroup,
+  storeAbsentText,
   decideTakeover,
   type FetchLike,
   type SessionSettings,
@@ -1432,7 +1433,15 @@ landingJoinForm.addEventListener("submit", async (e) => {
   // conjured on the spot, so one typo started an empty group of one while the
   // resident believed they had joined the twenty.
   landingWhy.textContent = "";
-  if (!(await groupIsStarted(next.code))) {
+  const checked = await checkGroup(next.code);
+  if ("failure" in checked) {
+    landingWhy.textContent =
+      checked.failure === "absent"
+        ? storeAbsentText()
+        : `The store could not answer for ${next.code}. Try again in a moment.`;
+    return;
+  }
+  if (!checked.started) {
     landingWhy.textContent = noSuchGroupText(next.code);
     return;
   }
@@ -1476,6 +1485,7 @@ const savePublishNote = document.getElementById("save-publish-note") as HTMLElem
  *  successful publish (run 0024). */
 const saveReplaceInput = document.getElementById("save-replace") as HTMLInputElement;
 const tbSession = document.getElementById("tb-session") as HTMLElement;
+const tbCode = document.getElementById("tb-code") as HTMLElement;
 const PUBLISH_NOTE = savePublishNote.textContent ?? "";
 
 // Run 0025 folded these two fields behind a one-line summary once both were
@@ -1500,6 +1510,10 @@ let session: SessionSettings = readSession(sessionStorageArea, location.search);
 function syncSessionUI(): void {
   tbSession.textContent = sessionLine(session);
   tbSession.classList.toggle("set", session.code.length > 0);
+  // The code itself, read from `session` rather than kept anywhere new, so
+  // there is still exactly one place it lives.
+  tbCode.textContent = session.code;
+  tbCode.hidden = session.code.length === 0;
   const why = whyPublishDisabled(session);
   const input = saveWhatInputs.publish;
   const wasDisabled = input.disabled;
@@ -2052,6 +2066,7 @@ const unitBrowser = createUnitBrowser({
         showToast("info", `Deleted "${entry.name}" and ${r.removed?.length ?? 0} of its files.`);
       }
     : undefined,
+  storeAbsentText,
   openUnitId: () => openLibraryUnitId,
   onOpen: (file, source) => {
     file

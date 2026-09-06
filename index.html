@@ -35,6 +35,11 @@
           <span class="tb-name">(Re)<b>Configure</b></span>
           <span class="tb-meta" id="tb-meta">0.6 m grid</span>
         </span>
+        <!-- The group's code, wherever the resident is once they are in one.
+             Run 0032 showed it once on the screen that invented it, so anybody
+             who forgot it had to dig it out of the send panel. Empty and hidden
+             when there is no group, rather than saying so. -->
+        <span class="tb-code" id="tb-code" hidden title="Your group code"></span>
       </div>
       <!-- Two tabs, clickable both ways so neither is a trap. `aria-selected`
            carries which screen is up; `#step-send` also carries `disabled`
@@ -371,7 +376,7 @@
             <p class="landing-new-label">Your group code</p>
             <p class="landing-new-code" id="landing-new-code">…</p>
             <p class="landing-new-say" id="landing-new-say">
-              Pass this to the others so they can join. It is the only way in.
+              Pass this to the others so they can join.
             </p>
             <label>Your name
               <input id="landing-new-name" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />

@@ -2032,6 +2032,19 @@ button.primary:hover {
 /* Which group this resident is in (run 0023; wording, run 0026). Muted
    until a code is set; the code itself reads mono, matching the
    wireframe's treatment of a code like "review-0023". */
+/* The group's code beside the brand: quiet, in the mono face so a 0 and an O
+   differ, and select-all so one click takes the whole thing the way it does on
+   the Start a group screen. */
+.tb-code {
+  padding: 3px 7px;
+  border: 1px solid var(--line-paper, #c9c5bb);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--meta);
+  user-select: all;
+  white-space: nowrap;
+}
 .tb-session {
   font-family: var(--font-mono);
   font-size: 10px;

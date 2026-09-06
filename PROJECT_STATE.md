@@ -4246,6 +4246,23 @@ unit export"), which describes where a setting is stored.
 the screen, next to the button that uses them (FlatSend.dc.html), so both
 stay open and `syncSessionFold`/`unfoldSessionFields` are gone.
 
+**One command, and a clear word when the store is not there (run 0033).**
+`npm run dev` is now `netlify dev` on **8888**, which serves the app and the
+store together; `npm run dev:vite` is the old plain Vite on 5173.
+`netlify-cli` is pinned at 27.5.0 in `devDependencies` and `netlify.toml` pins
+the command, the port, `publish` and `functions`, so the address does not move.
+Nothing the CLI brings reaches the bundle: the JS grew 859 bytes and the CSS 211
+across this whole run, all of it this run's own source.
+
+`classifyStoreFailure` (`src/session/session.ts`) is THE ONE RULE for "is the
+store reachable". A thrown fetch, an `ok` response whose body will not parse,
+and a 404 carrying HTML are all `absent`; anything else is the store answering
+and keeps its own message. On plain Vite the group panel used to print
+`Unexpected token '<'`, which is an exception shown to a person. `checkGroup`
+replaced `groupIsStarted`, which collapsed a missing store into a missing group.
+The unit browser takes the sentence as an option rather than knowing it, since
+it is handed a URL and nothing about what serves it.
+
 **Four doors, and joining means joining (run 0032).** The landing's doors are
 Start a flat, Start a group, Join a group, Open a file. Start a group calls
 `inventCode` (`src/session/session.ts`), which makes a code from a 58-word list
