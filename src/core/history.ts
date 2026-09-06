@@ -55,16 +55,22 @@ export class History {
    * Record that a mutating user action just completed. No-op if the serialized
    * state is unchanged (so failed/degenerate actions cost nothing). Any real
    * change clears the redo stack (standard semantics).
+   *
+   * Returns the snapshot it just took, or null when it took none. Run 0036
+   * keeps the flat in the browser as a resident draws, and this is the string
+   * it keeps: handing it back means the app serializes once per action rather
+   * than twice, and means the draft is exactly what undo would restore.
    */
-  commit(): void {
-    if (this.restoring) return;
+  commit(): string | null {
+    if (this.restoring) return null;
     const now = this.serialize();
-    if (now === this.lastState) return; // nothing actually changed
+    if (now === this.lastState) return null; // nothing actually changed
     this.undoStack.push(this.lastState);
     if (this.undoStack.length > this.cap) this.undoStack.shift();
     this.redoStack = [];
     this.lastState = now;
     this.onChange?.();
+    return now;
   }
 
   undo(): void {

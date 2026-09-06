@@ -57,6 +57,7 @@ import {
   NO_WAY_IN,
   type FlatPhase,
 } from "./core/flatState";
+import { saveDraft, readDraft, DRAFT_RESTORED, type DraftStore } from "./core/draft";
 import { JOURNEY, journeyTones } from "./core/journey";
 import { slugifyUnitName } from "./library/ids";
 import { projectNameFor, unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
@@ -166,8 +167,12 @@ let history: History | undefined;
 // gate (run 0027, `refreshFlatFigures` below) all piggyback on the SAME
 // single point rather than adding a second, narrower hook.
 const commitHistory = () => {
-  history?.commit();
+  const snapshot = history?.commit() ?? null;
   refreshFlatFigures();
+  // The flat is kept as you draw (run 0036). The SAME string the history just
+  // took, so there is one serialization in the app and the draft cannot drift
+  // from what undo restores. Every mutating action already comes through here.
+  if (snapshot !== null) saveDraft(draftStore, snapshot);
 };
 
 // ---- Interaction ----
@@ -1595,6 +1600,16 @@ const PUBLISH_NOTE = savePublishNote.textContent ?? "";
 // fields stay open.
 
 /** localStorage, or null where the browser refuses it (a sandboxed frame). */
+/** The draft's own storage, separate from the session's only so that a
+ *  failure to read one cannot cost the other. Same `localStorage`. */
+const draftStore: DraftStore | null = (() => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+})();
+
 const sessionStorageArea = (() => {
   try {
     return window.localStorage;
@@ -2349,6 +2364,10 @@ function restoreState(snapshot: string): void {
   renderSidebar();
   syncNorthUI(); // north is in the snapshot — reflect the restored angle on the dial
   refreshFlatFigures(); // an undo/redo/import changes the flat as much as any edit does
+  // An undo is a change to the flat like any other, and `History.commit` is
+  // deliberately a no-op while restoring, so the draft is written here too.
+  // The snapshot is already in hand, so this costs no serialization (run 0036).
+  saveDraft(draftStore, snapshot);
 }
 
 function updateHistoryButtons(): void {
@@ -2427,6 +2446,17 @@ window.addEventListener("resize", () => ctx.handleResize());
 // The send panel's own state needs one startup read rather than waiting for
 // a first "open", and the figures, the drop hint and the step gate all come
 // from the same first pass.
+// The flat is kept as you draw (run 0036), so a refresh, a closed tab or a
+// crash no longer costs an afternoon. `readDraft` is the one rule that says
+// whether to bring it back: a URL naming a project wins over it, and a draft
+// with no rooms in it is not worth announcing. The restore goes through
+// `restoreState`, which is the same rebuild an import and an undo use.
+const draft = readDraft(draftStore, location.search);
+if (draft !== null) {
+  restoreState(draft);
+  showToast("info", DRAFT_RESTORED);
+}
+
 void openSaveDialog();
 refreshFlatFigures();
 renderJourney();
