@@ -38,6 +38,49 @@ export function isValidCode(code: string): boolean {
 }
 
 /**
+ * The words a made-up group code is built from.
+ *
+ * Chosen to be said across a table without spelling: one or two syllables, no
+ * pair that sounds alike, nothing that could be heard as a letter, and nothing
+ * whose spelling anybody would have to ask about. All lowercase a-z, so a code
+ * is inside the store's own `CODE` rule by construction.
+ */
+const CODE_WORDS = [
+  "amber", "anchor", "apple", "basil", "birch", "cedar", "cherry", "cobalt",
+  "copper", "cotton", "daisy", "delta", "ember", "fern", "garnet", "ginger",
+  "harbour", "hazel", "indigo", "ivory", "jasmine", "juniper", "lantern",
+  "lemon", "lilac", "linen", "maple", "marble", "meadow", "mulberry", "nutmeg",
+  "olive", "onyx", "orchard", "pebble", "pepper", "pewter", "poppy", "quartz",
+  "quince", "rosemary", "saffron", "sage", "salmon", "sorrel", "spruce",
+  "sumac", "teasel", "thistle", "thyme", "timber", "topaz", "tulip", "velvet",
+  "walnut", "willow", "yarrow", "zinc",
+] as const;
+
+/**
+ * A group code a person can read aloud: one of {@link CODE_WORDS} and two
+ * digits, joined by a hyphen, so `willow-42`.
+ *
+ * Pure, and the randomness is injected, so a test can pin the shape and the
+ * collision retry without waiting on chance. `taken` is asked before a code is
+ * offered, and a taken one is tried again up to `attempts` times; after that it
+ * gives up and returns null rather than looping, because a wordlist of 58 words
+ * and 100 numbers is 5800 codes and running out means something else is wrong.
+ */
+export function inventCode(
+  taken: (code: string) => boolean,
+  random: () => number = Math.random,
+  attempts = 12
+): string | null {
+  for (let i = 0; i < attempts; i++) {
+    const word = CODE_WORDS[Math.floor(random() * CODE_WORDS.length)];
+    const digits = String(Math.floor(random() * 100)).padStart(2, "0");
+    const code = `${word}-${digits}`;
+    if (!taken(code)) return code;
+  }
+  return null;
+}
+
+/**
  * The stored settings, with a `?session=` in the URL winning over the stored
  * code and being stored at once. Storage that is missing or refuses (a private
  * window, a full quota) reads as empty and never throws.
