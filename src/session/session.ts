@@ -98,6 +98,32 @@ export function sessionLine(s: SessionSettings): string {
  * ever displaying, so a test that called the real dialog would only prove
  * the decline path.
  */
+/**
+ * What the landing should put in its two fields, and what it should say about
+ * having done so.
+ *
+ * THE ONLY PLACE that decides whether this browser has been here before. Before
+ * run 0031 the landing filled both fields from storage every time, so a person
+ * who had never used the app could not tell a field holding their own name from
+ * one holding somebody else's, and neither could a person sitting down at
+ * somebody else's machine. A first visit now shows two empty fields and says
+ * nothing.
+ *
+ * Pure, so the wording is pinned by a test rather than read off a screen, and
+ * so the three cases (nothing known, both known, one known) are stated once.
+ */
+export function landingRecall(s: SessionSettings): { code: string; name: string; line: string } {
+  const code = s.code.trim();
+  const name = s.resident.trim();
+  if (!code && !name) return { code: "", name: "", line: "" };
+  const who = name ? `as ${name}` : "";
+  const where = code ? `in ${code}` : "";
+  const both = [who, where].filter(Boolean).join(" ");
+  // "either" only when there are two things to change.
+  const which = who && where ? "either" : "it";
+  return { code, name, line: `Picking up where you left off, ${both}. Change ${which} if that is not you.` };
+}
+
 export function takeoverConfirmText(owner: string): string {
   return `This flat belongs to ${owner}. Take it over?`;
 }

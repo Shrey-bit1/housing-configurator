@@ -96,6 +96,27 @@ export interface Resident {
    * bound.
    */
   extraM2: number | null;
+  /**
+   * The three wishes a resident makes about their OWN flat: a corner flat, one
+   * near a terrace, one away from the noise. Null when never answered.
+   *
+   * All three keys are always present together, and a partial object is refused
+   * rather than merged. A wish that is absent and a wish that is false are the
+   * same thing to whoever reads them, so letting them differ here would invent a
+   * third state the packer would then have to have an opinion about.
+   *
+   * The packer scores these. That is the building app's work and not this one's;
+   * this end only has to carry them, which before run 0031 it did not, so they
+   * lived in one browser's localStorage and nothing ever read them.
+   */
+  wishes: Wishes | null;
+}
+
+/** A resident's three wishes about their own flat. All three, always. */
+export interface Wishes {
+  corner: boolean;
+  terrace: boolean;
+  quiet: boolean;
 }
 
 export interface BuildingRun {
@@ -112,15 +133,40 @@ export interface BuildingRun {
 }
 
 /** The index blob. Maps here, lists on the wire (see `sessionView`). */
+/**
+ * One thing somebody said to the group while it was deciding something.
+ *
+ * Append-only. There is no edit and no delete, because the point is a record of
+ * what a group said while a building changed under them, and a record you can
+ * quietly rewrite is not one. Moderation is not built here.
+ */
+export interface Message {
+  /** Who said it, as they typed their name. */
+  who: string;
+  /** What they said, stored exactly as sent and never interpreted. */
+  text: string;
+  /** When the STORE received it, not when the sender's clock says. */
+  at: string;
+}
+
+/** The last messages a group sent, oldest first. Older ones are dropped. */
+export const MESSAGE_CAP = 200;
+/** The longest one message may be. */
+export const MESSAGE_MAX = 500;
+
 interface SessionIndex {
   flats: Record<string, FlatSummary>;
   residents: Record<string, Resident>;
   building: BuildingRun | null;
+  /** Optional in the type because an index written before run 0031 has none,
+   *  and the store reads a record back as it found it rather than backfilling. */
+  messages?: Message[];
 }
 
 const CORS = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, PUT, OPTIONS",
+  // POST joined in run 0031 for the messages route, the store's first.
+  "access-control-allow-methods": "GET, POST, PUT, OPTIONS",
   "access-control-allow-headers": "content-type",
 };
 
@@ -264,12 +310,47 @@ async function route(req: Request, kv: KV): Promise<Response> {
     let record!: Resident;
     await updateIndex(kv, indexKey, (index) => {
       record = {
-        ...(index.residents[who] ?? { counts: {}, share: null, ballot: [], shareM2: null, extraM2: null }),
+        ...(index.residents[who] ??
+          { counts: {}, share: null, ballot: [], shareM2: null, extraM2: null, wishes: null }),
         ...patch,
       };
       index.residents[who] = record;
     });
     return json({ name: who, ...record });
+  }
+
+  if (rest.length === 1 && rest[0] === "messages") {
+    // POST rather than PUT because this appends rather than replaces, and it is
+    // the one call in the store that does. Reading them is the poll's job, so
+    // there is no GET here: a client that wants the chat is already polling.
+    if (req.method !== "POST") return fail(405, "POST only");
+    const body = await req.json().catch(() => fail(400, "body must be JSON"));
+    if (!isRecord(body)) return fail(400, "body must be a JSON object");
+
+    // `who` gets the same loose rule a resident name gets (run 0026): trimmed,
+    // 1 to 64 characters, nothing a terminal would swallow. It is deliberately
+    // NOT checked against the resident list, because somebody may say something
+    // before they have published a flat.
+    const who = typeof body.who === "string" ? body.who.trim() : "";
+    if (who.length === 0 || who.length > 64 || /[\p{C}]/u.test(who)) {
+      return fail(400, "who must be 1-64 printable characters");
+    }
+    // `text` is NOT trimmed before the length check the way `who` is, because
+    // the leading and trailing spaces of a message are the sender's business.
+    // It is only rejected for being empty or too long.
+    const text = typeof body.text === "string" ? body.text : "";
+    if (text.length === 0 || text.length > MESSAGE_MAX) {
+      return fail(400, `text must be 1-${MESSAGE_MAX} characters`);
+    }
+
+    const message: Message = { who, text, at: new Date().toISOString() };
+    await updateIndex(kv, indexKey, (index) => {
+      const list = index.messages ?? [];
+      list.push(message);
+      // Oldest dropped, so a long session cannot grow the index without bound.
+      index.messages = list.slice(-MESSAGE_CAP);
+    });
+    return json(message, 201);
   }
 
   if (rest.length === 1 && rest[0] === "export") {
@@ -395,6 +476,11 @@ function sessionView(code: string, index: SessionIndex) {
     flats: Object.values(index.flats),
     residents: Object.entries(index.residents).map(([name, r]) => ({ name, ...r })),
     building: index.building,
+    // Named one by one here, unlike a resident's fields, which ride in on the
+    // spread above. So a top-level addition like this one DOES need a line, and
+    // it defaults to an empty list rather than being absent, so a group with
+    // nothing said reads as having said nothing.
+    messages: index.messages ?? [],
   };
 }
 
@@ -476,5 +562,24 @@ function parseResidentPatch(body: unknown): Partial<Resident> {
     }
     patch[key] = v as number | null;
   }
+  // The three wishes (run 0031). Checked whole: null, or an object carrying all
+  // three keys as booleans. A partial object is a 400 rather than a merge, for
+  // the reason on the field itself.
+  if ("wishes" in body) {
+    const w = body.wishes;
+    if (w !== null) {
+      const ok =
+        isRecord(w) &&
+        WISH_KEYS.every((k) => typeof w[k] === "boolean") &&
+        Object.keys(w).length === WISH_KEYS.length;
+      if (!ok) {
+        return fail(400, `wishes must be null or an object with ${WISH_KEYS.join(", ")} all boolean`);
+      }
+    }
+    patch.wishes = w as Wishes | null;
+  }
   return patch;
 }
+
+/** The three, named once so the check, the message and the document agree. */
+const WISH_KEYS = ["corner", "terrace", "quiet"] as const;

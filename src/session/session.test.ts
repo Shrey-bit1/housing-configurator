@@ -10,6 +10,7 @@ import {
   publishUnit,
   publishPreview,
   takeoverConfirmText,
+  landingRecall,
   decideTakeover,
   type KeyValue,
   type PublishResult,
@@ -278,5 +279,34 @@ describe("decideTakeover — what runSave does after a 409, without a DOM", () =
 
   it("proceeds for a 409 that names no owner", () => {
     expect(decideTakeover(conflictNoOwner, true, true)).toEqual({ action: "proceed" });
+  });
+});
+
+describe("landingRecall — what the landing fills in and what it says about it", () => {
+  const settings = (code: string, resident: string) => ({ code, resident });
+
+  it("fills nothing and says nothing on a browser that has never used the app", () => {
+    expect(landingRecall(settings("", ""))).toEqual({ code: "", name: "", line: "" });
+  });
+
+  it("fills both and names both on a return visit", () => {
+    expect(landingRecall(settings("room-42", "Ana"))).toEqual({
+      code: "room-42",
+      name: "Ana",
+      line: "Picking up where you left off, as Ana in room-42. Change either if that is not you.",
+    });
+  });
+
+  it("says 'it' rather than 'either' when it only recognised one thing", () => {
+    expect(landingRecall(settings("room-42", "")).line).toBe(
+      "Picking up where you left off, in room-42. Change it if that is not you."
+    );
+    expect(landingRecall(settings("", "Ana")).line).toBe(
+      "Picking up where you left off, as Ana. Change it if that is not you."
+    );
+  });
+
+  it("treats whitespace as nothing, so a stored blank is still a first visit", () => {
+    expect(landingRecall(settings("   ", "  "))).toEqual({ code: "", name: "", line: "" });
   });
 });

@@ -58,7 +58,8 @@ There are four things in a session: **flats**, **residents**, the last
 | `PUT` | `/api/session/{code}/flats/{id}?resident=…&label=…` | the `dwelling-unit` JSON | the flat's summary; `201` created, `200` replaced, `409` refused |
 | `GET` | `/api/session/{code}/flats/{id}/preview` | none | the flat's JPEG picture |
 | `PUT` | `/api/session/{code}/flats/{id}/preview` | the JPEG bytes | `{ ok, bytes }` |
-| `PUT` | `/api/session/{code}/residents/{name}` | any of `counts`, `share`, `ballot`, `shareM2`, `extraM2` | that resident's whole record after the merge |
+| `PUT` | `/api/session/{code}/residents/{name}` | any of `counts`, `share`, `ballot`, `shareM2`, `extraM2`, `wishes` | that resident's whole record after the merge |
+| `POST` | `/api/session/{code}/messages` | `who`, `text` | the stored message with the store's `at`; `201` |
 | `GET` | `/api/session/{code}/building` | none | the last run, or `null` |
 | `PUT` | `/api/session/{code}/building` | `genome`, `summary`, `by` | the stored run with its `at` timestamp |
 | `GET` | `/api/session/{code}/export` | none | the session state plus every flat body, as strings |
@@ -222,16 +223,26 @@ replaced whole:
 - `extraM2` is how many square metres this resident offered to pay for beyond
   that share, after the vote settled, or `null` when never answered. Same units
   and the same check: a whole number, zero or more.
+- `wishes` is the three wishes this resident makes about their own flat, or
+  `null` when never answered. `corner` is a wish for a flat on a corner of the
+  building, with two outside faces rather than one. `terrace` is a wish to be
+  near a shared terrace. `quiet` is a wish to be away from the noise, meaning
+  the shared rooms and the circulation. All three keys must be present and all
+  three must be booleans; a partial object is a `400` rather than a merge,
+  because a wish that is absent and a wish that is false are the same thing to
+  whoever reads them and letting them differ would invent a third state.
 
 A resident who has never been written reads as
-`{ "counts": {}, "share": null, "ballot": [], "shareM2": null, "extraM2": null }`
+`{ "counts": {}, "share": null, "ballot": [], "shareM2": null, "extraM2": null,
+"wishes": null }`
 underneath the merge.
 
 ```
 PUT /api/session/room-42/residents/Ben
 content-type: application/json
 
-{ "shareM2": 7, "extraM2": 5, "ballot": ["garden"] }
+{ "shareM2": 7, "extraM2": 5, "ballot": ["garden"],
+  "wishes": { "corner": true, "terrace": false, "quiet": true } }
 ```
 
 ```json
@@ -242,12 +253,44 @@ content-type: application/json
   "share": null,
   "ballot": ["garden"],
   "shareM2": 7,
-  "extraM2": 5
+  "extraM2": 5,
+  "wishes": { "corner": true, "terrace": false, "quiet": true }
 }
 ```
 
 Here Ben's `counts` came from an earlier body that sent only `counts`, and his
 `share` is `null` because he has never sent one.
+
+### `POST /api/session/{code}/messages` — what the group said
+
+A small append-only list, so five people in a room can say something to each
+other while the building changes under them. `who` is 1 to 64 printable
+characters, trimmed, and is deliberately not checked against the resident list,
+since somebody may want to say something before they have published a flat.
+`text` is 1 to 500 characters, is not trimmed, and is stored exactly as sent and
+never interpreted. `at` is the store's own timestamp rather than the sender's.
+
+```
+POST /api/session/room-42/messages
+content-type: application/json
+
+{ "who": "Ana", "text": "shall we put the terrace on the south side?" }
+```
+
+```json
+201 Created
+{
+  "who": "Ana",
+  "text": "shall we put the terrace on the south side?",
+  "at": "2026-09-04T18:22:10.417Z"
+}
+```
+
+The list is capped at the **last 200** messages, oldest dropped, so a long
+session cannot grow the index without bound. It comes back under `messages` in
+`GET /api/session/{code}` and in `/export`, oldest first, and a group that has
+said nothing reads as `[]` rather than as a missing key. There is no edit and no
+delete: the point is a record of what a group said while it decided something.
 
 ### `PUT` and `GET /api/session/{code}/building` — the last run
 

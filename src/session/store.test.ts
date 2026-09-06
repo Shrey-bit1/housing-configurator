@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { handleSession, sameResident, type KV } from "./store";
+import { handleSession, sameResident, MESSAGE_CAP, MESSAGE_MAX, type KV } from "./store";
 
 /**
  * The session store's contract (docs/store.md), driven through an in-memory
@@ -54,7 +54,7 @@ describe("routing", () => {
     const res = await call(new MemoryKV(), "OPTIONS", "/api/session/abc/flats/x");
     expect(res.status).toBe(204);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
-    expect(res.headers.get("access-control-allow-methods")).toBe("GET, PUT, OPTIONS");
+    expect(res.headers.get("access-control-allow-methods")).toBe("GET, POST, PUT, OPTIONS");
     expect(res.headers.get("access-control-allow-headers")).toBe("content-type");
   });
 
@@ -62,7 +62,7 @@ describe("routing", () => {
     const res = await call(new MemoryKV(), "GET", "/api/session/Fresh-1");
     expect(res.status).toBe(200);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
-    expect(await res.json()).toEqual({ code: "fresh-1", flats: [], residents: [], building: null });
+    expect(await res.json()).toEqual({ code: "fresh-1", flats: [], residents: [], building: null, messages: [] });
   });
 
   it("rejects unknown routes, bad codes and wrong methods, each with a message", async () => {
@@ -201,13 +201,13 @@ describe("a resident's wishes", () => {
     const kv = new MemoryKV();
     const a = await put(kv, "/api/session/abc/residents/Ana%20B", { counts: { u9: 2 }, share: 0.3, ballot: ["laundry", "workshop"] });
     expect(a.status).toBe(200);
-    expect(await a.json()).toEqual({ name: "Ana B", counts: { u9: 2 }, share: 0.3, ballot: ["laundry", "workshop"], shareM2: null, extraM2: null });
+    expect(await a.json()).toEqual({ name: "Ana B", counts: { u9: 2 }, share: 0.3, ballot: ["laundry", "workshop"], shareM2: null, extraM2: null, wishes: null });
 
     const b = await put(kv, "/api/session/abc/residents/Ana%20B", { share: 0.5 });
-    expect(await b.json()).toEqual({ name: "Ana B", counts: { u9: 2 }, share: 0.5, ballot: ["laundry", "workshop"], shareM2: null, extraM2: null });
+    expect(await b.json()).toEqual({ name: "Ana B", counts: { u9: 2 }, share: 0.5, ballot: ["laundry", "workshop"], shareM2: null, extraM2: null, wishes: null });
 
     const c = await put(kv, "/api/session/abc/residents/Ben", {});
-    expect(await c.json()).toEqual({ name: "Ben", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null });
+    expect(await c.json()).toEqual({ name: "Ben", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null, wishes: null });
 
     expect((await put(kv, "/api/session/abc/residents/Ben", { share: 1.5 })).status).toBe(400);
     expect((await put(kv, "/api/session/abc/residents/Ben", { counts: { u9: -1 } })).status).toBe(400);
@@ -217,8 +217,8 @@ describe("a resident's wishes", () => {
 
     const session = await (await call(kv, "GET", "/api/session/abc")).json();
     expect(session.residents).toEqual([
-      { name: "Ana B", counts: { u9: 2 }, share: 0.5, ballot: ["laundry", "workshop"], shareM2: null, extraM2: null },
-      { name: "Ben", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null },
+      { name: "Ana B", counts: { u9: 2 }, share: 0.5, ballot: ["laundry", "workshop"], shareM2: null, extraM2: null, wishes: null },
+      { name: "Ben", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null, wishes: null },
     ]);
   });
 });
@@ -228,7 +228,7 @@ describe("the two square-metre answers (run 0030)", () => {
     const kv = new MemoryKV();
     const r = await put(kv, "/api/session/abc/residents/Cara", {});
     expect(await r.json()).toEqual({
-      name: "Cara", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null,
+      name: "Cara", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null, wishes: null,
     });
   });
 
@@ -237,7 +237,7 @@ describe("the two square-metre answers (run 0030)", () => {
     await put(kv, "/api/session/abc/residents/Ana", { counts: { u9: 2 }, ballot: ["garden"] });
     const r = await put(kv, "/api/session/abc/residents/Ana", { shareM2: 7 });
     expect(await r.json()).toEqual({
-      name: "Ana", counts: { u9: 2 }, share: null, ballot: ["garden"], shareM2: 7, extraM2: null,
+      name: "Ana", counts: { u9: 2 }, share: null, ballot: ["garden"], shareM2: 7, extraM2: null, wishes: null,
     });
   });
 
@@ -265,13 +265,131 @@ describe("the two square-metre answers (run 0030)", () => {
 
   it("carries both fields through the export as well as the poll", async () => {
     const kv = new MemoryKV();
-    await put(kv, "/api/session/abc/residents/Ana", { shareM2: 7, extraM2: 5 });
+    await put(kv, "/api/session/abc/residents/Ana", { shareM2: 7, extraM2: 5, wishes: null });
     const polled = await (await call(kv, "GET", "/api/session/abc")).json();
     expect(polled.residents).toEqual([
-      { name: "Ana", counts: {}, share: null, ballot: [], shareM2: 7, extraM2: 5 },
+      { name: "Ana", counts: {}, share: null, ballot: [], shareM2: 7, extraM2: 5, wishes: null },
     ]);
+    // A group that has said nothing reads as an empty list, not a missing key.
+    expect(polled.messages).toEqual([]);
     const exported = await (await call(kv, "GET", "/api/session/abc/export")).json();
     expect(exported.residents).toEqual(polled.residents);
+  });
+});
+
+describe("the three wishes (run 0031)", () => {
+  it("reads back null when the resident has never answered", async () => {
+    const kv = new MemoryKV();
+    const r = await put(kv, "/api/session/abc/residents/Cara", { ballot: ["garden"] });
+    expect(await r.json()).toMatchObject({ wishes: null });
+  });
+
+  it("accepts a full object and gives it back whole", async () => {
+    const kv = new MemoryKV();
+    const r = await put(kv, "/api/session/abc/residents/Ana", {
+      wishes: { corner: true, terrace: false, quiet: true },
+    });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({
+      name: "Ana", counts: {}, share: null, ballot: [], shareM2: null, extraM2: null,
+      wishes: { corner: true, terrace: false, quiet: true },
+    });
+  });
+
+  it("refuses a partial object rather than merging it", async () => {
+    const kv = new MemoryKV();
+    // Absent and false would otherwise be two ways of saying the same thing,
+    // which is the third state the field exists to avoid.
+    const r = await put(kv, "/api/session/abc/residents/Ana", { wishes: { corner: true } });
+    expect(r.status).toBe(400);
+    expect(await r.text()).toContain("corner, terrace, quiet all boolean");
+  });
+
+  it("refuses a non-boolean, an extra key, and a non-object", async () => {
+    const kv = new MemoryKV();
+    const bad = [
+      { corner: "yes", terrace: false, quiet: true },
+      { corner: true, terrace: false, quiet: true, loud: true },
+      { corner: 1, terrace: 0, quiet: 1 },
+      "corner",
+      [],
+    ];
+    for (const w of bad) {
+      const r = await put(kv, "/api/session/abc/residents/Ana", { wishes: w });
+      expect(r.status, JSON.stringify(w)).toBe(400);
+    }
+  });
+
+  it("survives the export", async () => {
+    const kv = new MemoryKV();
+    const wishes = { corner: false, terrace: true, quiet: false };
+    await put(kv, "/api/session/abc/residents/Ana", { wishes });
+    const exported = await (await call(kv, "GET", "/api/session/abc/export")).json();
+    expect(exported.residents[0].wishes).toEqual(wishes);
+  });
+});
+
+describe("the group's messages (run 0031)", () => {
+  const post = (kv: MemoryKV, code: string, body: unknown) =>
+    call(kv, "POST", `/api/session/${code}/messages`, JSON.stringify(body));
+
+  it("appends, keeps the order, and stamps the time itself", async () => {
+    const kv = new MemoryKV();
+    const before = Date.now();
+    const a = await post(kv, "abc", { who: "Ana", text: "shall we?" });
+    expect(a.status).toBe(201);
+    const first = await a.json();
+    await post(kv, "abc", { who: "Ben", text: "yes" });
+
+    const state = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(state.messages.map((m: { who: string }) => m.who)).toEqual(["Ana", "Ben"]);
+    expect(state.messages[0]).toEqual(first);
+    // The store's clock, not the sender's: nothing in the body set this.
+    const at = Date.parse(first.at);
+    expect(at).toBeGreaterThanOrEqual(before);
+    expect(at).toBeLessThanOrEqual(Date.now());
+  });
+
+  it("stores the text exactly as sent and never interprets it", async () => {
+    const kv = new MemoryKV();
+    const text = '  <b>hi</b> & "quoted"  ';
+    const r = await post(kv, "abc", { who: "Ana", text });
+    expect((await r.json()).text).toBe(text);
+  });
+
+  it("takes who and text at their limits and refuses them past", async () => {
+    const kv = new MemoryKV();
+    expect((await post(kv, "abc", { who: "x".repeat(64), text: "ok" })).status).toBe(201);
+    expect((await post(kv, "abc", { who: "x".repeat(65), text: "ok" })).status).toBe(400);
+    expect((await post(kv, "abc", { who: "  Ana  ", text: "ok" })).status).toBe(201);
+    expect((await post(kv, "abc", { who: "   ", text: "ok" })).status).toBe(400);
+    expect((await post(kv, "abc", { who: "Ana", text: "y".repeat(MESSAGE_MAX) })).status).toBe(201);
+    expect((await post(kv, "abc", { who: "Ana", text: "y".repeat(MESSAGE_MAX + 1) })).status).toBe(400);
+    expect((await post(kv, "abc", { who: "Ana", text: "" })).status).toBe(400);
+    // Unlike `who`, `text` is not trimmed before the length check: a message of
+    // two spaces is a message somebody chose to send.
+    expect((await post(kv, "abc", { who: "Ana", text: "  " })).status).toBe(201);
+    expect((await post(kv, "abc", { who: "Ana" })).status).toBe(400);
+    expect((await call(kv, "GET", "/api/session/abc/messages")).status).toBe(405);
+  });
+
+  it("keeps the last 200 and drops the oldest", async () => {
+    const kv = new MemoryKV();
+    for (let i = 1; i <= MESSAGE_CAP + 3; i++) await post(kv, "abc", { who: "Ana", text: `m${i}` });
+    const state = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(state.messages).toHaveLength(MESSAGE_CAP);
+    // m1, m2 and m3 fell off the front; m203 is the newest at the back.
+    expect(state.messages[0].text).toBe("m4");
+    expect(state.messages[MESSAGE_CAP - 1].text).toBe(`m${MESSAGE_CAP + 3}`);
+  });
+
+  it("reads as an empty list on a group that has said nothing", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/abc/residents/Ana", { ballot: [] });
+    const state = await (await call(kv, "GET", "/api/session/abc")).json();
+    expect(state.messages).toEqual([]);
+    const exported = await (await call(kv, "GET", "/api/session/abc/export")).json();
+    expect(exported.messages).toEqual([]);
   });
 });
 
@@ -418,7 +536,7 @@ describe("two writers", () => {
     expect(res.status).toBe(200);
     const session = await (await call(kv, "GET", "/api/session/abc")).json();
     expect(session.residents).toEqual([
-      { name: "Ana", counts: {}, share: 0.9, ballot: [], shareM2: null, extraM2: null },
+      { name: "Ana", counts: {}, share: 0.9, ballot: [], shareM2: null, extraM2: null, wishes: null },
       // Ben keeps the shape he was written with. The store reads a record back
       // as it found it and does not backfill, so an old record stays readable
       // and its two missing keys simply read as absent rather than as zero.
