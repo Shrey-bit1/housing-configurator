@@ -1485,6 +1485,7 @@ const savePublishNote = document.getElementById("save-publish-note") as HTMLElem
  *  successful publish (run 0024). */
 const saveReplaceInput = document.getElementById("save-replace") as HTMLInputElement;
 const tbSession = document.getElementById("tb-session") as HTMLElement;
+const tbCode = document.getElementById("tb-code") as HTMLElement;
 const PUBLISH_NOTE = savePublishNote.textContent ?? "";
 
 // Run 0025 folded these two fields behind a one-line summary once both were
@@ -1509,6 +1510,10 @@ let session: SessionSettings = readSession(sessionStorageArea, location.search);
 function syncSessionUI(): void {
   tbSession.textContent = sessionLine(session);
   tbSession.classList.toggle("set", session.code.length > 0);
+  // The code itself, read from `session` rather than kept anywhere new, so
+  // there is still exactly one place it lives.
+  tbCode.textContent = session.code;
+  tbCode.hidden = session.code.length === 0;
   const why = whyPublishDisabled(session);
   const input = saveWhatInputs.publish;
   const wasDisabled = input.disabled;
