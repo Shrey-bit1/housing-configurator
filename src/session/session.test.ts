@@ -13,7 +13,9 @@ import {
   landingRecall,
   inventCode,
   noSuchGroupText,
-  groupIsStarted,
+  checkGroup,
+  classifyStoreFailure,
+  storeAbsentText,
   decideTakeover,
   type KeyValue,
   type PublishResult,
@@ -356,18 +358,86 @@ describe("noSuchGroupText — what a resident reads on a code nobody started", (
   });
 });
 
-describe("groupIsStarted — the one field the landing reads", () => {
-  const res = (body: unknown, ok = true) =>
-    Promise.resolve({ ok, json: () => Promise.resolve(body) } as Response);
 
-  it("is true only when the store says exists", async () => {
-    expect(await groupIsStarted("a", () => res({ exists: true }))).toBe(true);
-    expect(await groupIsStarted("a", () => res({ exists: false }))).toBe(false);
+describe("classifyStoreFailure — the store is not there, or it said no", () => {
+  const res = (status: number, contentType: string) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (n: string) => (n.toLowerCase() === "content-type" ? contentType : null) },
   });
 
-  it("treats a missing field, a bad status and a dead store as not started", async () => {
-    expect(await groupIsStarted("a", () => res({}))).toBe(false);
-    expect(await groupIsStarted("a", () => res({ exists: true }, false))).toBe(false);
-    expect(await groupIsStarted("a", () => Promise.reject(new Error("offline")))).toBe(false);
+  it("calls HTML where JSON was expected an absent store", () => {
+    // Plain Vite answers /api/session/... with index.html and a 200, which is
+    // the case that used to reach a resident as "Unexpected token '<'".
+    expect(classifyStoreFailure(res(200, "text/html"), false)).toBe("absent");
+  });
+
+  it("calls a refused connection an absent store", () => {
+    // fetch threw, so there is no response at all.
+    expect(classifyStoreFailure(null, false)).toBe("absent");
+  });
+
+  it("calls a 404 from the store an error, and a 404 of HTML absent", () => {
+    // The store's own 404 is JSON and is about the request.
+    expect(classifyStoreFailure(res(404, "application/json"), true)).toBe("error");
+    // A static server's 404 is a page, and is about there being no store.
+    expect(classifyStoreFailure(res(404, "text/html"), false)).toBe("absent");
+  });
+
+  it("calls a 500 carrying the store's own message an error", () => {
+    expect(classifyStoreFailure(res(500, "application/json; charset=utf-8"), true)).toBe("error");
+  });
+
+  it("calls a clean JSON 200 an error, since only a failed call asks", () => {
+    // Reached only when the caller already knows something went wrong, so a
+    // parsed body means the store answered and said no.
+    expect(classifyStoreFailure(res(200, "application/json"), true)).toBe("error");
+  });
+});
+
+describe("storeAbsentText — what a resident reads instead of an exception", () => {
+  it("names the command and the address, and quotes no exception", () => {
+    expect(storeAbsentText()).toBe(
+      "The group needs the store, which is not running. " +
+        "Start it with npm run dev and open http://localhost:8888."
+    );
+  });
+});
+
+describe("checkGroup — one call, three answers", () => {
+  const ok = (body: unknown) =>
+    Promise.resolve({
+      ok: true, status: 200,
+      headers: { get: () => "application/json" },
+      json: () => Promise.resolve(body),
+    } as unknown as Response);
+
+  it("says started when the store says exists", async () => {
+    expect(await checkGroup("a", () => ok({ exists: true }))).toEqual({ started: true });
+    expect(await checkGroup("a", () => ok({ exists: false }))).toEqual({ started: false });
+  });
+
+  it("says absent when the body will not parse", async () => {
+    const html = Promise.resolve({
+      ok: true, status: 200,
+      headers: { get: () => "text/html" },
+      json: () => Promise.reject(new SyntaxError("Unexpected token '<'")),
+    } as unknown as Response);
+    expect(await checkGroup("a", () => html)).toEqual({ failure: "absent" });
+  });
+
+  it("says absent when the connection never landed", async () => {
+    expect(await checkGroup("a", () => Promise.reject(new Error("refused")))).toEqual({
+      failure: "absent",
+    });
+  });
+
+  it("says error when the store answered and said no", async () => {
+    const five = Promise.resolve({
+      ok: false, status: 500,
+      headers: { get: () => "application/json" },
+      json: () => Promise.resolve({ error: "four attempts lost the race" }),
+    } as unknown as Response);
+    expect(await checkGroup("a", () => five)).toEqual({ failure: "error" });
   });
 });
