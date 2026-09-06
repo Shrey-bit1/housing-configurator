@@ -63,6 +63,21 @@ export const DASH = "—";
 /** The check line in the empty phase: a hint, carrying no fault. */
 export const EMPTY_HINT = "Drag a room onto the grid to start. Nothing is checked until you do.";
 
+/**
+ * Step 02's one red button, in its two moments (run 0034). Before a flat
+ * has reached the group it is the send button; after, it is the way to the
+ * group, where the resident goes on with the same flat. One button rather
+ * than two, so the screen never offers a choice a resident has no way to
+ * make.
+ */
+export const SEND_IT = "Send it";
+export const GO_TO_GROUP = "Go to your group";
+
+/** @param hasSent whether this flat has reached the group in this visit. */
+export function sendButtonLabel(hasSent: boolean): string {
+  return hasSent ? GO_TO_GROUP : SEND_IT;
+}
+
 /** Why step 02 is locked, said in the resident's own terms. */
 export const NO_WAY_IN =
   "Place an entrance on an outside edge first, so the flat has a way in.";
