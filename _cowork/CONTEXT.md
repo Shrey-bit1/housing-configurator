@@ -235,6 +235,22 @@ calls and the CORS line; no new directory, no new entry point, no new
 dependency and no new run step. PROJECT_STATE new §16, and docs/store.md is
 still the contract's source of truth.
 
+Run 0036 cut sending down to one press. Pressing the red button used to
+download a project file, download a unit file, write a library entry and
+publish, with all four ticked by default and a browser dialog before them if
+the layout check had anything to say. It now publishes and does nothing else,
+and the dialog is gone: the button itself reads "Send anyway · N things to look
+at" before the press. What a resident may still want written lives folded under
+More as three named presses, two of them dev-only, alongside the colour; the
+design number left the screen and is chosen automatically. Step 02 no longer
+asks again who is sending and where to, showing "As Ana, to hall-14." with a
+"change" instead. The flat is now kept in the browser as a resident draws and
+restored on load, which it was not before: a refresh used to cost the drawing.
+And the store writes one line into a group's chat when somebody leaves, with an
+empty `who` so its own voice is distinguishable from a person's. No new
+directory, no new entry point, no new dependency and no new run step; the store
+contract changed only by that line. PROJECT_STATE new §17.
+
 **Last updated:** 2026-09-06
 
 ## What this project is
