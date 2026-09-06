@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { JOURNEY, journeyIndex, journeyMarks } from "./journey";
+import { JOURNEY, journeyIndex, journeyTones } from "./journey";
 
 /**
  * The journey the landing renders and the building app is expected to render
@@ -44,20 +44,41 @@ describe("journeyIndex", () => {
   });
 });
 
-describe("journeyMarks", () => {
-  it("marks the landing's own step as now and everything after it as ahead", () => {
-    expect(journeyMarks("draw")).toEqual(["now", "ahead", "ahead", "ahead", "ahead", "ahead"]);
+describe("journeyTones", () => {
+  it("gives the flat app its own two in ink and the building app's four dim", () => {
+    expect(journeyTones("draw", "flat")).toEqual([
+      "now",
+      "here",
+      "elsewhere",
+      "elsewhere",
+      "elsewhere",
+      "elsewhere",
+    ]);
   });
 
-  it("marks everything before the current step as done", () => {
-    expect(journeyMarks("group")).toEqual(["done", "done", "done", "now", "ahead", "ahead"]);
+  it("gives the building app the mirror image", () => {
+    expect(journeyTones("group", "building")).toEqual([
+      "elsewhere",
+      "elsewhere",
+      "here",
+      "now",
+      "here",
+      "here",
+    ]);
   });
 
-  it("leaves every step ahead when the current id is unknown", () => {
-    expect(journeyMarks("")).toEqual(new Array(6).fill("ahead"));
+  it("marks no step as now when the current id is unknown", () => {
+    expect(journeyTones("", "flat")).toEqual([
+      "here",
+      "here",
+      "elsewhere",
+      "elsewhere",
+      "elsewhere",
+      "elsewhere",
+    ]);
   });
 
-  it("returns one mark per step", () => {
-    expect(journeyMarks("send")).toHaveLength(JOURNEY.length);
+  it("returns one tone per step", () => {
+    expect(journeyTones("send", "flat")).toHaveLength(JOURNEY.length);
   });
 });

@@ -44,6 +44,7 @@ import { unitStats } from "./core/unitStats";
 import {
   flatPhase,
   canSend,
+  sendButtonLabel,
   showsDropHint,
   checksRun,
   showsLanding,
@@ -53,7 +54,7 @@ import {
   NO_WAY_IN,
   type FlatPhase,
 } from "./core/flatState";
-import { JOURNEY, journeyMarks } from "./core/journey";
+import { JOURNEY, journeyTones } from "./core/journey";
 import { slugifyUnitName } from "./library/ids";
 import { projectNameFor, unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
 import { parseUnitLibraryIndex, type UnitManifestEntry } from "./library/manifest";
@@ -996,6 +997,12 @@ const saveColorInput = document.getElementById("save-color") as HTMLInputElement
 const saveNamesLine = document.getElementById("save-names") as HTMLElement;
 const saveResultsEl = document.getElementById("save-results") as HTMLElement;
 const saveGoBtn = document.getElementById("save-go") as HTMLButtonElement;
+const saveGoLabelEl = document.getElementById("save-go-label") as HTMLElement;
+/** Whether this flat has reached the group in this visit (run 0034). It is
+ *  what turns step 02's one red button from the send button into the way to
+ *  the group. Any edit to the flat clears it (`refreshFlatFigures`), because
+ *  a changed flat has not been sent. */
+let hasSent = false;
 
 // ---- "More": folded by default (run 0026), holding the design number,
 // colour and the five checkboxes that used to be the whole dialog. ----
@@ -1197,6 +1204,9 @@ let phase: FlatPhase = "empty";
  * gate's own reason when the unit cannot be built yet.
  */
 function refreshFlatFigures(): void {
+  // A flat that has been edited has not been sent, whatever went before, so
+  // step 02's button goes back to being the send button (run 0034).
+  hasSent = false;
   const rooms = placedRooms();
   const built = buildUnitExport(floors, "", "#000000");
   phase = flatPhase(rooms, built.ok);
@@ -1282,6 +1292,8 @@ frCheckEl.addEventListener("click", () => runCheck());
 type Step = "draw" | "send";
 const stepDrawBtn = document.getElementById("step-draw") as HTMLButtonElement;
 const stepSendBtn = document.getElementById("step-send") as HTMLButtonElement;
+const forwardGoBtn = document.getElementById("forward-go") as HTMLButtonElement;
+const forwardWhyEl = document.getElementById("forward-why") as HTMLElement;
 let step: Step = "draw";
 
 function setStep(next: Step): void {
@@ -1305,6 +1317,12 @@ function setStep(next: Step): void {
  *  in step 01 lights step 02 up at once. */
 function syncStepTabs(): void {
   const open = canSend(phase);
+  // Run 0034: the bar's 02 and the viewport's forward button read this ONE
+  // call, on the same line, so they cannot disagree about whether the flat
+  // is ready. The sentence under the button is the same sentence the bar's
+  // 02 carries as its title.
+  forwardGoBtn.setAttribute("aria-disabled", String(!open));
+  forwardWhyEl.textContent = open ? "" : NO_WAY_IN;
   stepDrawBtn.setAttribute("aria-selected", String(step === "draw"));
   stepSendBtn.setAttribute("aria-selected", String(step === "send"));
   stepDrawBtn.classList.toggle("done", step === "send");
@@ -1322,6 +1340,10 @@ function syncStepTabs(): void {
 
 stepDrawBtn.addEventListener("click", () => setStep("draw"));
 stepSendBtn.addEventListener("click", () => setStep("send"));
+// One way forward out of step 01 (run 0034). It goes through `setStep`, which
+// is the same refusal the bar's 02 gets, so an asleep press says why rather
+// than doing nothing.
+forwardGoBtn.addEventListener("click", () => setStep("send"));
 
 // ---- The landing (run 0027) -------------------------------------------------
 // It covers the editor rather than replacing it, so the scene behind it is
@@ -1336,8 +1358,27 @@ stepSendBtn.addEventListener("click", () => setStep("send"));
  *  tools that already share a store. */
 const BUILDING_APP_URL = "http://localhost:5182/";
 
+/** The building app on THIS resident's group, or its front door when there
+ *  is no group yet. One place, read by the landing's "Go to your group" and
+ *  by step 02's button after a send (run 0034). */
+function groupUrl(): string {
+  return session.code
+    ? `${BUILDING_APP_URL}?session=${encodeURIComponent(session.code)}`
+    : BUILDING_APP_URL;
+}
+
 const landingEl = document.getElementById("landing") as HTMLElement;
 const landingDoors = document.getElementById("landing-doors") as HTMLElement;
+
+/** Show the doors again without replaying run 0034's arrival. Coming back
+ *  from the join form or the new-group form re-shows the same element, and a
+ *  `display` change restarts a CSS animation, so a resident pressing "back"
+ *  would sit through the stagger a second time. `.no-arrive` in style.css
+ *  turns it off; the first show, in `showLanding`, never carries it. */
+function showLandingDoors(): void {
+  landingDoors.classList.add("no-arrive");
+  landingDoors.hidden = false;
+}
 const landingJoinForm = document.getElementById("landing-join-form") as HTMLFormElement;
 const landingStartLabel = document.getElementById("landing-start-label") as HTMLElement;
 const landingCode = document.getElementById("landing-code") as HTMLInputElement;
@@ -1368,9 +1409,7 @@ function showLanding(): void {
   landingRecallLine.textContent = recall.line;
   landingRecallLine.hidden = recall.line.length === 0;
   landingWhy.textContent = "";
-  landingGroupLink.href = session.code
-    ? `${BUILDING_APP_URL}?session=${encodeURIComponent(session.code)}`
-    : BUILDING_APP_URL;
+  landingGroupLink.href = groupUrl();
 }
 
 function hideLanding(): void {
@@ -1382,7 +1421,10 @@ function hideLanding(): void {
  *  steps from the same array. */
 function renderJourney(): void {
   const strip = document.getElementById("journey-strip") as HTMLElement;
-  const marks = journeyMarks("draw");
+  // Run 0034, the brief: all six dots always, the two this app owns in ink,
+  // the building app's four dim, and the one a resident is on in red. The
+  // building app calls the same function with "building" and gets the mirror.
+  const tones = journeyTones("draw", "flat");
   const parts: HTMLElement[] = [];
   JOURNEY.forEach((s, i) => {
     if (i > 0) {
@@ -1391,7 +1433,7 @@ function renderJourney(): void {
       parts.push(rule);
     }
     const el = document.createElement("div");
-    el.className = `journey-step ${marks[i]}`;
+    el.className = `journey-step ${tones[i]}`;
     const dot = document.createElement("span");
     dot.className = "journey-dot";
     const label = document.createElement("span");
@@ -1440,7 +1482,7 @@ document.getElementById("landing-new")!.addEventListener("click", async () => {
 });
 document.getElementById("landing-new-back")!.addEventListener("click", () => {
   landingNewForm.hidden = true;
-  landingDoors.hidden = false;
+  showLandingDoors();
 });
 landingNewForm.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -1466,7 +1508,7 @@ document.getElementById("landing-join")!.addEventListener("click", () => {
 });
 document.getElementById("landing-join-back")!.addEventListener("click", () => {
   landingJoinForm.hidden = true;
-  landingDoors.hidden = false;
+  showLandingDoors();
 });
 landingJoinForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1626,7 +1668,11 @@ function syncSaveDialog(): void {
     ? `It becomes ${parts.join(" and ")}` + (numberCountsSession ? `, next free in the library and ${session.code}` : "")
     : "Nothing selected";
   if (!saveColorTouched) saveColorInput.value = defaultUnitColor(unitNameFor(n));
-  saveGoBtn.disabled = isEmptySelection(sel) || !canSend(phase);
+  // Two moments, one button (run 0034). Once the flat has gone to the group
+  // the button stops being a send and becomes the way onward, so the send's
+  // own gates no longer apply to it.
+  saveGoLabelEl.textContent = sendButtonLabel(hasSent);
+  saveGoBtn.disabled = hasSent ? false : isEmptySelection(sel) || !canSend(phase);
 }
 
 /** The library manifest, or an empty one when it cannot be read. The dialog
@@ -1842,6 +1888,7 @@ async function runSave(): Promise<void> {
         // "make completion feel closer"): where to go and check it landed.
         line += " · open Units to see your group.";
         setSaveResult("publish", "written", line);
+        hasSent = true; // the button below now reads "Go to your group"
         saveReplaceInput.checked = false; // one deliberate tick per takeover, not a standing default
         void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
       } else {
@@ -1854,7 +1901,7 @@ async function runSave(): Promise<void> {
     }
   }
 
-  saveGoBtn.disabled = isEmptySelection(readSaveSelection());
+  syncSaveDialog(); // the label may have just become "Go to your group"
 }
 
 /**
@@ -1948,7 +1995,13 @@ saveNumberInput.addEventListener("input", syncSaveDialog);
 saveColorInput.addEventListener("input", () => (saveColorTouched = true));
 for (const input of Object.values(saveWhatInputs))
   input.addEventListener("change", syncSaveDialog);
-saveGoBtn.addEventListener("click", () => void runSave());
+saveGoBtn.addEventListener("click", () => {
+  if (hasSent) {
+    window.open(groupUrl(), "_blank", "noopener");
+    return;
+  }
+  void runSave();
+});
 
 /** Nothing authored yet: one floor, nothing placed, no doors, no entrances. Used
  *  to decide whether an import has anything to destroy. */

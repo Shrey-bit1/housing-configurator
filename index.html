@@ -174,6 +174,27 @@
             <button id="redo-btn" type="button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">↷</button>
           </div>
         </div>
+        <!-- The one way out of step 01 (run 0034). A resident who has just
+             finished drawing is handed onward rather than left to notice the
+             numbers strip and click a 02. It sits at the bottom centre, which
+             is the one free edge of the viewport: undo and redo hold the left
+             corner, Display holds the right, and the palette is outside the
+             viewport entirely, so nothing it needs is covered.
+
+             It says where it goes rather than "next", and while the flat is
+             not ready it is asleep with one sentence saying why. `aria-disabled`
+             rather than `disabled` for the same reason the bar's 02 uses it: a
+             disabled button fires no click, so the resident who most needs the
+             reason would press it and get silence. `setStep` is what refuses.
+
+             Hidden in step 02 by style.css, so there is never a second thing
+             on the screen that sends. -->
+        <div id="forward">
+          <p id="forward-why"></p>
+          <button id="forward-go" class="btn-send" type="button">
+            <span>Send it to your group</span><span aria-hidden="true">→</span>
+          </button>
+        </div>
         <!-- Bottom-right: ONE Display card. Collapsed by default; the header
              summarises what is on so the state is readable without opening it.
              The compass row is ALWAYS visible, collapsed or not, because north
@@ -252,7 +273,7 @@
               </label>
             </div>
             <button id="save-go" class="btn-send" type="button">
-              <span>Send it</span><span aria-hidden="true">→</span>
+              <span id="save-go-label">Send it</span><span aria-hidden="true">→</span>
             </button>
             <p id="save-names" class="save-names"></p>
             <p class="group-hint">Your neighbours see it within seconds.</p>
@@ -335,7 +356,11 @@
         </div>
         <div class="landing-body">
           <div class="landing-copy">
-            <h1 class="landing-title">Draw the flat<br />you want<br />to live in.</h1>
+            <!-- Three spans rather than three <br>s (run 0034): the headline
+                 arrives one line at a time, and a <br> is not an element CSS
+                 can hold a delay on. `.landing-title span` is display:block,
+                 so the three lines break exactly where they did. -->
+            <h1 class="landing-title"><span>Draw the flat</span><span>you want</span><span>to live in.</span></h1>
             <p class="landing-lead">
               Then the building arranges itself around everybody's flats. You and your
               neighbours decide together how much is shared, and where it goes.

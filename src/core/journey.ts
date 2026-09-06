@@ -45,8 +45,20 @@ export const JOURNEY: readonly JourneyStep[] = [
   { id: "vote", label: "Vote", app: "building" },
 ];
 
-/** How one step reads against the step a resident is on. */
-export type JourneyMark = "done" | "now" | "ahead";
+/**
+ * How one dot reads (run 0034, the brief's landing section as settled on
+ * 6 September). Three tones, not four: the dot a resident is on now, the
+ * dots that belong to the app they are in, and the dots that belong to the
+ * other app.
+ *
+ * This replaces run 0027's done/now/ahead. Done and ahead told a resident
+ * how far along they were, which the strip cannot know across two apps that
+ * share nothing but a store: the flat app has no way to find out whether a
+ * resident has voted. Which app owns a step is knowable from
+ * {@link JOURNEY} alone, and it answers the question the strip is actually
+ * for, which is "how much of this happens here".
+ */
+export type JourneyTone = "now" | "here" | "elsewhere";
 
 /** Position of `id` in {@link JOURNEY}, or -1 when nothing carries it. */
 export function journeyIndex(id: string): number {
@@ -54,12 +66,16 @@ export function journeyIndex(id: string): number {
 }
 
 /**
- * One mark per step, in {@link JOURNEY}'s own order: everything before the
- * current step is `done`, the current step is `now`, everything after it is
- * `ahead`. An id no step carries leaves every step `ahead`, which is what
- * the landing wants before a resident has chosen a door at all.
+ * One tone per step, in {@link JOURNEY}'s own order. The step a resident is
+ * on is `now`; every other step is `here` when this app owns it and
+ * `elsewhere` when the other app does. An id no step carries leaves no `now`
+ * at all, which is what a landing wants before a resident has chosen a door.
+ *
+ * The two apps call this with different `thisApp`, so the flat app gets the
+ * first two `here` and the last four `elsewhere`, and the building app gets
+ * the mirror image, from one function neither app has to reimplement.
  */
-export function journeyMarks(currentId: string): JourneyMark[] {
+export function journeyTones(currentId: string, thisApp: JourneyApp): JourneyTone[] {
   const at = journeyIndex(currentId);
-  return JOURNEY.map((_, i) => (at < 0 || i > at ? "ahead" : i === at ? "now" : "done"));
+  return JOURNEY.map((s, i) => (i === at ? "now" : s.app === thisApp ? "here" : "elsewhere"));
 }
