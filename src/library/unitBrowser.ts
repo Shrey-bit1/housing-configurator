@@ -82,6 +82,12 @@ export interface UnitBrowserOptions {
    *  Resolve to accept, reject to leave the card alone; either way the browser
    *  refreshes. Cards carry no Delete control without it. */
   onDelete?: (entry: UnitManifestEntry) => Promise<void>;
+  /** OPTIONAL. What to say when a call to the session store failed because the
+   *  store is not running at all. The browser cannot know that on its own: it
+   *  is told a URL and nothing about what serves it, so the host supplies the
+   *  sentence and the rule behind it (src/session/session.ts). Without it a
+   *  failure reads the way it always did, with the error's own words. */
+  storeAbsentText?: () => string;
   /** OPTIONAL. The id of the library entry whose copy is currently open in the
    *  editor, or null. Deleting that one is refused before anything is asked or
    *  sent, because the file the editor was opened from would vanish underneath
@@ -445,6 +451,14 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
     grid.prepend(p);
   }
 
+  /** Whether this response is the SPA fallback rather than the store. Only
+   *  asked when the host gave a sentence to say about it. */
+  function absent(res: Response): boolean {
+    if (!opts.storeAbsentText) return false;
+    const html = (res.headers.get("content-type") ?? "").includes("text/html");
+    return html && (res.ok || res.status === 404);
+  }
+
   function card(entry: UnitManifestEntry): HTMLElement {
     const c = document.createElement("article");
     c.className = "ulb-card";
@@ -656,6 +670,11 @@ export function createUnitBrowser(opts: UnitBrowserOptions): UnitBrowser {
     status(sessionGrid, "Loading…");
     try {
       const res = await fetch(url, { cache: "no-store" });
+      // A store that is not running is not an error worth quoting. Plain Vite
+      // answers /api/session/... with index.html, so this is a 200 whose body
+      // will not parse, and the parser's complaint is the thing a resident used
+      // to be shown. `absent` is that case; anything else is the store talking.
+      if (absent(res)) return status(sessionGrid, opts.storeAbsentText!());
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const state = (await res.json()) as { code?: string; flats?: SessionFlat[] };
       const flats = Array.isArray(state.flats) ? state.flats : [];

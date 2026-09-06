@@ -87,8 +87,9 @@ import {
   landingRecall,
   inventCode,
   startGroup,
-  groupIsStarted,
   noSuchGroupText,
+  checkGroup,
+  storeAbsentText,
   decideTakeover,
   type FetchLike,
   type SessionSettings,
@@ -1432,7 +1433,15 @@ landingJoinForm.addEventListener("submit", async (e) => {
   // conjured on the spot, so one typo started an empty group of one while the
   // resident believed they had joined the twenty.
   landingWhy.textContent = "";
-  if (!(await groupIsStarted(next.code))) {
+  const checked = await checkGroup(next.code);
+  if ("failure" in checked) {
+    landingWhy.textContent =
+      checked.failure === "absent"
+        ? storeAbsentText()
+        : `The store could not answer for ${next.code}. Try again in a moment.`;
+    return;
+  }
+  if (!checked.started) {
     landingWhy.textContent = noSuchGroupText(next.code);
     return;
   }
@@ -2052,6 +2061,7 @@ const unitBrowser = createUnitBrowser({
         showToast("info", `Deleted "${entry.name}" and ${r.removed?.length ?? 0} of its files.`);
       }
     : undefined,
+  storeAbsentText,
   openUnitId: () => openLibraryUnitId,
   onOpen: (file, source) => {
     file

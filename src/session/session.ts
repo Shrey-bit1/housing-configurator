@@ -80,17 +80,81 @@ export function inventCode(
   return null;
 }
 
-/** Whether the store says this group has been started (run 0032). Anything
- *  other than a clean 200 carrying `exists: true` reads as "not started", so a
- *  store that is down refuses a join rather than inventing one. */
-export async function groupIsStarted(code: string, f: typeof fetch = fetch): Promise<boolean> {
+/**
+ * Why a call to the store failed, in the two ways that matter to a resident.
+ *
+ * `"absent"` means the store is not running: the app is being served by plain
+ * Vite on 5173 rather than by Netlify, so `/api/session/...` falls through to
+ * the SPA fallback and the app gets `index.html` where it asked for JSON. The
+ * old behaviour printed the parser's own words, "Unexpected token '<'", which
+ * is an exception shown to a person.
+ *
+ * `"error"` means the store answered and said no. That is the store's own
+ * message and it keeps saying it, because it is about the request rather than
+ * about the setup.
+ */
+export type StoreFailure = "absent" | "error";
+
+/** Where the store lives when it is running, and the command that starts it. */
+export const STORE_ADDRESS = "http://localhost:8888";
+export const STORE_COMMAND = "npm run dev";
+
+/**
+ * Which of the two happened. THE ONE RULE, read by every screen that talks to
+ * the store, so the app cannot decide it three different ways.
+ *
+ * A thrown error is a connection that never landed. A response that is not
+ * `ok` is the store answering, unless it is a 404 carrying HTML, which is what
+ * a static server says about a path it has never heard of. And an `ok`
+ * response whose body will not parse as JSON is the SPA fallback: 200, an HTML
+ * page, and nothing to do with the store at all.
+ */
+export function classifyStoreFailure(
+  res: { ok: boolean; status: number; headers?: { get(name: string): string | null } } | null,
+  parsedJson: boolean
+): StoreFailure {
+  if (res === null) return "absent";
+  const type = res.headers?.get("content-type") ?? "";
+  const html = type.includes("text/html");
+  if (res.ok) return parsedJson ? "error" : "absent";
+  if (res.status === 404 && html) return "absent";
+  return "error";
+}
+
+/** The one sentence a resident reads when the store is not running. It names
+ *  the command and the address, so it can be acted on without asking. */
+export function storeAbsentText(): string {
+  return `The group needs the store, which is not running. Start it with ${STORE_COMMAND} and open ${STORE_ADDRESS}.`;
+}
+
+/**
+ * Whether the store says this group has been started, and if it cannot say,
+ * why not (run 0032, reshaped by run 0033).
+ *
+ * It returns the reason rather than a bare boolean, because a missing store and
+ * a missing group are different things to the person reading the answer, and
+ * collapsing them is how "the store is not running" used to reach a resident as
+ * "no such group" or, worse, as a parser error.
+ */
+export async function checkGroup(
+  code: string,
+  f: typeof fetch = fetch
+): Promise<{ started: boolean } | { failure: StoreFailure }> {
+  let res: Response;
   try {
-    const res = await f(`/api/session/${encodeURIComponent(code)}`);
-    if (!res.ok) return false;
-    return ((await res.json()) as { exists?: boolean }).exists === true;
+    res = await f(`/api/session/${encodeURIComponent(code)}`);
   } catch {
-    return false;
+    return { failure: classifyStoreFailure(null, false) };
   }
+  let body: unknown;
+  let parsed = true;
+  try {
+    body = await res.json();
+  } catch {
+    parsed = false;
+  }
+  if (!res.ok || !parsed) return { failure: classifyStoreFailure(res, parsed) };
+  return { started: (body as { exists?: boolean }).exists === true };
 }
 
 /** Start a group at `code`. True on 201, false on 409 or anything else. */
