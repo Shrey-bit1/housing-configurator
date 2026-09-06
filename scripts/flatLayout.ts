@@ -52,12 +52,21 @@ export const cellKey = (cx: number, cz: number): string => `${cx},${cz}`;
  *             the open well over the stair on the storey below instead: the app
  *             cuts that hole itself and blocks growth into it, so it is exempt
  *             from the enclosure check and may sit on the flat's edge.
+ *  - `gap`    space the flat is NOT in. Rows are left-aligned, so without this
+ *             every row starts at the same edge and the only shape available is
+ *             a staircase. A gap lets a row start further in or stop short in
+ *             the middle, which is what makes an L with a re-entrant corner, a
+ *             C, and a plan wrapped round a courtyard. It is the exact inverse
+ *             of a growth void and is checked as such: a gap MUST reach the
+ *             grid border, because one that does not is an enclosed pocket that
+ *             an elastic room will quietly absorb.
  */
 export type Slot =
   | { key: string; type: string; rotation?: number }
   | { stack: Slot[] }
   | { key: string; fill: "circulation" | "outdoor"; w: number; d: number }
-  | { void: true; w: number; d: number; stairwell?: boolean };
+  | { void: true; w: number; d: number; stairwell?: boolean }
+  | { gap: true; w: number; d: number };
 
 /** A horizontal strip of the flat. Every slot in it must be the same depth. */
 export interface Row {
@@ -100,6 +109,8 @@ export interface StoreyLayout {
    *  stairwell void is the open well over the stair on the storey below, which
    *  the app cuts for itself and which nothing is allowed to grow into. */
   voids: (Cell & { stairwell: boolean })[];
+  /** Cells the flat does not occupy, which shape its outline. */
+  gaps: Cell[];
   /** The storey's bounding box, for the entrance and the size report. */
   bounds: { minX: number; minZ: number; maxX: number; maxZ: number };
 }
@@ -145,7 +156,7 @@ export function slotSize(slot: Slot): { w: number; d: number } {
         );
     return { w, d: parts.reduce((n, p) => n + p.d, 0) };
   }
-  if ("fill" in slot || "void" in slot) return { w: slot.w, d: slot.d };
+  if ("fill" in slot || "void" in slot || "gap" in slot) return { w: slot.w, d: slot.d };
   const cells = normalizedCells(slot.type, slot.rotation ?? 0);
   return {
     w: Math.max(...cells.map((c) => c.cx)) + 1,
@@ -212,6 +223,12 @@ function placeSlot(
     return;
   }
 
+  if ("gap" in slot) {
+    for (let x = 0; x < slot.w; x++)
+      for (let z = 0; z < slot.d; z++) out.gaps.push({ cx: at.cx + x, cz: at.cz + z });
+    return;
+  }
+
   const claimed: Cell[] = [];
   if ("fill" in slot) {
     const tiled = tileFill(slot.fill, at, slot.w, slot.d);
@@ -249,6 +266,7 @@ export function packStorey(plan: StoreyPlan): StoreyLayout {
     placements: [] as Placement[],
     cells: new Map<string, CellSet>(),
     voids: [] as (Cell & { stairwell: boolean })[],
+    gaps: [] as Cell[],
   };
   let z = plan.origin.cz;
   let widest = 0;
@@ -281,15 +299,16 @@ export function packStorey(plan: StoreyPlan): StoreyLayout {
       if (other) throw new LayoutError(`"${key}" and "${other}" both claim cell ${c}`);
       seen.set(c, key);
     }
-  for (const v of out.voids) {
+  for (const v of [...out.voids, ...out.gaps]) {
     const other = seen.get(cellKey(v.cx, v.cz));
-    if (other) throw new LayoutError(`a void and "${other}" both claim cell ${v.cx},${v.cz}`);
+    if (other) throw new LayoutError(`empty space and "${other}" both claim cell ${v.cx},${v.cz}`);
   }
 
   return {
     placements: out.placements,
     cells: out.cells,
     voids: out.voids,
+    gaps: out.gaps,
     bounds: {
       minX: plan.origin.cx,
       minZ: plan.origin.cz,
@@ -343,16 +362,25 @@ export interface DerivedDoor {
  * corner of a room is the tell of a generated plan, and because it leaves the
  * furniture wall of both rooms free. Doors already placed are avoided cell for
  * cell, since the app refuses two doors on one physical edge (core/door.ts).
+ *
+ * That avoidance is PER STOREY, which `storeyOf` supplies. Both storeys of a
+ * maisonette are drawn on the same grid coordinates, so without it a door on
+ * the ground floor blocks the edge a first-floor door needs at the same place,
+ * and the second one fails with "the two rooms share no straight boundary" on
+ * a boundary they plainly share. A door belongs to the storey of the first room
+ * it names, which is how the runner files it too.
  */
 export function deriveDoors(
   cells: Map<string, CellSet>,
-  edges: [string, string][]
+  edges: [string, string][],
+  storeyOf: (key: string) => number = () => 0
 ): DerivedDoor[] {
   const SIDES: Side[] = ["north", "south", "east", "west"];
   const taken = new Set<string>();
   const out: DerivedDoor[] = [];
 
   for (const [ka, kb] of edges) {
+    const storey = storeyOf(ka);
     const a = cells.get(ka);
     const b = cells.get(kb);
     if (!a) throw new LayoutError(`door "${ka}"–"${kb}": no room called "${ka}"`);
@@ -365,7 +393,7 @@ export function deriveDoors(
       const along = side === "north" || side === "south" ? "cx" : "cz";
       const fixed = along === "cx" ? "cz" : "cx";
       const anchors = doorAnchors(a, b, side).filter(
-        (c) => !taken.has(`${c.cx},${c.cz},${side}`)
+        (c) => !taken.has(`${storey}:${c.cx},${c.cz},${side}`)
       );
       let run: Cell[] = [];
       for (const c of anchors) {
@@ -386,7 +414,7 @@ export function deriveDoors(
     // Both edges of the chosen door, so a later door cannot reuse either.
     const along = best.side === "north" || best.side === "south" ? { cx: 1, cz: 0 } : { cx: 0, cz: 1 };
     for (let i = 0; i < DOOR_SPAN; i++)
-      taken.add(`${at.cx + along.cx * i},${at.cz + along.cz * i},${best.side}`);
+      taken.add(`${storey}:${at.cx + along.cx * i},${at.cz + along.cz * i},${best.side}`);
 
     out.push({ cx: at.cx, cz: at.cz, side: best.side, between: [ka, kb] });
   }

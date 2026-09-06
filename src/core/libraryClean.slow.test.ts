@@ -66,9 +66,22 @@ const FILES = Object.entries(UNITS)
   .map(([path, unit]) => [path.split("/").pop()!, unit] as const)
   .sort(([a], [b]) => a.localeCompare(b));
 
+/**
+ * The flats this project DESIGNED, as opposed to the ones that happen to be in
+ * the folder. Run 0028 drew five and run 0029 drew fifteen more, and the point
+ * of naming them is that the glob above cannot tell a missing flat from a flat
+ * that was never there. If one is deleted the glob simply stops checking it.
+ */
+const DESIGNED = Array.from({ length: 20 }, (_, i) => `unit-${i + 8}.json`);
+
 describe("every library unit passes Check Layout", () => {
   it("finds the library where it is meant to be", () => {
     expect(FILES.length).toBeGreaterThan(0);
+  });
+
+  it("still holds all twenty designed flats", () => {
+    const present = new Set(FILES.map(([name]) => name));
+    expect(DESIGNED.filter((n) => !present.has(n))).toEqual([]);
   });
 
   for (const [name, unit] of FILES) {

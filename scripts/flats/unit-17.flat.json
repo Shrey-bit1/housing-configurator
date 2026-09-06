@@ -1,0 +1,112 @@
+{
+  "id": "unit-17",
+  "name": "Flat 17 — two rooms, wide hall",
+  "color": "#38d9a9",
+  "targetM2": [
+    50,
+    65
+  ],
+  "grid": {
+    "cols": 24,
+    "rows": 22
+  },
+  "northAngle": 0,
+  "reference": "Plan 6, Else Zueblin West at 3.5 rooms, with its dining half kept",
+  "wetRooms": [
+    "kitchen",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "gap": true,
+              "w": 7,
+              "d": 3
+            },
+            {
+              "key": "loggia",
+              "fill": "outdoor",
+              "w": 5,
+              "d": 3
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "dining",
+              "type": "recreation"
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "hall",
+              "fill": "circulation",
+              "w": 12,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            },
+            {
+              "key": "bed1",
+              "type": "bedroom_small"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "hall",
+      "living"
+    ],
+    [
+      "hall",
+      "kitchen"
+    ],
+    [
+      "hall",
+      "bath"
+    ],
+    [
+      "hall",
+      "bed1"
+    ],
+    [
+      "living",
+      "dining"
+    ],
+    [
+      "dining",
+      "loggia"
+    ]
+  ],
+  "entrance": {
+    "key": "hall",
+    "side": "west"
+  }
+}

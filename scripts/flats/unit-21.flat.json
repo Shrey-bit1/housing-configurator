@@ -1,0 +1,134 @@
+{
+  "id": "unit-21",
+  "name": "Flat 21 — three rooms, through",
+  "color": "#4dabf7",
+  "targetM2": [
+    70,
+    85
+  ],
+  "grid": {
+    "cols": 28,
+    "rows": 24
+  },
+  "northAngle": 0,
+  "reference": "Kalkbreite's Grosshaushalt: rooms on two opposite facades with the spine between",
+  "wetRooms": [
+    "kitchen",
+    "wc",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "dining",
+              "type": "recreation"
+            },
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "spine",
+              "fill": "circulation",
+              "w": 18,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "bed2",
+              "type": "bedroom_small"
+            },
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "stack": [
+                {
+                  "key": "wcp",
+                  "fill": "circulation",
+                  "w": 2,
+                  "d": 1
+                },
+                {
+                  "key": "wc",
+                  "type": "wc"
+                }
+              ]
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            },
+            {
+              "key": "loggia",
+              "fill": "outdoor",
+              "w": 3,
+              "d": 4
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "spine",
+      "living"
+    ],
+    [
+      "spine",
+      "dining"
+    ],
+    [
+      "spine",
+      "bed1"
+    ],
+    [
+      "spine",
+      "bed2"
+    ],
+    [
+      "spine",
+      "kitchen"
+    ],
+    [
+      "spine",
+      "bath"
+    ],
+    [
+      "wcp",
+      "wc"
+    ],
+    [
+      "living",
+      "dining"
+    ],
+    [
+      "bath",
+      "loggia"
+    ]
+  ],
+  "entrance": {
+    "key": "spine",
+    "side": "west"
+  }
+}

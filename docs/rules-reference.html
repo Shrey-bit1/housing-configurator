@@ -124,7 +124,7 @@
     <li><span class="n">8</span>Adjacency by touch</li>
     <li><span class="n">9</span>Program</li>
     <li><span class="n">10</span>Daylight and glazing</li>
-    <li><span class="n">A</span>All 41 rules, for lookup</li>
+    <li><span class="n">A</span>All 42 rules, for lookup</li>
     <li><span class="n">B</span>Metrics the report prints</li>
     <li><span class="n">C</span>Assumptions and limits</li>
     <li><span class="n">D</span>References</li>
@@ -239,6 +239,8 @@
 
 <p>A few checks aren't about the graph's shape at all, just about what's present. <span class="rid hard">P1</span> and <span class="rid hard">P2</span> ask whether a bathroom and a kitchen exist anywhere in the dwelling; without either one the flat doesn't work, hard, and there isn't much more to say about them.</p>
 
+<p><span class="rid hard">P4</span> joined them in run 0029 and asks the same kind of question about a bedroom. It is worth saying why it is hard rather than soft, because a living room that doubles as a bedroom is a real dwelling type and plenty of studios are built that way. This project decided against them: the packer downstream gives one flat to one resident, so a flat with nowhere to sleep is not a flat it can allocate, and the smallest unit in the library is a proper one-bedroom. That is a decision about the housing this tool makes rather than a claim about housing in general.</p>
+
 <p><span class="rid soft">MB1</span> is a softer version of the same idea, scoped to one floor at a time: bedrooms present, no bathroom on that floor, which on a multi-storey flat means an inconvenient trip down the stairs at three in the morning, so it's soft. It only runs once a bathroom exists somewhere in the dwelling — a bathroom-less flat is already <span class="rid hard">P1</span>'s problem, and <span class="rid soft">MB1</span> is gated on <span class="rid hard">P1</span> being satisfied so the two don't both fire over the same missing room.</p>
 
 <!-- ============================ 10 ============================ -->
@@ -267,7 +269,7 @@
 
 <!-- ============================ APPENDIX A ============================ -->
 <div class="appendix">
-<h2 class="sec">A · All 41 rules, for lookup</h2>
+<h2 class="sec">A · All 42 rules, for lookup</h2>
 <div class="sec-rule"></div>
 <table>
   <thead><tr><th style="width:56px">Id</th><th>What it checks</th><th style="width:64px">Tier</th></tr></thead>
@@ -299,6 +301,7 @@
     <tr><td class="rid-cell">P1</td><td>No bathroom exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
     <tr><td class="rid-cell">P2</td><td>No kitchen exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
     <tr><td class="rid-cell">P3</td><td>More than one kitchen exists in the dwelling.</td><td class="tier-cell"><span class="tier note">Note</span></td></tr>
+    <tr><td class="rid-cell">P4</td><td>No bedroom exists anywhere in the dwelling.</td><td class="tier-cell"><span class="tier hard">Must fix</span></td></tr>
     <tr><td class="rid-cell">PG1</td><td>The mean depth of public rooms exceeds the mean depth of bedrooms.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
     <tr><td class="rid-cell">S1</td><td>An outdoor cluster has more than two AUTHORED doors onto it (french windows don't count).</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>
     <tr><td class="rid-cell">S2</td><td>A living room has one door or none.</td><td class="tier-cell"><span class="tier soft">Worth a look</span></td></tr>

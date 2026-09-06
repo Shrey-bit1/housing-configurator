@@ -2042,7 +2042,8 @@ sheet spanning the viewport bottom, rendered by `ui/validationPanel.ts`:
   (`OR1 (1/2)`), because hover emphasis targets ONE violation's rooms and a merged
   card would have nothing single to point at.
 - `ACTION_BY_RULE` (`validationPanel.ts:46`) is a display-only suggested move per
-  rule id, covering 34 of the 41 rules; the seven notes have no entry and render
+  rule id, covering 35 of the 42 rules (run 0029 added P4's); the seven notes have
+  no entry and render
   no action line. It is deliberately NOT in `RULES` — `validate()`'s returned data
   is unchanged and `rules.test.ts` never sees this file.
 - `bindWheelToScroll` calls `preventDefault` only while the rail can still move
@@ -2074,7 +2075,7 @@ repository reads. Renaming the preset would change a file format. The report and
 the diagram therefore still say Circulation while the palette says Hall.
 
 **DOCS DRIFT, MEASURED.** `docs/rules-list.html` and `docs/rules-list.md`
-document 37 of the 41 rules; FAC1, OR2, ST3 and WET1 have no entry, and E1 is
+document 37 of the 42 rules; FAC1, OR2, P4, ST3 and WET1 have no entry, and E1 is
 filed as a note where `rules.ts` has it hard. Run 0017 corrected the totals it was
 already rewriting (35/36 → 41, and the tier index 11/19/7 → 14/21/6) but left the
 per-rule entries alone, because filling them is a docs regeneration rather than a
@@ -3136,6 +3137,7 @@ typology — open-plan, en-suite, efficient services).
 | P1 | 🔴 hard | A dwelling needs a bathroom. |
 | P2 | 🔴 hard | A dwelling needs a kitchen. |
 | P3 | 🟢 note | More than one kitchen — atypical, but not a problem. |
+| P4 | 🔴 hard | A dwelling needs a bedroom — place one so the flat has somewhere to sleep. |
 | MB1 | 🟡 soft | A floor has bedrooms but no bathroom (nighttime stair trip). GATED on P1 silent (a bathroom exists somewhere) — never double-fires with P1 on a bathroom-less flat. Per-floor. |
 
 **Reachability** (entrance-rooted, whole dwelling, DOOR-BASED — traverses ACCESS/`viaDoor` edges only, across door-gated stairs; corridors NOT required). The blocked-BFS family (H2/H3/H6/G1) EXEMPTS the seed/root node from blocking — you enter *through* the host by definition, so an entrance ON a bedroom/bathroom/outdoor space doesn't detonate every room; G2 is the gentle signal for that typology.
@@ -3532,7 +3534,28 @@ the glob found anything), which walks EVERY file in `public/units/` and asserts
 zero must-fix through `computeDwellingGraph` + `validate`. It carries one named
 quarantine, `unit-5.json`, which was already rotten; see §15.
 
-**The library holds twelve committed flats as of run 0028.** The seven that
+**Delete (run 0029).** Every library card carries a Delete control beside Open
+a copy and Rename, for anybody; the architect-only version is a later run. The
+wording is a pure helper, `deleteConfirmText` in `unitBrowser.ts`, for the same
+reason `takeoverConfirmText` is one (`window.confirm` returns false under
+scripting without displaying). A second pure helper, `deleteRefusal`, refuses
+the flat whose copy is open in the editor. That needed state the app did not
+keep: the editor holds a copy and deliberately forgets which entry it came from
+so a later save adds a new entry, so `main.ts` now records `openLibraryUnitId`,
+set after a library open succeeds and cleared at the top of `importProjectText`,
+the one function every project replacement goes through. A refusal uses
+`notice()` rather than `status()`, because `status` replaces the whole grid and
+the resident needs the cards in front of them. Persistence is the host's, as
+with Rename: `POST /__library/delete` in vite.config.ts removes the row and both
+files, dev-only beside the other three sinks.
+
+**The library holds twenty-seven committed flats as of run 0029**, of which
+twenty are designed by this project (`unit-8` through `unit-27`). Run 0028 drew
+five and run 0029 drew fifteen more and redrew Flat 08.
+`src/core/libraryClean.slow.test.ts` names those twenty as well as globbing the
+folder, because a glob cannot tell a missing flat from one that was never there.
+
+**The library held twelve committed flats as of run 0028.** The seven that
 existed before, plus `unit-8` through `unit-12`, the first generated batch
 (§15). The five were not dragged in the editor: `scripts/gen-flat.mjs` wrote
 them from bubble diagrams and each was proved against the app's own rules before
@@ -3865,7 +3888,7 @@ without Netlify.
 | `GET` | `…/flats/{id}` | the stored text, byte for byte, `content-type: application/json`; 404 if absent. |
 | `PUT` | `…/flats/{id}?resident=…&label=…` | body = the `dwelling-unit` JSON as Export writes it. `parseUnit` checks only `format`, `storeys[].cells` as `[int,int]`; `measure` derives `bbox [minX,minZ,maxX,maxZ]`, `floors`, `areaCells`, `preview` (carried across a republish). Existing id, same resident → version+1, `changed: true`, 200; existing id, DIFFERENT resident → 409 unless `?replace=1` (run 0024, `store.ts:180`, body `{error, resident: <owner>}`); new → version 1, 201. `label` falls back to the unit's `name`. |
 | `GET`/`PUT` | `…/flats/{id}/preview` | Run 0024. GET returns the flat's JPEG (`content-type: image/jpeg`); PUT takes the JPEG as the raw body, 404 if the flat itself does not exist yet. Base64 under a key that is a SIBLING of the flat's own (`{code}/flats/{id}.preview`, not a child of it — see Storage layout). Sets `preview: true` on the flat's summary. |
-| `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[]); each present key replaced whole. Returns `{name, …record}`. |
+| `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[], and since run 0030 `shareM2`/`extraM2` whole ints ≥0 or null); each present key replaced whole. Returns `{name, …record}`. |
 | `GET`/`PUT` | `…/building` | PUT stores `{genome, summary, by, at: now}` and sets `changed = false` on every flat; GET returns it or `null`. |
 | `GET` | `…/export` | Run 0023 (`store.ts:185-195`). The session state plus `bodies: {id: <flat text>}` (every flat blob, as a STRING so the bytes survive; `null` if a blob is missing) and `exportedAt`. The only call that reads every blob; for the end of a session, never for polling. |
 | `OPTIONS` | anything | 204, `access-control-allow-origin: *`, methods `GET, PUT, OPTIONS`, headers `content-type`. Every other response carries the same CORS headers, errors included. |
@@ -3929,6 +3952,22 @@ second module needs the same answer.
 **Proof.** `scripts/store-roundtrip.mjs <base-url>` (plain Node, no deps):
 fresh session per run, publishes `public/units/flat-2-single-storey.json`
 (37484 bytes) as Ana and `public/units/flat-3-terrace.json` (33388 bytes) as
+**The two square-metre answers (run 0030).** `Resident` carries `shareM2` and
+`extraM2`, both `number | null`: how many square metres of shared space this
+resident thinks each person should pay for, and how many they offered to pay for
+beyond that share after the vote settled. Whole numbers, zero or more, or null
+when never answered, with **no upper bound in the store** because the slider's
+range belongs to the building app and a limit here would move in two
+repositories at once. Before this the store dropped both keys silently, which
+run 0056 of the building app measured against the live store, and the effect
+there was a median taken over one answer. The old `share`, a fraction 0..1,
+STAYS accepted and is marked in the type as the pre-0056 reading of the same
+question, because records already written carry it; the store reads a record
+back as it found it and does not backfill, which
+`store.test.ts`'s ETag-race case now asserts. `sessionView`
+(`src/session/store.ts:365`) spreads each record whole, so both keys reach the
+poll and `/export` with no further change.
+
 Ben, republishes flat-2 (version 2), sets counts/share/ballot (Ben in two
 partial bodies), reads the state and checks the summaries (194 / 168 cells,
 bbox `0,0,15,14` / `0,0,14,12`), reads both flats back byte-identical, writes
@@ -4247,9 +4286,11 @@ runs. The runner exits non-zero on any must-fix finding, any refused placement,
 any pruned door, or an area outside the target band. It writes to `build/units/`,
 gitignored as of this run; a flat enters `public/units/` by a deliberate copy.
 
-**The five flats.** `scripts/flats/unit-{8,9,10,11,12}.flat.json` are the
-diagrams, `public/units/unit-{8..12}.json` the files. All five carry zero
-must-fix. Areas 38.88, 51.48, 56.88, 70.20 and 110.88 m²; four one-storey and one
+**The twenty flats.** `scripts/flats/unit-8.flat.json` through
+`unit-27.flat.json` are the diagrams and `public/units/unit-8.json` through
+`unit-27.json` the files. All twenty carry zero must-fix, five are over two
+storeys, and every one holds a bedroom (rule P4, run 0029). Run 0028's first
+five were: Areas 38.88, 51.48, 56.88, 70.20 and 110.88 m²; four one-storey and one
 maisonette. Each traces to a plan in `_cowork/outbox/0028-reference-plans.md`.
 Advisory counts are 0, 1, 1, 3 and 4 worth-a-look plus one note each. Flat 12's
 three N1 findings are the maisonette's own cost: its stair is 16 cells on each
@@ -4263,6 +4304,30 @@ the graph edge, not to move the room. And a growth void only ever works in a
 middle row, because the first and last rows of a flat face the outside on one
 side, so voids are affordable in a large flat and expensive in a small one, where
 the filler needed to enclose them eats the circulation budget.
+
+**Run 0029 added one slot kind and fixed one real bug.** A `gap` is space the
+flat is NOT in. Rows are left-aligned, so before it a row could only start at
+the flat's own west edge and the only shape available was a staircase; a gap
+lets a row start further in or stop short, which is what makes an L with a
+re-entrant corner and a stepped edge. It is checked as the exact inverse of a
+growth void: a gap MUST reach the grid border, since one that does not is an
+enclosed pocket an elastic room absorbs, taking the hole the plan was drawn
+around with it. The bug: both storeys of a maisonette are drawn on the same
+grid coordinates, and `deriveDoors` kept its used-edge set in plain plan
+coordinates, so a ground-floor door reserved the edge a first-floor door needed
+at the same place and the second failed on a boundary it plainly shared. It now
+takes a `storeyOf` function and keys that set per storey. Two people found this
+independently, and it would have broken every maisonette from here on.
+
+**Shapes the packer can and cannot make**, measured over the twenty. It makes
+the L with a re-entrant corner, the stepped edge, the deep plan with a
+landlocked kitchen, and the through-flat with rooms on two opposite facades and
+a spine between. It cannot make a closed ring or a courtyard, because a hole
+inside the outline is an enclosed pocket an elastic room absorbs; it cannot make
+a split level, because a storey is a whole storey here; and it cannot make a
+non-orthogonal outline, because every module is an axis-aligned rectangle on the
+0.6 m grid. `_cowork/outbox/0029-reference-plans-2.md` names the built projects
+each of those shapes comes from.
 
 **The library has one rotten flat, quarantined.**
 `src/core/libraryClean.slow.test.ts` walks every file in `public/units/` and

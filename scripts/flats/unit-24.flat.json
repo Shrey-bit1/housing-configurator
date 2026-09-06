@@ -1,0 +1,161 @@
+{
+  "id": "unit-24",
+  "name": "Flat 24 — three rooms, inner core",
+  "color": "#f783ac",
+  "targetM2": [
+    70,
+    85
+  ],
+  "grid": {
+    "cols": 28,
+    "rows": 26
+  },
+  "northAngle": 0,
+  "reference": "Oekohaus House 12's inner core, at three rooms",
+  "wetRooms": [
+    "kitchen",
+    "wc",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "bed2",
+              "type": "bedroom_small",
+              "rotation": 1
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "hall",
+              "fill": "circulation",
+              "w": 17,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "stack": [
+                {
+                  "key": "bath",
+                  "type": "bathroom_full"
+                },
+                {
+                  "key": "bathpad",
+                  "fill": "outdoor",
+                  "w": 4,
+                  "d": 1
+                }
+              ]
+            },
+            {
+              "stack": [
+                {
+                  "key": "wcp",
+                  "fill": "circulation",
+                  "w": 2,
+                  "d": 2
+                },
+                {
+                  "key": "wc",
+                  "type": "wc"
+                }
+              ]
+            },
+            {
+              "stack": [
+                {
+                  "key": "kitchen",
+                  "type": "kitchen"
+                },
+                {
+                  "key": "kitpad",
+                  "fill": "outdoor",
+                  "w": 4,
+                  "d": 1
+                }
+              ]
+            },
+            {
+              "key": "dining",
+              "type": "recreation",
+              "rotation": 1
+            },
+            {
+              "gap": true,
+              "w": 2,
+              "d": 5
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "loggia",
+              "fill": "outdoor",
+              "w": 12,
+              "d": 2
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "hall",
+      "living"
+    ],
+    [
+      "hall",
+      "bed1"
+    ],
+    [
+      "hall",
+      "bed2"
+    ],
+    [
+      "hall",
+      "bath"
+    ],
+    [
+      "hall",
+      "kitchen"
+    ],
+    [
+      "hall",
+      "dining"
+    ],
+    [
+      "wcp",
+      "wc"
+    ],
+    [
+      "dining",
+      "loggia"
+    ]
+  ],
+  "entrance": {
+    "key": "hall",
+    "side": "west"
+  }
+}

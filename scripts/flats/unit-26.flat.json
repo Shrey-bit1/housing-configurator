@@ -1,0 +1,163 @@
+{
+  "id": "unit-26",
+  "name": "Flat 26 — four rooms, long spine",
+  "color": "#ff922b",
+  "targetM2": [
+    95,
+    115
+  ],
+  "grid": {
+    "cols": 32,
+    "rows": 24
+  },
+  "northAngle": 0,
+  "reference": "Plan 5, Obsthalden at 4.5 rooms, on one long spine",
+  "wetRooms": [
+    "kitchen",
+    "wc",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "dining",
+              "type": "recreation"
+            },
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "bed2",
+              "type": "bedroom_small",
+              "rotation": 1
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "spine",
+              "fill": "circulation",
+              "w": 22,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "bed3",
+              "type": "bedroom_large"
+            },
+            {
+              "stack": [
+                {
+                  "key": "kpad",
+                  "fill": "circulation",
+                  "w": 4,
+                  "d": 1
+                },
+                {
+                  "key": "kitchen",
+                  "type": "kitchen"
+                }
+              ]
+            },
+            {
+              "stack": [
+                {
+                  "key": "wcp",
+                  "fill": "circulation",
+                  "w": 2,
+                  "d": 2
+                },
+                {
+                  "key": "wc",
+                  "type": "wc"
+                }
+              ]
+            },
+            {
+              "stack": [
+                {
+                  "key": "bpad",
+                  "fill": "circulation",
+                  "w": 4,
+                  "d": 1
+                },
+                {
+                  "key": "bath",
+                  "type": "bathroom_full"
+                }
+              ]
+            },
+            {
+              "key": "loggia",
+              "fill": "outdoor",
+              "w": 6,
+              "d": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "spine",
+      "living"
+    ],
+    [
+      "spine",
+      "dining"
+    ],
+    [
+      "spine",
+      "bed1"
+    ],
+    [
+      "spine",
+      "bed2"
+    ],
+    [
+      "spine",
+      "bed3"
+    ],
+    [
+      "kpad",
+      "kitchen"
+    ],
+    [
+      "bpad",
+      "bath"
+    ],
+    [
+      "wcp",
+      "wc"
+    ],
+    [
+      "living",
+      "dining"
+    ],
+    [
+      "spine",
+      "loggia"
+    ]
+  ],
+  "entrance": {
+    "key": "spine",
+    "side": "west"
+  }
+}

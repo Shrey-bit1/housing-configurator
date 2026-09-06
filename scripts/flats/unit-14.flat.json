@@ -1,0 +1,105 @@
+{
+  "id": "unit-14",
+  "name": "Flat 14 — one bedroom, inner kitchen",
+  "color": "#4dabf7",
+  "targetM2": [
+    35,
+    45
+  ],
+  "grid": {
+    "cols": 22,
+    "rows": 22
+  },
+  "northAngle": 0,
+  "reference": "Oekohaus House 12, whose kitchen is lit only by a rooflight",
+  "wetRooms": [
+    "kitchen",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "bed1",
+              "type": "bedroom_small",
+              "rotation": 1
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 11,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "bath",
+              "type": "bathroom_full_compact"
+            },
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "gap": true,
+              "w": 4,
+              "d": 4
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "loggia",
+              "fill": "outdoor",
+              "w": 7,
+              "d": 2
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "bed1"
+    ],
+    [
+      "entree",
+      "bath"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "kitchen",
+      "loggia"
+    ]
+  ],
+  "entrance": {
+    "key": "entree",
+    "side": "east"
+  }
+}

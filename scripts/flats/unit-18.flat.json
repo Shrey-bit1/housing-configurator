@@ -1,0 +1,119 @@
+{
+  "id": "unit-18",
+  "name": "Flat 18 — two rooms, stepped south",
+  "color": "#ff922b",
+  "targetM2": [
+    50,
+    65
+  ],
+  "grid": {
+    "cols": 24,
+    "rows": 22
+  },
+  "northAngle": 0,
+  "reference": "Plan 1, Manegg 1 at 3.5 rooms, whose Zimmer opens off the living space",
+  "wetRooms": [
+    "kitchen",
+    "wc",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "living",
+              "type": "living"
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 11,
+              "d": 2
+            },
+            {
+              "key": "loggia",
+              "fill": "outdoor",
+              "w": 8,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "gap": true,
+              "w": 3,
+              "d": 4
+            },
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "stack": [
+                {
+                  "key": "wcp",
+                  "fill": "circulation",
+                  "w": 2,
+                  "d": 1
+                },
+                {
+                  "key": "wc",
+                  "type": "wc"
+                }
+              ]
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "living",
+      "bed1"
+    ],
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "entree",
+      "bath"
+    ],
+    [
+      "wcp",
+      "wc"
+    ],
+    [
+      "living",
+      "loggia"
+    ]
+  ],
+  "entrance": {
+    "key": "entree",
+    "side": "west"
+  }
+}

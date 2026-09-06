@@ -1,0 +1,149 @@
+{
+  "id": "unit-19",
+  "name": "Flat 19 — two rooms, maisonette",
+  "color": "#ff6b6b",
+  "targetM2": [
+    50,
+    65
+  ],
+  "grid": {
+    "cols": 24,
+    "rows": 22
+  },
+  "northAngle": 0,
+  "reference": "Quinta Monroy's narrow two-storey bay, at Swiss areas",
+  "wetRooms": [
+    "kitchen",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "loggia_lo",
+              "fill": "outdoor",
+              "w": 3,
+              "d": 5
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 10,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full_compact"
+            },
+            {
+              "key": "stair",
+              "type": "stair_spiral"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            },
+            {
+              "gap": true,
+              "w": 5,
+              "d": 5
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "landing",
+              "fill": "circulation",
+              "w": 10,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "gap": true,
+              "w": 7,
+              "d": 4
+            },
+            {
+              "void": true,
+              "w": 4,
+              "d": 4,
+              "stairwell": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "entree",
+      "bath"
+    ],
+    [
+      "entree",
+      "stair"
+    ],
+    [
+      "living",
+      "loggia_lo"
+    ],
+    [
+      "landing",
+      "stair"
+    ],
+    [
+      "landing",
+      "bed1"
+    ]
+  ],
+  "entrance": {
+    "key": "entree",
+    "side": "west"
+  }
+}

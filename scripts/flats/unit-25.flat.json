@@ -1,0 +1,225 @@
+{
+  "id": "unit-25",
+  "name": "Flat 25 — four rooms, maisonette",
+  "color": "#38d9a9",
+  "targetM2": [
+    95,
+    115
+  ],
+  "grid": {
+    "cols": 26,
+    "rows": 24
+  },
+  "northAngle": 0,
+  "reference": "Plan 2, Manegg 1 at 4.5 rooms, over two storeys",
+  "wetRooms": [
+    "kitchen",
+    "wc",
+    "bath"
+  ],
+  "storeys": [
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "living",
+              "type": "living"
+            },
+            {
+              "key": "dining",
+              "type": "recreation"
+            },
+            {
+              "key": "loggia_lo",
+              "fill": "outdoor",
+              "w": 3,
+              "d": 5
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "entree",
+              "fill": "circulation",
+              "w": 15,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "kitchen",
+              "type": "kitchen"
+            },
+            {
+              "stack": [
+                {
+                  "key": "wcp",
+                  "fill": "circulation",
+                  "w": 2,
+                  "d": 1
+                },
+                {
+                  "key": "wc",
+                  "type": "wc"
+                }
+              ]
+            },
+            {
+              "key": "bath",
+              "type": "bathroom_full"
+            },
+            {
+              "key": "stair",
+              "type": "stair_spiral"
+            },
+            {
+              "gap": true,
+              "w": 1,
+              "d": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "origin": {
+        "cx": 2,
+        "cz": 2
+      },
+      "rows": [
+        {
+          "slots": [
+            {
+              "key": "bed1",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "bed2",
+              "type": "bedroom_large"
+            },
+            {
+              "key": "loggia_up",
+              "fill": "outdoor",
+              "w": 3,
+              "d": 5
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "landing",
+              "fill": "circulation",
+              "w": 15,
+              "d": 2
+            }
+          ]
+        },
+        {
+          "slots": [
+            {
+              "key": "bed3",
+              "type": "bedroom_small"
+            },
+            {
+              "stack": [
+                {
+                  "key": "terrace",
+                  "fill": "outdoor",
+                  "w": 5,
+                  "d": 3
+                },
+                {
+                  "gap": true,
+                  "w": 5,
+                  "d": 1
+                }
+              ]
+            },
+            {
+              "void": true,
+              "w": 4,
+              "d": 4,
+              "stairwell": true
+            },
+            {
+              "gap": true,
+              "w": 1,
+              "d": 4
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "doors": [
+    [
+      "entree",
+      "living"
+    ],
+    [
+      "entree",
+      "dining"
+    ],
+    [
+      "entree",
+      "kitchen"
+    ],
+    [
+      "entree",
+      "bath"
+    ],
+    [
+      "entree",
+      "stair"
+    ],
+    [
+      "wcp",
+      "wc"
+    ],
+    [
+      "living",
+      "dining"
+    ],
+    [
+      "dining",
+      "loggia_lo"
+    ],
+    [
+      "landing",
+      "stair"
+    ],
+    [
+      "landing",
+      "bed1"
+    ],
+    [
+      "landing",
+      "bed2"
+    ],
+    [
+      "landing",
+      "bed3"
+    ],
+    [
+      "landing",
+      "terrace"
+    ],
+    [
+      "bed2",
+      "loggia_up"
+    ]
+  ],
+  "entrance": {
+    "key": "entree",
+    "side": "west"
+  }
+}

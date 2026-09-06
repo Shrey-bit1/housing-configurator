@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from "vite";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { assignUnitId, slugifyUnitName } from "./src/library/ids.ts";
 
@@ -217,6 +217,56 @@ function librarySink(root: string): Plugin {
               writeFileSync(unitPath, JSON.stringify(unit, null, 2) + "\n");
             }
             reply(200, { ok: true, entry: manifest.units[at] });
+          } catch (err) {
+            reply(500, { ok: false, error: err instanceof Error ? err.message : String(err) });
+          }
+        });
+      });
+
+      // DELETE (run 0029): remove an entry and both of the files it points at.
+      // The counterpart of the save sink, and dev-only for the same reason:
+      // the manifest lives on disk beside the units and only this server can
+      // write it. It removes the manifest row FIRST and the files after, so a
+      // half-done delete leaves orphaned files rather than a manifest row
+      // pointing at nothing, which is the failure the library browser handles
+      // worse. Missing files are not an error: the row is what the browser
+      // reads, and an entry whose files already went is exactly the state this
+      // is meant to clear up.
+      server.middlewares.use("/__library/delete", (req, res) => {
+        const reply = (status: number, payload: unknown) => {
+          res.statusCode = status;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify(payload));
+        };
+        if (req.method !== "POST") return reply(405, { ok: false, error: "POST only" });
+        let body = "";
+        req.on("data", (c) => (body += c));
+        req.on("end", () => {
+          try {
+            const { id } = JSON.parse(body) as { id?: string };
+            if (!id || typeof id !== "string")
+              return reply(400, { ok: false, error: "missing id" });
+            const manifest = readManifest(manifestPath);
+            const at = manifest.units.findIndex((u) => u.id === id);
+            if (at < 0) return reply(404, { ok: false, error: `no entry with id "${id}"` });
+            const entry = manifest.units[at];
+
+            // Both names are resolved against the units directory and then
+            // tested against it, the same guard the capture sink uses, so a
+            // hand-edited manifest cannot make this unlink anything outside.
+            const removed: string[] = [];
+            for (const name of [entry.file, entry.preview]) {
+              const target = resolve(unitsDir, normalize(name));
+              if (!target.startsWith(unitsDir))
+                return reply(400, { ok: false, error: `${name} escapes the units directory` });
+              if (existsSync(target)) {
+                rmSync(target);
+                removed.push(name);
+              }
+            }
+            manifest.units.splice(at, 1);
+            writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+            reply(200, { ok: true, id, removed, remaining: manifest.units.length });
           } catch (err) {
             reply(500, { ok: false, error: err instanceof Error ? err.message : String(err) });
           }

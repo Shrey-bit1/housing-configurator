@@ -1,0 +1,1634 @@
+{
+  "format": "dwelling-unit",
+  "version": 1,
+  "name": "Flat 16 — two rooms, inner kitchen",
+  "color": "#f783ac",
+  "cellSize": 0.6,
+  "northAngle": 0,
+  "storeys": [
+    {
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          0
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          0
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          6,
+          0
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          6,
+          4
+        ],
+        [
+          7,
+          0
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          8,
+          3
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          9,
+          0
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          9,
+          2
+        ],
+        [
+          9,
+          3
+        ],
+        [
+          9,
+          4
+        ],
+        [
+          10,
+          0
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          10,
+          2
+        ],
+        [
+          10,
+          3
+        ],
+        [
+          10,
+          4
+        ],
+        [
+          11,
+          0
+        ],
+        [
+          11,
+          1
+        ],
+        [
+          11,
+          2
+        ],
+        [
+          11,
+          3
+        ],
+        [
+          11,
+          4
+        ],
+        [
+          12,
+          0
+        ],
+        [
+          12,
+          1
+        ],
+        [
+          12,
+          2
+        ],
+        [
+          12,
+          3
+        ],
+        [
+          12,
+          4
+        ],
+        [
+          0,
+          7
+        ],
+        [
+          0,
+          8
+        ],
+        [
+          0,
+          9
+        ],
+        [
+          0,
+          10
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          1,
+          8
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          1,
+          10
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          2,
+          9
+        ],
+        [
+          2,
+          10
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          3,
+          9
+        ],
+        [
+          3,
+          10
+        ],
+        [
+          4,
+          7
+        ],
+        [
+          4,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          8
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          6,
+          9
+        ],
+        [
+          6,
+          10
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          9
+        ],
+        [
+          7,
+          10
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          0,
+          6
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          10,
+          6
+        ],
+        [
+          10,
+          5
+        ],
+        [
+          11,
+          5
+        ],
+        [
+          12,
+          5
+        ],
+        [
+          12,
+          6
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          0,
+          11
+        ],
+        [
+          0,
+          12
+        ],
+        [
+          1,
+          12
+        ],
+        [
+          2,
+          12
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          4,
+          12
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          12
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          8,
+          12
+        ],
+        [
+          7,
+          12
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          3,
+          12
+        ],
+        [
+          1,
+          11
+        ]
+      ],
+      "cellKinds": [
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "circulation",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor",
+        "outdoor"
+      ],
+      "cellRooms": [
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "living",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bedroom_large",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "bathroom_full",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "kitchen",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_single",
+        "circulation_single",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "circulation_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_single",
+        "outdoor_single",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double",
+        "outdoor_double"
+      ],
+      "openCeilings": [],
+      "edges": [
+        {
+          "cell": [
+            0,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            0
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            1
+          ],
+          "side": "W",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            0,
+            2
+          ],
+          "side": "W",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            0,
+            3
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            4
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            1,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            2,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            3,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            4,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            5,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            6,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            9,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            10,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            11,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            0
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            1
+          ],
+          "side": "E",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            12,
+            2
+          ],
+          "side": "E",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            12,
+            3
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            4
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            7
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            8
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            9
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            10
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            7
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            8
+          ],
+          "side": "E",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            7,
+            9
+          ],
+          "side": "E",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            7,
+            10
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            5
+          ],
+          "side": "W",
+          "class": "entrance"
+        },
+        {
+          "cell": [
+            0,
+            6
+          ],
+          "side": "W",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            6
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            9,
+            6
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            10,
+            6
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            5
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            6
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            12,
+            6
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            11,
+            6
+          ],
+          "side": "S",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            0,
+            11
+          ],
+          "side": "W",
+          "class": "open"
+        },
+        {
+          "cell": [
+            0,
+            12
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            0,
+            12
+          ],
+          "side": "W",
+          "class": "open"
+        },
+        {
+          "cell": [
+            1,
+            12
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            2,
+            12
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            4,
+            12
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            5,
+            12
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            6,
+            12
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            8,
+            11
+          ],
+          "side": "N",
+          "class": "open"
+        },
+        {
+          "cell": [
+            8,
+            11
+          ],
+          "side": "E",
+          "class": "open"
+        },
+        {
+          "cell": [
+            8,
+            12
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            8,
+            12
+          ],
+          "side": "E",
+          "class": "open"
+        },
+        {
+          "cell": [
+            7,
+            12
+          ],
+          "side": "S",
+          "class": "open"
+        },
+        {
+          "cell": [
+            3,
+            12
+          ],
+          "side": "S",
+          "class": "open"
+        }
+      ],
+      "height": 3
+    }
+  ],
+  "roomTypes": [
+    {
+      "id": "bathroom_full",
+      "name": "Bathroom — Full",
+      "color": "#d8d4cb"
+    },
+    {
+      "id": "bedroom_large",
+      "name": "Bedroom — Large",
+      "color": "#274a9e"
+    },
+    {
+      "id": "circulation_double",
+      "name": "Circulation — Double",
+      "color": "#141414"
+    },
+    {
+      "id": "circulation_single",
+      "name": "Circulation — Single",
+      "color": "#141414"
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen",
+      "color": "#e8b117"
+    },
+    {
+      "id": "living",
+      "name": "Living Room",
+      "color": "#c13a2e"
+    },
+    {
+      "id": "outdoor_double",
+      "name": "Outdoor — Double",
+      "color": "#2e6b4f"
+    },
+    {
+      "id": "outdoor_single",
+      "name": "Outdoor — Single",
+      "color": "#2e6b4f"
+    }
+  ],
+  "sourceProject": {
+    "format": "flat-configurator-project",
+    "version": 1,
+    "northAngle": 0,
+    "orientationPreference": {},
+    "floors": [
+      {
+        "cols": 24,
+        "rows": 24,
+        "instances": [
+          {
+            "type": "living",
+            "cx": 2,
+            "cz": 2,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "bedroom_large",
+            "cx": 9,
+            "cz": 2,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 2,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 4,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 6,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 8,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 10,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 12,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_single",
+            "cx": 14,
+            "cz": 7,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 2,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 4,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 6,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 8,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 10,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_double",
+            "cx": 12,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "circulation_single",
+            "cx": 14,
+            "cz": 8,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "bathroom_full",
+            "cx": 2,
+            "cz": 9,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "kitchen",
+            "cx": 6,
+            "cz": 9,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 2,
+            "cz": 13,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 4,
+            "cz": 13,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 6,
+            "cz": 13,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 8,
+            "cz": 13,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_single",
+            "cx": 10,
+            "cz": 13,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 2,
+            "cz": 14,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 4,
+            "cz": 14,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 6,
+            "cz": 14,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_double",
+            "cx": 8,
+            "cz": 14,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          },
+          {
+            "type": "outdoor_single",
+            "cx": 10,
+            "cz": 14,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
+          }
+        ],
+        "entrances": [
+          {
+            "cx": 2,
+            "cz": 7,
+            "side": "west"
+          }
+        ],
+        "doors": [
+          {
+            "cx": 4,
+            "cz": 7,
+            "side": "north",
+            "swing": {
+              "hinge": "a",
+              "into": "B"
+            }
+          },
+          {
+            "cx": 11,
+            "cz": 7,
+            "side": "north",
+            "swing": {
+              "hinge": "a",
+              "into": "B"
+            }
+          },
+          {
+            "cx": 3,
+            "cz": 8,
+            "side": "south",
+            "swing": {
+              "hinge": "a",
+              "into": "B"
+            }
+          },
+          {
+            "cx": 7,
+            "cz": 8,
+            "side": "south",
+            "swing": {
+              "hinge": "a",
+              "into": "B"
+            }
+          },
+          {
+            "cx": 7,
+            "cz": 12,
+            "side": "south",
+            "swing": {
+              "hinge": "a",
+              "into": "B"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

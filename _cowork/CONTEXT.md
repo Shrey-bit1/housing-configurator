@@ -254,7 +254,8 @@ rules engine and the export format are the mature parts, the UI is not.
   exiting non-zero on any must-fix. It needs no runner dependency because it
   boots the project's own Vite in middleware mode to reach `src/`. Output goes
   to `build/`, which is gitignored; a flat enters the library by a deliberate
-  copy. See PROJECT_STATE §15.
+  copy. `scripts/flats/` holds twenty diagrams as of run 0029. See
+  PROJECT_STATE §15.
 - `_cowork/` — the bridge traffic. Tracked in git on purpose.
 - `_cowork/design/` — the approved 3 September design brief
   (`DESIGN-BRIEF-3sep.md`) and its wireframe (`wireframe/`, seven `.dc.html`
@@ -282,7 +283,10 @@ rules engine and the export format are the mature parts, the UI is not.
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 244 cases in eighteen files as of run 0028 (the new
+  a second over 261 cases in eighteen files as of run 0030 (five in
+  `store.test.ts` for the two square-metre answers); 256 in eighteen as of run 0029 (P4's four in
+  `rules.test.ts`, six for the delete helpers in `unitBrowser.test.ts`, and two
+  more in `scripts/flatLayout.test.ts`); 244 in eighteen as of run 0028 (the new
   `scripts/flatLayout.test.ts` at 21); 223 in seventeen as of run 0027 (the new
   `flatState.test.ts` at 17 and `journey.test.ts` at 6, plus 2 in
   `session.test.ts` for the landing's join); 198 in fifteen as of run 0026 (`store.test.ts` 18 to
@@ -318,12 +322,15 @@ rules engine and the export format are the mature parts, the UI is not.
   `*.slow.test.ts` — files that drive a real `FloorManager` through a stubbed
   `FloorDeps` (`unitExport.slow.test.ts`, run 0018's
   `libraryRoundTrip.slow.test.ts`, and run 0028's `libraryClean.slow.test.ts`,
-  which walks every file in `public/units/` and asserts zero must-fix). The
+  which walks every file in `public/units/` and asserts zero must-fix, and names
+  the twenty flats runs 0028 and 0029 designed so a deleted one cannot go
+  unnoticed). The
   split exists because that import graph
   pulls in three.js; it is written in exactly two places, `test.exclude` in
   `vite.config.ts` and `include` in `vitest.slow.config.ts`.
-- **`npm run test:slow` currently reports `41 passed | 1 expected fail` as of run
-  0028 (26 plus the one as of run 0027), and the expected fail is deliberate.** French-window edges are built but never exported
+- **`npm run test:slow` currently reports `57 passed | 1 expected fail` as of run
+  0029 (41 plus the one as of run 0028, 26 as of run 0027), and the expected fail
+  is deliberate.** French-window edges are built but never exported
   (`unitExport.ts:311` enumerates the envelope with the strict open-sky test, which
   skips edges whose neighbour cell is occupied, and a balcony cell is occupied). It is
   recorded as an `it.fails` case so the suite stays green and turns RED the day someone
