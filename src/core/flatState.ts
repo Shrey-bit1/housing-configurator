@@ -78,9 +78,12 @@ export function sendButtonLabel(hasSent: boolean): string {
   return hasSent ? GO_TO_GROUP : SEND_IT;
 }
 
-/** Why step 02 is locked, said in the resident's own terms. */
-export const NO_WAY_IN =
-  "Place an entrance on an outside edge first, so the flat has a way in.";
+/** Why step 02 is locked, and why the forward button is asleep. It names
+ *  what the entrance is FOR rather than where it goes (run 0035): a
+ *  resident who has not placed one needs the reason they should care, and
+ *  the editor already refuses an entrance anywhere but an outside edge, so
+ *  saying where to put it was answering a question nobody had. */
+export const NO_WAY_IN = "Place an entrance to send the flat to the group.";
 
 /**
  * Whether the landing screen shows at all. A URL that already names a

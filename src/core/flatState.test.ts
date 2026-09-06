@@ -119,9 +119,7 @@ describe("the readiness rule, on its three cases", () => {
   });
 
   it("carries the one sentence the asleep button says", () => {
-    expect(NO_WAY_IN).toBe(
-      "Place an entrance on an outside edge first, so the flat has a way in."
-    );
+    expect(NO_WAY_IN).toBe("Place an entrance to send the flat to the group.");
   });
 });
 
