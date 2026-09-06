@@ -96,6 +96,27 @@ export interface Resident {
    * bound.
    */
   extraM2: number | null;
+  /**
+   * The three wishes a resident makes about their OWN flat: a corner flat, one
+   * near a terrace, one away from the noise. Null when never answered.
+   *
+   * All three keys are always present together, and a partial object is refused
+   * rather than merged. A wish that is absent and a wish that is false are the
+   * same thing to whoever reads them, so letting them differ here would invent a
+   * third state the packer would then have to have an opinion about.
+   *
+   * The packer scores these. That is the building app's work and not this one's;
+   * this end only has to carry them, which before run 0031 it did not, so they
+   * lived in one browser's localStorage and nothing ever read them.
+   */
+  wishes: Wishes | null;
+}
+
+/** A resident's three wishes about their own flat. All three, always. */
+export interface Wishes {
+  corner: boolean;
+  terrace: boolean;
+  quiet: boolean;
 }
 
 export interface BuildingRun {
@@ -264,7 +285,8 @@ async function route(req: Request, kv: KV): Promise<Response> {
     let record!: Resident;
     await updateIndex(kv, indexKey, (index) => {
       record = {
-        ...(index.residents[who] ?? { counts: {}, share: null, ballot: [], shareM2: null, extraM2: null }),
+        ...(index.residents[who] ??
+          { counts: {}, share: null, ballot: [], shareM2: null, extraM2: null, wishes: null }),
         ...patch,
       };
       index.residents[who] = record;
@@ -476,5 +498,24 @@ function parseResidentPatch(body: unknown): Partial<Resident> {
     }
     patch[key] = v as number | null;
   }
+  // The three wishes (run 0031). Checked whole: null, or an object carrying all
+  // three keys as booleans. A partial object is a 400 rather than a merge, for
+  // the reason on the field itself.
+  if ("wishes" in body) {
+    const w = body.wishes;
+    if (w !== null) {
+      const ok =
+        isRecord(w) &&
+        WISH_KEYS.every((k) => typeof w[k] === "boolean") &&
+        Object.keys(w).length === WISH_KEYS.length;
+      if (!ok) {
+        return fail(400, `wishes must be null or an object with ${WISH_KEYS.join(", ")} all boolean`);
+      }
+    }
+    patch.wishes = w as Wishes | null;
+  }
   return patch;
 }
+
+/** The three, named once so the check, the message and the document agree. */
+const WISH_KEYS = ["corner", "terrace", "quiet"] as const;
