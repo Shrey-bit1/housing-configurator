@@ -492,14 +492,23 @@ button.primary:hover {
   background: transparent;
   color: var(--accent);
 }
-.btn-send:disabled {
+/* Asleep. `aria-disabled` reads the same as `disabled` here on purpose:
+   run 0034's forward button stays pressable so it can answer why, and it
+   must still look shut. */
+.btn-send:disabled,
+.btn-send[aria-disabled="true"] {
   background: var(--dim);
   border-color: var(--dim);
   color: var(--bg);
   cursor: not-allowed;
 }
-.btn-send:disabled span:last-child {
+.btn-send:disabled span:last-child,
+.btn-send[aria-disabled="true"] span:last-child {
   animation: none;
+}
+.btn-send[aria-disabled="true"]:hover {
+  background: var(--dim);
+  color: var(--bg);
 }
 
 .hint-text {
@@ -2675,7 +2684,40 @@ body[data-step="draw"] #send-caption {
 body[data-step="send"] #sidebar,
 body[data-step="send"] .tb-figures,
 body[data-step="send"] #bottom-left,
+body[data-step="send"] #forward,
 body[data-step="send"] #drop-hint {
+  display: none;
+}
+
+/* The one way out of step 01 (run 0034). Bottom centre of the viewport, the
+   one free edge: the left corner is undo and redo, the right is Display, and
+   the palette is outside the viewport. A fixed width so the button does not
+   change size when its label does, and `text-align: center` on the reason so
+   the sentence reads as belonging to the button above it. */
+#forward {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 2;
+  width: 292px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+#forward-why {
+  margin: 0;
+  order: -1;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  text-align: center;
+  background: var(--bg);
+  padding: 5px 8px;
+  border: 1px solid var(--line-paper);
+}
+#forward-why:empty {
   display: none;
 }
 

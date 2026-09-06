@@ -174,6 +174,27 @@
             <button id="redo-btn" type="button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">↷</button>
           </div>
         </div>
+        <!-- The one way out of step 01 (run 0034). A resident who has just
+             finished drawing is handed onward rather than left to notice the
+             numbers strip and click a 02. It sits at the bottom centre, which
+             is the one free edge of the viewport: undo and redo hold the left
+             corner, Display holds the right, and the palette is outside the
+             viewport entirely, so nothing it needs is covered.
+
+             It says where it goes rather than "next", and while the flat is
+             not ready it is asleep with one sentence saying why. `aria-disabled`
+             rather than `disabled` for the same reason the bar's 02 uses it: a
+             disabled button fires no click, so the resident who most needs the
+             reason would press it and get silence. `setStep` is what refuses.
+
+             Hidden in step 02 by style.css, so there is never a second thing
+             on the screen that sends. -->
+        <div id="forward">
+          <p id="forward-why"></p>
+          <button id="forward-go" class="btn-send" type="button">
+            <span>Send it to your group</span><span aria-hidden="true">→</span>
+          </button>
+        </div>
         <!-- Bottom-right: ONE Display card. Collapsed by default; the header
              summarises what is on so the state is readable without opening it.
              The compass row is ALWAYS visible, collapsed or not, because north

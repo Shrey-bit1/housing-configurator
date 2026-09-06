@@ -1282,6 +1282,8 @@ frCheckEl.addEventListener("click", () => runCheck());
 type Step = "draw" | "send";
 const stepDrawBtn = document.getElementById("step-draw") as HTMLButtonElement;
 const stepSendBtn = document.getElementById("step-send") as HTMLButtonElement;
+const forwardGoBtn = document.getElementById("forward-go") as HTMLButtonElement;
+const forwardWhyEl = document.getElementById("forward-why") as HTMLElement;
 let step: Step = "draw";
 
 function setStep(next: Step): void {
@@ -1305,6 +1307,12 @@ function setStep(next: Step): void {
  *  in step 01 lights step 02 up at once. */
 function syncStepTabs(): void {
   const open = canSend(phase);
+  // Run 0034: the bar's 02 and the viewport's forward button read this ONE
+  // call, on the same line, so they cannot disagree about whether the flat
+  // is ready. The sentence under the button is the same sentence the bar's
+  // 02 carries as its title.
+  forwardGoBtn.setAttribute("aria-disabled", String(!open));
+  forwardWhyEl.textContent = open ? "" : NO_WAY_IN;
   stepDrawBtn.setAttribute("aria-selected", String(step === "draw"));
   stepSendBtn.setAttribute("aria-selected", String(step === "send"));
   stepDrawBtn.classList.toggle("done", step === "send");
@@ -1322,6 +1330,10 @@ function syncStepTabs(): void {
 
 stepDrawBtn.addEventListener("click", () => setStep("draw"));
 stepSendBtn.addEventListener("click", () => setStep("send"));
+// One way forward out of step 01 (run 0034). It goes through `setStep`, which
+// is the same refusal the bar's 02 gets, so an asleep press says why rather
+// than doing nothing.
+forwardGoBtn.addEventListener("click", () => setStep("send"));
 
 // ---- The landing (run 0027) -------------------------------------------------
 // It covers the editor rather than replacing it, so the scene behind it is
