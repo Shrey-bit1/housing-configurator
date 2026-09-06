@@ -597,6 +597,163 @@ describe("a flat has a picture", () => {
   });
 });
 
+/**
+ * Leaving and renaming (run 0035). Both turn on ONE ownership rule,
+ * `sameResident`, so every case below spells a name in a case the store was
+ * never given, and expects it to find the person anyway.
+ */
+
+/** A group with Ana and Ben, a flat each, a picture on Ben's. */
+async function twoResidents(): Promise<MemoryKV> {
+  const kv = new MemoryKV();
+  await put(kv, "/api/session/g/flats/f-ana?resident=Ana", UNIT_TEXT);
+  await put(kv, "/api/session/g/flats/f-ben?resident=Ben", UNIT_TEXT);
+  await put(kv, "/api/session/g/residents/Ana", { share: 0.3 });
+  await put(kv, "/api/session/g/residents/Ben", { shareM2: 9 });
+  await callBinary(kv, "PUT", "/api/session/g/flats/f-ben/preview", new Uint8Array([1, 2, 3]));
+  return kv;
+}
+const state = async (kv: KV) => (await (await call(kv, "GET", "/api/session/g")).json()) as {
+  flats: { id: string; resident: string }[];
+  residents: { name: string }[];
+};
+
+describe("DELETE a resident", () => {
+  it("removes the row, the flats they own and each flat's picture", async () => {
+    const kv = await twoResidents();
+    const res = await call(kv, "DELETE", "/api/session/g/residents/Ben");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ resident: "Ben", flats: ["f-ben"] });
+
+    const after = await state(kv);
+    expect(after.residents.map((r) => r.name)).toEqual(["Ana"]);
+    expect(after.flats.map((f) => f.id)).toEqual(["f-ana"]);
+    expect(kv.map.has("g/flats/f-ben")).toBe(false);
+    expect(kv.map.has("g/flats/f-ben.preview")).toBe(false);
+    // Ana's flat and its key are untouched.
+    expect(kv.map.has("g/flats/f-ana")).toBe(true);
+  });
+
+  it("finds the person by the one ownership rule, so \"ben\" removes Ben's", async () => {
+    const kv = await twoResidents();
+    const res = await call(kv, "DELETE", "/api/session/g/residents/%20BEN%20");
+    expect(res.status).toBe(200);
+    // The name that comes back is the one that was STORED, not the one typed.
+    expect((await res.json()).resident).toBe("Ben");
+    expect((await state(kv)).residents.map((r) => r.name)).toEqual(["Ana"]);
+  });
+
+  it("takes them out of the export as well, bodies and all", async () => {
+    const kv = await twoResidents();
+    await call(kv, "DELETE", "/api/session/g/residents/Ben");
+    const exp = await (await call(kv, "GET", "/api/session/g/export")).json();
+    expect(Object.keys(exp.bodies)).toEqual(["f-ana"]);
+    expect(exp.residents.map((r: { name: string }) => r.name)).toEqual(["Ana"]);
+    expect(exp.flats.map((f: { id: string }) => f.id)).toEqual(["f-ana"]);
+  });
+
+  it("refuses a name that owns nothing and has no row", async () => {
+    const kv = await twoResidents();
+    const res = await call(kv, "DELETE", "/api/session/g/residents/Cara");
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toMatch(/no resident "Cara"/);
+    expect((await state(kv)).residents).toHaveLength(2);
+  });
+
+  it("lets a person leave who published a flat and never sent any wishes", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/g/flats/f1?resident=Dan", UNIT_TEXT);
+    const res = await call(kv, "DELETE", "/api/session/g/residents/dan");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ resident: "Dan", flats: ["f1"] });
+  });
+
+  it("lets a person leave who sent wishes and never published", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/g/residents/Eve", { share: 0.5 });
+    const res = await call(kv, "DELETE", "/api/session/g/residents/EVE");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ resident: "Eve", flats: [] });
+  });
+
+  it("is offered to a browser, which is what makes the call reachable at all", async () => {
+    const res = await call(new MemoryKV(), "OPTIONS", "/api/session/g/residents/Ben");
+    expect(res.headers.get("access-control-allow-methods")).toContain("DELETE");
+  });
+});
+
+describe("rename a resident", () => {
+  it("moves the row and retags every flat they own", async () => {
+    const kv = await twoResidents();
+    const res = await call(kv, "POST", "/api/session/g/residents/ana/rename", JSON.stringify({ to: "Ana B" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ from: "Ana", to: "Ana B", flats: ["f-ana"] });
+
+    const after = await state(kv);
+    expect(after.residents.map((r) => r.name).sort()).toEqual(["Ana B", "Ben"]);
+    expect(after.flats.find((f) => f.id === "f-ana")!.resident).toBe("Ana B");
+    expect(after.flats.find((f) => f.id === "f-ben")!.resident).toBe("Ben");
+  });
+
+  it("carries the record itself across, not just the name", async () => {
+    const kv = await twoResidents();
+    await call(kv, "POST", "/api/session/g/residents/Ana/rename", JSON.stringify({ to: "Ana B" }));
+    const moved = (await (await call(kv, "GET", "/api/session/g")).json()).residents.find(
+      (r: { name: string }) => r.name === "Ana B"
+    );
+    expect(moved.share).toBe(0.3);
+  });
+
+  it("refuses a name already at the table", async () => {
+    const kv = await twoResidents();
+    const res = await call(kv, "POST", "/api/session/g/residents/Ana/rename", JSON.stringify({ to: "BEN" }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/already at the table/);
+    // Nothing moved.
+    expect((await state(kv)).residents.map((r) => r.name).sort()).toEqual(["Ana", "Ben"]);
+  });
+
+  it("refuses a name held only by a flat, with no row of its own", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/g/residents/Ana", { share: 0.3 });
+    await put(kv, "/api/session/g/flats/f1?resident=Zoe", UNIT_TEXT);
+    const res = await call(kv, "POST", "/api/session/g/residents/Ana/rename", JSON.stringify({ to: "zoe" }));
+    expect(res.status).toBe(409);
+  });
+
+  it("lets a person fix their own spelling, which is not a clash with themselves", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/g/flats/f1?resident=ana", UNIT_TEXT);
+    await put(kv, "/api/session/g/residents/ana", { share: 0.3 });
+    const res = await call(kv, "POST", "/api/session/g/residents/ana/rename", JSON.stringify({ to: "Ana" }));
+    expect(res.status).toBe(200);
+    const after = await state(kv);
+    expect(after.residents.map((r) => r.name)).toEqual(["Ana"]);
+    expect(after.flats[0].resident).toBe("Ana");
+  });
+
+  it("stores both names as typed and folds case only in the comparison", async () => {
+    const kv = await twoResidents();
+    // The URL spells her name in lower case; the body spells the new one with
+    // spaces around it. What is stored is the trimmed body, exactly.
+    const res = await call(kv, "POST", "/api/session/g/residents/ana/rename", JSON.stringify({ to: "  aNa B  " }));
+    expect((await res.json()).to).toBe("aNa B");
+    expect((await state(kv)).residents.map((r) => r.name).sort()).toEqual(["Ben", "aNa B"]);
+  });
+
+  it("refuses a name nobody carries", async () => {
+    const kv = await twoResidents();
+    const res = await call(kv, "POST", "/api/session/g/residents/Cara/rename", JSON.stringify({ to: "Cara B" }));
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses a body with no name in it", async () => {
+    const kv = await twoResidents();
+    const res = await call(kv, "POST", "/api/session/g/residents/Ana/rename", JSON.stringify({ nope: 1 }));
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("two writers", () => {
   it("retries a write that lost the ETag race instead of overwriting", async () => {
     class RacingKV extends MemoryKV {

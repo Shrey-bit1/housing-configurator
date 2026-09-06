@@ -229,6 +229,22 @@ function residentKey(index: SessionIndex, who: string): string | undefined {
   return Object.keys(index.residents).find((k) => sameResident(k, who));
 }
 
+/**
+ * The spelling this group already has for this person, which is what a removal
+ * and a rename report back (run 0035). Their row's key when they have a row,
+ * otherwise the name recorded against a flat they own, otherwise the name as
+ * it was typed. The middle case is the one worth having: somebody who
+ * published a flat and never sent any wishes has no row, and answering
+ * `DELETE .../residents/dan` with "dan" would tell the caller a spelling the
+ * store never held.
+ */
+function storedName(index: SessionIndex, who: string, owned: string[]): string {
+  const key = residentKey(index, who);
+  if (key !== undefined) return key;
+  const first = owned[0];
+  return first === undefined ? who : index.flats[first].resident;
+}
+
 /** Every flat this person owns, by the same one rule (run 0035). Sorted, so a
  *  removal and a rename report the same list in the same order every time. */
 function flatsOwnedBy(index: SessionIndex, who: string): string[] {
@@ -407,11 +423,12 @@ async function route(req: Request, kv: KV): Promise<Response> {
             return fail(409, `"${to}" is already at the table in session "${code}"`);
           }
         }
+        const name = storedName(index, who, owned);
         const record = from === undefined ? undefined : index.residents[from];
         if (from !== undefined) delete index.residents[from];
         if (record !== undefined) index.residents[to] = record;
         for (const id of owned) index.flats[id].resident = to;
-        moved = { from: from ?? who, to, flats: owned };
+        moved = { from: name, to, flats: owned };
       });
       return json(moved);
     }
@@ -429,9 +446,10 @@ async function route(req: Request, kv: KV): Promise<Response> {
         if (key === undefined && owned.length === 0) {
           return fail(404, `no resident "${who}" in session "${code}"`);
         }
+        const name = storedName(index, who, owned);
         if (key !== undefined) delete index.residents[key];
         for (const id of owned) delete index.flats[id];
-        gone = { resident: key ?? who, flats: owned };
+        gone = { resident: name, flats: owned };
       });
       // The index is the record of what exists, so it loses the flats first
       // and the blobs go afterwards. A crash between the two leaves orphaned

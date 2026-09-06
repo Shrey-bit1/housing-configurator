@@ -6,8 +6,11 @@ import {
   checksRun,
   showsLanding,
   sendButtonLabel,
+  staleNotice,
+  afterEdit,
   SEND_IT,
   GO_TO_GROUP,
+  GROUP_HAS_OLDER,
   NO_WAY_IN,
   UNTITLED,
   DASH,
@@ -141,5 +144,46 @@ describe("sendButtonLabel", () => {
   it("says where it goes rather than saying next", () => {
     expect(GO_TO_GROUP.toLowerCase()).not.toBe("next");
     expect(GO_TO_GROUP).toContain("group");
+  });
+});
+
+/**
+ * What step 02 says under its button (run 0035), over the four moments a flat
+ * passes through. The state is one value, so the four moments are just the
+ * three states plus the transition back into `sent`.
+ */
+
+describe("the sentence under step 02's button", () => {
+  it("says nothing before a send, however much the flat is edited", () => {
+    expect(staleNotice("never")).toBe("");
+    expect(staleNotice(afterEdit("never"))).toBe("");
+    expect(staleNotice(afterEdit(afterEdit("never")))).toBe("");
+  });
+
+  it("says nothing after a send with no edit", () => {
+    expect(staleNotice("sent")).toBe("");
+  });
+
+  it("says the group has the older one after a send and an edit", () => {
+    expect(staleNotice(afterEdit("sent"))).toBe(GROUP_HAS_OLDER);
+    expect(GROUP_HAS_OLDER).toBe(
+      "Your group still has this flat as you sent it. Sending again replaces it."
+    );
+  });
+
+  it("says nothing again after a second send", () => {
+    // The edit put it in `edited`; the send puts it back in `sent`, which is
+    // the only way out of `edited` and is what main.ts does on a 200.
+    expect(staleNotice(afterEdit("sent"))).toBe(GROUP_HAS_OLDER);
+    expect(staleNotice("sent")).toBe("");
+  });
+
+  it("keeps saying it while the resident goes on editing", () => {
+    expect(staleNotice(afterEdit(afterEdit("sent")))).toBe(GROUP_HAS_OLDER);
+  });
+
+  it("turns the button back into the send button in the same breath", () => {
+    expect(sendButtonLabel("sent")).toBe(GO_TO_GROUP);
+    expect(sendButtonLabel(afterEdit("sent"))).toBe(SEND_IT);
   });
 });
