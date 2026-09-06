@@ -67,3 +67,74 @@ describe("one readiness rule, one call site", () => {
     expect(css).toContain('body[data-step="draw"] #save-column,');
   });
 });
+
+/**
+ * Sending sends, and writes nothing to this machine (run 0036).
+ *
+ * Same reason as above for testing the source text: there is no jsdom here and
+ * `runSend` cannot be driven and asked. What can be checked is that the
+ * function which the button calls contains the publish and contains none of
+ * the three writes, which is the whole of what the change promises.
+ */
+
+/** The body of a top-level function, from its signature to the first line that
+ *  closes at column 1. */
+function body(name: string): string {
+  const at = MAIN.indexOf(`function ${name}(`);
+  expect(at, `${name} exists`).toBeGreaterThan(-1);
+  const end = MAIN.indexOf("\n}\n", at);
+  expect(end).toBeGreaterThan(at);
+  return MAIN.slice(at, end);
+}
+
+describe("what a send does", () => {
+  it("publishes the flat", () => {
+    expect(body("runSend")).toContain("await publishUnit(");
+  });
+
+  it("sends the picture with it", () => {
+    expect(body("runSend")).toContain("publishPreview(");
+  });
+
+  it("downloads nothing", () => {
+    expect(body("runSend")).not.toContain("downloadAs(");
+    expect(body("runSend")).not.toContain("createObjectURL");
+  });
+
+  it("writes no library entry", () => {
+    expect(body("runSend")).not.toContain("saveLibraryEntry(");
+  });
+
+  it("opens no browser dialog", () => {
+    expect(body("runSend")).not.toContain("window.confirm");
+  });
+
+  it("never asks to replace, because the store decides that by itself", () => {
+    expect(body("runSend")).toContain("publishUnit(doFetch, \"\", session, id, unitName, text, false)");
+    expect(MAIN).not.toContain("saveReplaceInput");
+    expect(MAIN).not.toContain("takeoverConfirmText");
+  });
+});
+
+describe("what is left on the screen", () => {
+  it("has no design number, no What-to-write boxes and no Replace tick", () => {
+    const html = source("../index.html");
+    for (const id of ["save-number", "save-what-project", "save-what-unit", "save-what-library", "save-what-publish", "save-replace"]) {
+      expect(html, `${id} is gone`).not.toContain(`id="${id}"`);
+    }
+  });
+
+  it("holds the colour and three named things under More", () => {
+    const html = source("../index.html");
+    const more = html.slice(html.indexOf('id="more-body"'), html.indexOf("</section>", html.indexOf('id="more-body"')));
+    expect(more).toContain('id="save-color"');
+    expect(more).toContain('id="save-project-copy"');
+    expect(more).toContain('id="save-library"');
+    expect(more).toContain('id="save-unit-file"');
+  });
+
+  it("keeps the two the deployed build cannot do out of it", () => {
+    expect(MAIN).toContain("saveLibraryBtn.hidden = !import.meta.env.DEV;");
+    expect(MAIN).toContain("saveUnitFileBtn.hidden = !import.meta.env.DEV;");
+  });
+});
