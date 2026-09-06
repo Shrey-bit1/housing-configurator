@@ -356,7 +356,11 @@
         </div>
         <div class="landing-body">
           <div class="landing-copy">
-            <h1 class="landing-title">Draw the flat<br />you want<br />to live in.</h1>
+            <!-- Three spans rather than three <br>s (run 0034): the headline
+                 arrives one line at a time, and a <br> is not an element CSS
+                 can hold a delay on. `.landing-title span` is display:block,
+                 so the three lines break exactly where they did. -->
+            <h1 class="landing-title"><span>Draw the flat</span><span>you want</span><span>to live in.</span></h1>
             <p class="landing-lead">
               Then the building arranges itself around everybody's flats. You and your
               neighbours decide together how much is shared, and where it goes.

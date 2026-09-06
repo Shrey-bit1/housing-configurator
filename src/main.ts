@@ -1369,6 +1369,16 @@ function groupUrl(): string {
 
 const landingEl = document.getElementById("landing") as HTMLElement;
 const landingDoors = document.getElementById("landing-doors") as HTMLElement;
+
+/** Show the doors again without replaying run 0034's arrival. Coming back
+ *  from the join form or the new-group form re-shows the same element, and a
+ *  `display` change restarts a CSS animation, so a resident pressing "back"
+ *  would sit through the stagger a second time. `.no-arrive` in style.css
+ *  turns it off; the first show, in `showLanding`, never carries it. */
+function showLandingDoors(): void {
+  landingDoors.classList.add("no-arrive");
+  landingDoors.hidden = false;
+}
 const landingJoinForm = document.getElementById("landing-join-form") as HTMLFormElement;
 const landingStartLabel = document.getElementById("landing-start-label") as HTMLElement;
 const landingCode = document.getElementById("landing-code") as HTMLInputElement;
@@ -1472,7 +1482,7 @@ document.getElementById("landing-new")!.addEventListener("click", async () => {
 });
 document.getElementById("landing-new-back")!.addEventListener("click", () => {
   landingNewForm.hidden = true;
-  landingDoors.hidden = false;
+  showLandingDoors();
 });
 landingNewForm.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -1498,7 +1508,7 @@ document.getElementById("landing-join")!.addEventListener("click", () => {
 });
 document.getElementById("landing-join-back")!.addEventListener("click", () => {
   landingJoinForm.hidden = true;
-  landingDoors.hidden = false;
+  showLandingDoors();
 });
 landingJoinForm.addEventListener("submit", async (e) => {
   e.preventDefault();
