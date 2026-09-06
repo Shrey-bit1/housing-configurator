@@ -1,8 +1,8 @@
 {
   "format": "dwelling-unit",
   "version": 1,
-  "name": "Flat 23 — three rooms, maisonette",
-  "color": "#ff6b6b",
+  "name": "Flat 16",
+  "color": "#9775fa",
   "cellSize": 0.6,
   "northAngle": 0,
   "storeys": [
@@ -365,6 +365,106 @@
           10
         ],
         [
+          7,
+          0
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          2
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          8,
+          3
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          9,
+          0
+        ],
+        [
+          9,
+          1
+        ],
+        [
+          9,
+          2
+        ],
+        [
+          9,
+          3
+        ],
+        [
+          9,
+          4
+        ],
+        [
+          10,
+          0
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          10,
+          2
+        ],
+        [
+          10,
+          3
+        ],
+        [
+          10,
+          4
+        ],
+        [
+          11,
+          0
+        ],
+        [
+          11,
+          1
+        ],
+        [
+          11,
+          2
+        ],
+        [
+          11,
+          3
+        ],
+        [
+          11,
+          4
+        ],
+        [
           0,
           5
         ],
@@ -575,6 +675,31 @@
         "stair",
         "stair",
         "stair",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
+        "room",
         "circulation",
         "circulation",
         "circulation",
@@ -696,6 +821,31 @@
         "stair_spiral",
         "stair_spiral",
         "stair_spiral",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
+        "recreation",
         "circulation_double",
         "circulation_double",
         "circulation_double",
@@ -816,7 +966,7 @@
             1
           ],
           "side": "W",
-          "class": "blank"
+          "class": "glazed"
         },
         {
           "cell": [
@@ -824,7 +974,7 @@
             2
           ],
           "side": "W",
-          "class": "blank"
+          "class": "glazed"
         },
         {
           "cell": [
@@ -888,46 +1038,6 @@
             0
           ],
           "side": "N",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            6,
-            0
-          ],
-          "side": "E",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            6,
-            1
-          ],
-          "side": "E",
-          "class": "glazed"
-        },
-        {
-          "cell": [
-            6,
-            2
-          ],
-          "side": "E",
-          "class": "glazed"
-        },
-        {
-          "cell": [
-            6,
-            3
-          ],
-          "side": "E",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            6,
-            4
-          ],
-          "side": "E",
           "class": "blank"
         },
         {
@@ -1102,6 +1212,86 @@
           "cell": [
             13,
             10
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            7,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            8,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            9,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            10,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            11,
+            0
+          ],
+          "side": "N",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            11,
+            0
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            11,
+            1
+          ],
+          "side": "E",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            11,
+            2
+          ],
+          "side": "E",
+          "class": "glazed"
+        },
+        {
+          "cell": [
+            11,
+            3
+          ],
+          "side": "E",
+          "class": "blank"
+        },
+        {
+          "cell": [
+            11,
+            4
           ],
           "side": "E",
           "class": "blank"
@@ -1124,38 +1314,6 @@
         },
         {
           "cell": [
-            7,
-            5
-          ],
-          "side": "N",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            8,
-            5
-          ],
-          "side": "N",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            10,
-            5
-          ],
-          "side": "N",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            11,
-            5
-          ],
-          "side": "N",
-          "class": "blank"
-        },
-        {
-          "cell": [
             12,
             5
           ],
@@ -1184,14 +1342,6 @@
             5
           ],
           "side": "E",
-          "class": "blank"
-        },
-        {
-          "cell": [
-            9,
-            5
-          ],
-          "side": "N",
           "class": "blank"
         }
       ],
@@ -2407,6 +2557,11 @@
       "color": "#2e6b4f"
     },
     {
+      "id": "recreation",
+      "name": "Recreation Room",
+      "color": "#b98a2f"
+    },
+    {
       "id": "stair",
       "name": "Stair (dogleg, retired)",
       "color": "#8a8a8a"
@@ -2591,6 +2746,14 @@
             "rotation": 0,
             "mirrored": false,
             "doubleHeight": false
+          },
+          {
+            "type": "recreation",
+            "cx": 9,
+            "cz": 2,
+            "rotation": 0,
+            "mirrored": false,
+            "doubleHeight": false
           }
         ],
         "entrances": [
@@ -2644,6 +2807,15 @@
             "swing": {
               "hinge": "a",
               "into": "B"
+            }
+          },
+          {
+            "cx": 10,
+            "cz": 6,
+            "side": "south",
+            "swing": {
+              "hinge": "a",
+              "into": "A"
             }
           }
         ]
