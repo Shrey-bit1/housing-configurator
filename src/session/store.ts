@@ -512,6 +512,10 @@ function sessionView(code: string, index: SessionIndex) {
     flats: Object.values(index.flats),
     residents: Object.entries(index.residents).map(([name, r]) => ({ name, ...r })),
     building: index.building,
+    // Added in run 0032 BESIDE everything else, never in place of it: the
+    // building app polls this call continuously and treats what it already
+    // reads the way it always has. `exists` is the one rule, `groupExists`.
+    exists: groupExists(index),
     // Named one by one here, unlike a resident's fields, which ride in on the
     // spread above. So a top-level addition like this one DOES need a line, and
     // it defaults to an empty list rather than being absent, so a group with
