@@ -5,6 +5,10 @@ import {
   showsDropHint,
   checksRun,
   showsLanding,
+  sendButtonLabel,
+  SEND_IT,
+  GO_TO_GROUP,
+  NO_WAY_IN,
   UNTITLED,
   DASH,
   EMPTY_HINT,
@@ -93,5 +97,47 @@ describe("showsLanding", () => {
 
   it("skips it on a bare parameter with no value, which still names one", () => {
     expect(showsLanding("?session=")).toBe(false);
+  });
+});
+
+/**
+ * Run 0034. The readiness rule on its three cases, and the words step 02's
+ * one button reads in its two moments.
+ */
+
+describe("the readiness rule, on its three cases", () => {
+  it("says no when nothing is drawn", () => {
+    expect(canSend(flatPhase(0, false))).toBe(false);
+  });
+
+  it("says no when something is drawn but there is no way in", () => {
+    expect(canSend(flatPhase(6, false))).toBe(false);
+  });
+
+  it("says yes when something is drawn and there is a way in", () => {
+    expect(canSend(flatPhase(6, true))).toBe(true);
+  });
+
+  it("carries the one sentence the asleep button says", () => {
+    expect(NO_WAY_IN).toBe(
+      "Place an entrance on an outside edge first, so the flat has a way in."
+    );
+  });
+});
+
+describe("sendButtonLabel", () => {
+  it("reads the send text before a send", () => {
+    expect(sendButtonLabel(false)).toBe("Send it");
+    expect(sendButtonLabel(false)).toBe(SEND_IT);
+  });
+
+  it("reads the group text after a send", () => {
+    expect(sendButtonLabel(true)).toBe("Go to your group");
+    expect(sendButtonLabel(true)).toBe(GO_TO_GROUP);
+  });
+
+  it("says where it goes rather than saying next", () => {
+    expect(GO_TO_GROUP.toLowerCase()).not.toBe("next");
+    expect(GO_TO_GROUP).toContain("group");
   });
 });
