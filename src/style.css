@@ -511,6 +511,20 @@ button.primary:hover {
   color: var(--bg);
 }
 
+/* The line under step 02's button, when the group has an older flat than the
+   one on the screen (run 0035). Accent red rather than the meta grey the
+   `save-names` line takes, because it is the one thing on that panel a
+   resident may be wrong about. */
+.send-stale {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--accent);
+}
+.send-stale:empty {
+  display: none;
+}
+
 .hint-text {
   font-size: 11px;
   color: var(--text-dim);

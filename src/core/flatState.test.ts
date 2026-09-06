@@ -125,13 +125,17 @@ describe("the readiness rule, on its three cases", () => {
 
 describe("sendButtonLabel", () => {
   it("reads the send text before a send", () => {
-    expect(sendButtonLabel(false)).toBe("Send it");
-    expect(sendButtonLabel(false)).toBe(SEND_IT);
+    expect(sendButtonLabel("never")).toBe("Send it");
+    expect(sendButtonLabel("never")).toBe(SEND_IT);
   });
 
   it("reads the group text after a send", () => {
-    expect(sendButtonLabel(true)).toBe("Go to your group");
-    expect(sendButtonLabel(true)).toBe(GO_TO_GROUP);
+    expect(sendButtonLabel("sent")).toBe("Go to your group");
+    expect(sendButtonLabel("sent")).toBe(GO_TO_GROUP);
+  });
+
+  it("reads the send text again once the flat has been edited", () => {
+    expect(sendButtonLabel("edited")).toBe(SEND_IT);
   });
 
   it("says where it goes rather than saying next", () => {
