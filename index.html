@@ -292,7 +292,7 @@
             <p id="send-stale" class="send-stale"></p>
             <p id="save-names" class="save-names"></p>
             <p class="group-hint">Your neighbours see it within seconds.</p>
-            <div id="save-results" role="status" aria-live="polite"></div>
+            <div id="send-results" role="status" aria-live="polite"></div>
           </section>
 
           <section class="card more-card" id="more-card">
@@ -300,54 +300,29 @@
               <span>More</span><span class="plus" id="more-plus" aria-hidden="true">+</span>
             </button>
             <div class="more-body" id="more-body" hidden>
-              <div class="save-fields">
-                <label>Design number
-                  <input id="save-number" type="number" min="1" step="1" value="1" autocomplete="off" />
-                </label>
-                <label>Colour
-                  <input id="save-color" type="color" value="#4dabf7" />
-                </label>
-              </div>
-              <fieldset id="save-what">
-                <legend>What to write</legend>
-                <!-- Grouped as files vs. group (run 0025, UX pass, worded for
-                     the brief in run 0026): the first three write to THIS
-                     machine, the last two to the group. -->
-                <div class="sw-group">
-                  <p class="sw-group-label">Files</p>
-                  <label>
-                    <input type="checkbox" id="save-what-project" checked />
-                    <span class="sw-name">Project file</span>
-                    <span class="sw-note">the whole design, the only thing that reopens for editing</span>
-                  </label>
-                  <label>
-                    <input type="checkbox" id="save-what-unit" checked />
-                    <span class="sw-name">Unit file</span>
-                    <span class="sw-note">the contract with the building</span>
-                  </label>
-                  <label>
-                    <input type="checkbox" id="save-what-library" checked />
-                    <span class="sw-name">Library entry</span>
-                    <span class="sw-note">the unit plus a preview, browsable under Units</span>
-                  </label>
-                </div>
-                <div class="sw-group">
-                  <p class="sw-group-label">Group</p>
-                  <label>
-                    <input type="checkbox" id="save-what-publish" checked />
-                    <span class="sw-name">Send to group</span>
-                    <span class="sw-note" id="save-publish-note">the unit file, sent to your group for the building and your neighbours</span>
-                  </label>
-                  <!-- Off by default: a flat belongs to whoever published it
-                       (docs/store.md), so replacing someone else's is a deliberate
-                       tick, not the normal republish path. -->
-                  <label class="save-replace-row">
-                    <input type="checkbox" id="save-replace" />
-                    <span class="sw-name">Replace</span>
-                    <span class="sw-note">take over a flat someone else published under this number</span>
-                  </label>
-                </div>
-              </fieldset>
+              <!-- Nothing here is needed to send (run 0036). The design number
+                   left the screen entirely and is chosen automatically, the
+                   colour is chosen from the app's own palette and can be
+                   changed here, and the three writes that used to be ticked by
+                   default are now three deliberate presses. The last two are in
+                   the dev build only, because a library entry is written by a
+                   Vite endpoint that no deployed build has. -->
+              <label class="more-colour">Colour
+                <input id="save-color" type="color" value="#4dabf7" />
+              </label>
+              <button type="button" id="save-project-copy" class="more-action">
+                Save a copy to my computer
+                <span class="more-note">the whole design, the only thing that reopens for editing</span>
+              </button>
+              <button type="button" id="save-library" class="more-action" hidden>
+                Add to the library
+                <span class="more-note">the unit plus a picture, browsable under Units</span>
+              </button>
+              <button type="button" id="save-unit-file" class="more-action" hidden>
+                Save the unit file
+                <span class="more-note">the contract with the building</span>
+              </button>
+              <div id="save-results" role="status" aria-live="polite"></div>
             </div>
           </section>
           </div>

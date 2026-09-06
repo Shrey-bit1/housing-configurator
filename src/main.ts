@@ -59,17 +59,12 @@ import {
 import { saveDraft, readDraft, DRAFT_RESTORED, type DraftStore } from "./core/draft";
 import { JOURNEY, journeyTones } from "./core/journey";
 import { slugifyUnitName } from "./library/ids";
-import { projectNameFor, unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
+import { unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
 import { parseUnitLibraryIndex, type UnitManifestEntry } from "./library/manifest";
 import {
-  planOutputs,
-  isEmptySelection,
-  needsUnitBuild,
-  unitGateResults,
   outputLabel,
   type OutputKind,
   type OutputResult,
-  type SaveSelection,
 } from "./core/savePlan";
 import {
   projectFileText,
@@ -87,14 +82,12 @@ import {
   sessionLine,
   publishUnit,
   publishPreview,
-  takeoverConfirmText,
   landingRecall,
   inventCode,
   startGroup,
   noSuchGroupText,
   checkGroup,
   storeAbsentText,
-  decideTakeover,
   type FetchLike,
   type SessionSettings,
 } from "./session/session";
@@ -999,10 +992,15 @@ function downloadAs(href: string, filename: string, revoke: boolean): void {
 // so there is no show/hide; `openSaveDialog` (below) now means "refresh the
 // column's proposed number and session-derived state", called at startup and
 // whenever "More" is opened.
-const saveNumberInput = document.getElementById("save-number") as HTMLInputElement;
+/** The design number left the screen in run 0036 and is chosen automatically:
+ *  the next free one across the library and this group, proposed by
+ *  `openSaveDialog`. It stays a number the app knows rather than one a resident
+ *  has to pick, because nothing they could pick would be better than the next
+ *  free one and a wrong pick collides with a neighbour. */
+let designNumber = 1;
 const saveColorInput = document.getElementById("save-color") as HTMLInputElement;
 const saveNamesLine = document.getElementById("save-names") as HTMLElement;
-const saveResultsEl = document.getElementById("save-results") as HTMLElement;
+const saveResultsEl = document.getElementById("send-results") as HTMLElement;
 const saveGoBtn = document.getElementById("save-go") as HTMLButtonElement;
 const saveGoLabelEl = document.getElementById("save-go-label") as HTMLElement;
 const sendStaleEl = document.getElementById("send-stale") as HTMLElement;
@@ -1567,23 +1565,24 @@ landingJoinForm.addEventListener("submit", async (e) => {
   hideLanding();
   setStep("draw");
 });
-const saveWhatInputs: Record<OutputKind, HTMLInputElement> = {
-  project: document.getElementById("save-what-project") as HTMLInputElement,
-  unit: document.getElementById("save-what-unit") as HTMLInputElement,
-  library: document.getElementById("save-what-library") as HTMLInputElement,
-  publish: document.getElementById("save-what-publish") as HTMLInputElement,
-};
+// The four "What to write" checkboxes went in run 0036, with the design number
+// and the Replace tick. All four were ticked by default, so one press wrote
+// four things and two of them landed in a resident's Downloads folder
+// uninvited. Three are now separate, named presses under More; the fourth is
+// the button itself.
 
-/** REMEMBERED FOR THE SESSION (never serialized — this is how you save, not
- *  part of the design). All four default to on: the three retired menu items
- *  were being used together, and publishing is what the session is for; after
- *  the first save the second unit costs one click. Reset on reload, like every
- *  other view-state default. Publish is only EFFECTIVE while the session
- *  fields are filled — `readSaveSelection` reads a disabled box as off. */
-let saveSelection: SaveSelection = { project: true, unit: true, library: true, publish: true };
 /** Once the colour is touched by hand it stops following the name hash, for
  *  the rest of the session. */
 let saveColorTouched = false;
+
+/** The three things a resident may still ask to have written, under More. The
+ *  last two exist in the dev build only: a library entry is written by a Vite
+ *  endpoint that no deployed build has. */
+const saveProjectCopyBtn = document.getElementById("save-project-copy") as HTMLButtonElement;
+const saveLibraryBtn = document.getElementById("save-library") as HTMLButtonElement;
+const saveUnitFileBtn = document.getElementById("save-unit-file") as HTMLButtonElement;
+saveLibraryBtn.hidden = !import.meta.env.DEV;
+saveUnitFileBtn.hidden = !import.meta.env.DEV;
 
 // ---- The session: who, and which room (src/session/session.ts) -------------
 // Two fields at the top of the save dialog, remembered in localStorage under
@@ -1598,15 +1597,12 @@ const saveSessionFields = document.getElementById("save-session-fields") as HTML
 let whoFieldsOpen = false;
 const saveResidentInput = document.getElementById("save-resident") as HTMLInputElement;
 const saveCodeInput = document.getElementById("save-session") as HTMLInputElement;
-const savePublishNote = document.getElementById("save-publish-note") as HTMLElement;
-/** Off by default (docs/store.md): a flat belongs to whoever published it,
- *  so taking over someone else's is one deliberate tick, not the standing
- *  choice `saveSelection`'s four checkboxes get. Reset to off after every
- *  successful publish (run 0024). */
-const saveReplaceInput = document.getElementById("save-replace") as HTMLInputElement;
+// The Replace tick went in run 0036. A flat belongs to whoever published it
+// (docs/store.md), and taking over somebody else's is no longer something a
+// resident can do from this screen. The store still refuses it with a 409,
+// which is reported as it comes.
 const tbSession = document.getElementById("tb-session") as HTMLElement;
 const tbCode = document.getElementById("tb-code") as HTMLElement;
-const PUBLISH_NOTE = savePublishNote.textContent ?? "";
 
 // Run 0025 folded these two fields behind a one-line summary once both were
 // set, which earned its place while they sat at the top of a save dialog
@@ -1651,12 +1647,6 @@ function syncSessionUI(): void {
   // there is still exactly one place it lives.
   tbCode.textContent = session.code;
   tbCode.hidden = session.code.length === 0;
-  const why = whyPublishDisabled(session);
-  const input = saveWhatInputs.publish;
-  const wasDisabled = input.disabled;
-  input.disabled = why !== null;
-  input.checked = why !== null ? false : wasDisabled ? saveSelection.publish : input.checked;
-  savePublishNote.textContent = why ?? PUBLISH_NOTE;
 }
 
 function onSessionInput(): void {
@@ -1677,21 +1667,9 @@ saveResidentInput.value = session.resident;
 saveCodeInput.value = session.code;
 syncSessionUI();
 
-/** The EFFECTIVE selection: a disabled Publish box (no name or code yet) reads as off. */
-function readSaveSelection(): SaveSelection {
-  return {
-    project: saveWhatInputs.project.checked,
-    unit: saveWhatInputs.unit.checked,
-    library: saveWhatInputs.library.checked,
-    publish: saveWhatInputs.publish.checked && !saveWhatInputs.publish.disabled,
-  };
-}
-
-/** The design number in the field, floored at 1 so a cleared or nonsense field
- *  cannot produce `Flat NaN`. */
+/** The design number, chosen automatically (run 0036). */
 function saveDesignNumber(): number {
-  const n = Math.floor(Number(saveNumberInput.value));
-  return Number.isFinite(n) && n >= 1 ? n : 1;
+  return designNumber;
 }
 
 /** Names line, proposed colour, and the Send button's enabled state, all
@@ -1707,15 +1685,11 @@ function syncSaveDialog(): void {
   // does (found live, where the read-out said "Unit 1" beside a line
   // promising "Flat 6 and Unit 6").
   frNameEl.textContent = phase === "empty" ? UNTITLED : unitNameFor(n);
-  const sel = readSaveSelection();
-  // A disabled Publish box keeps the remembered choice rather than forgetting it.
-  saveSelection = { ...sel, publish: saveWhatInputs.publish.disabled ? saveSelection.publish : sel.publish };
-  const parts: string[] = [];
-  if (sel.project) parts.push(projectNameFor(n));
-  if (needsUnitBuild(sel)) parts.push(unitNameFor(n));
-  saveNamesLine.textContent = parts.length
-    ? `It becomes ${parts.join(" and ")}` + (numberCountsSession ? `, next free in the library and ${session.code}` : "")
-    : "Nothing selected";
+  // What the flat will be called in the group. One name now rather than a
+  // list built from four checkboxes (run 0036).
+  saveNamesLine.textContent =
+    `It becomes ${unitNameFor(n)}` +
+    (numberCountsSession ? `, the next free number in the library and in ${session.code}` : "");
   if (!saveColorTouched) saveColorInput.value = defaultUnitColor(unitNameFor(n));
   // ONE rule for the button and the line under it (run 0036), over three
   // facts: whether the flat is ready, how far it has got towards the group,
@@ -1723,7 +1697,7 @@ function syncSaveDialog(): void {
   const button = sendButton(phase, sendState, complaints);
   saveGoLabelEl.textContent = button.label;
   sendStaleEl.textContent = button.notice;
-  saveGoBtn.disabled = sendState === "sent" ? false : !button.awake || isEmptySelection(sel);
+  saveGoBtn.disabled = sendState === "sent" ? false : !button.awake;
 }
 
 /** The library manifest, or an empty one when it cannot be read. The dialog
@@ -1770,14 +1744,18 @@ let numberCountsSession = false;
  * now stale, freshen it" moments a dialog-open used to be.
  */
 async function openSaveDialog(): Promise<void> {
-  for (const kind of ["project", "unit", "library", "publish"] as OutputKind[])
-    saveWhatInputs[kind].checked = saveSelection[kind];
-  syncSessionUI(); // and off again if the group fields are still empty
+  syncSessionUI();
   syncSaveDialog();
+  // Once a flat has gone to the group it IS that number, so proposing again
+  // would rename it under the resident and a copy saved from More would carry
+  // a different name from the flat their neighbours are looking at (found
+  // live: sent as Unit 31, saved as flat-32.json). The number only moves while
+  // nothing has been sent (run 0036).
+  if (sendState !== "never") return;
   const entries = await readManifestEntries();
   const sessionFlats = await readSessionFlatNames();
   numberCountsSession = session.code.length > 0;
-  saveNumberInput.value = String(nextFreeNumber(entries, sessionFlats));
+  designNumber = nextFreeNumber(entries, sessionFlats);
   syncSaveDialog();
 }
 
@@ -1811,133 +1789,79 @@ function setSaveResult(kind: OutputKind, status: OutputResult["status"], detail:
 }
 
 /**
- * Write whichever outputs are ticked, reporting each on its own line.
+ * Send the flat to the group, and do nothing else (run 0036).
  *
- * The order matters: the project file is written FIRST and never depends on
- * the unit build, so a hard gate failure (no usable entrance, disconnected
- * footprint) or a declined layout-check confirm costs only the unit-derived
- * outputs. That is the rule `unitGateResults` encodes and `savePlan.test.ts`
- * pins.
+ * Pressing the red button used to run `runSave`, which downloaded a project
+ * file, downloaded a unit file, wrote a library entry and published, in that
+ * order, whichever of the four were ticked. All four were ticked by default,
+ * so one press put two files in a resident's Downloads folder they had not
+ * asked for. Sending is now sending: the only thing that leaves this machine
+ * is the flat, and it goes to the group.
+ *
+ * The unit's own bytes are the same bytes the unit file would carry, built
+ * from the same `buildUnitExport`, so what the group holds and what a resident
+ * can save under More cannot differ.
+ *
+ * A resident's own earlier flat in the group is replaced without asking. The
+ * store decides that, by `sameResident` (docs/store.md): a republish under the
+ * same name is not a conflict and needs no `?replace=1`. Taking over somebody
+ * ELSE's flat is no longer something a resident can do from this screen; the
+ * store still refuses it with a 409, which is reported as it comes.
  */
-async function runSave(): Promise<void> {
-  const sel = readSaveSelection();
-  if (isEmptySelection(sel)) return;
-  saveSelection = sel; // remembered for the next save this session
+async function runSend(): Promise<void> {
   const n = saveDesignNumber();
-  const color = saveColorInput.value;
   const unitName = unitNameFor(n);
-
   saveResults.clear();
-  for (const kind of planOutputs(sel)) setSaveResult(kind, "pending", "writing…");
+  setSaveResult("publish", "pending", "sending…");
   saveGoBtn.disabled = true;
 
-  // The unit is built ONCE and feeds both the unit file and the library entry.
-  let unitFile: DwellingUnitFile | null = null;
-  if (needsUnitBuild(sel)) {
-    const built = buildUnitExport(floors, unitName, color);
-    if (built.ok) unitFile = built.file;
-    else
-      for (const r of unitGateResults(sel, built.reason))
-        if (r.status === "failed") setSaveResult(r.kind, "failed", r.detail);
+  const built = buildUnitExport(floors, unitName, saveColorInput.value);
+  if (!built.ok) {
+    setSaveResult("publish", "failed", `not sent — ${built.reason}`);
+    syncSaveDialog();
+    return;
   }
 
-  // The advisory confirm is gone (run 0036). It asked a browser dialog's
-  // question, "Check Layout reports N MUST FIX issue(s) ... Continue?", which a
-  // resident could not answer from inside it: the dialog covered the flat and
-  // named no issue. The button says it now, before the press rather than after
-  // it, reading "Send anyway \u00b7 N things to look at", and the check chip in
-  // the bar is one press from the report that lists them.
-
-  // 1. The project file. Independent of everything above.
-  if (sel.project) {
-    const data = serializeProject(floors.floors, floors.northAngle, floors.orientationPreference);
-    const text = projectFileText(data);
-    const name = projectFileName(n);
-    downloadAs(URL.createObjectURL(new Blob([text], { type: "application/json" })), name, true);
-    setSaveResult(
-      "project",
-      "written",
-      `${name} downloaded — ${floors.floors.length} floor(s), ${text.length} bytes`
-    );
-  }
-
-  // 2. The unit file.
-  if (sel.unit && unitFile) {
-    const text = unitFileText(unitFile);
-    const name = unitFileName(n);
-    downloadAs(URL.createObjectURL(new Blob([text], { type: "application/json" })), name, true);
-    setSaveResult(
-      "unit",
-      "written",
-      `${name} downloaded — ${unitFile.storeys.length} storey(s), ${text.length} bytes`
-    );
-  }
-
-  // 3. The library entry.
-  if (sel.library && unitFile) await saveLibraryEntry(unitName, color, unitFile);
-
-  // 4. Publish to the session: the unit download's EXACT bytes, PUT to the
-  //    store on this origin as `unit-<n>` (docs/store.md). The files above are
-  //    already written, so a failure of any kind is one red line and nothing
-  //    else; `publishUnit` never throws. A CONFLICT WITH REPLACE TICKED asks
-  //    first, naming the current owner (run 0025), before the takeover PUT
-  //    goes out — the first attempt never sends `replace=1` itself, so the
-  //    store's own 409 is what tells this code there is anyone to ask about;
-  //    declining costs only this line, nothing already written. Right after a
-  //    real publish, its axonometric follows to the SAME id — a failed
-  //    preview is noted on the same line and never undoes the flat publish.
-  if (sel.publish && unitFile) {
-    const id = slugifyUnitName(unitName);
-    const text = unitFileText(unitFile);
-    const doFetch: FetchLike = (url, init) => fetch(url, init);
-    let r = await publishUnit(doFetch, "", session, id, unitName, text, false);
-    let declined = false;
-    if (!r.ok && r.status === 409 && r.ownerResident !== undefined && saveReplaceInput.checked) {
-      const confirmed = window.confirm(takeoverConfirmText(r.ownerResident));
-      const decision = decideTakeover(r, saveReplaceInput.checked, confirmed);
-      if (decision.action === "retry") {
-        r = await publishUnit(doFetch, "", session, id, unitName, text, true);
-      } else if (decision.action === "declined") {
-        declined = true;
-        setSaveResult("publish", "skipped", decision.detail);
-      }
+  const id = slugifyUnitName(unitName);
+  const text = unitFileText(built.file);
+  const doFetch: FetchLike = (url, init) => fetch(url, init);
+  const r = await publishUnit(doFetch, "", session, id, unitName, text, false);
+  if (r.ok) {
+    // Words, run 0026: "Sent to <code> as <label>", the brief's exact phrasing.
+    // The version shows only when it moved, since "version 1" says nothing a
+    // first send does not already imply.
+    let line = `Sent to ${session.code} as ${r.label}`;
+    if (r.version > 1) line += `, version ${r.version}`;
+    // The axonometric follows to the SAME id. A failed preview is noted on the
+    // same line and never undoes the flat itself.
+    const preview = captureFlatPreview();
+    if (preview.dataUrl.startsWith("data:image/jpeg") && preview.bytes >= 1000) {
+      const jpeg = await fetch(preview.dataUrl).then((res) => res.blob());
+      const pr = await publishPreview(doFetch, "", session.code, r.id, jpeg);
+      if (!pr.ok) line += ` (preview not sent — ${pr.reason})`;
+    } else {
+      line += ` (preview not sent — read back ${preview.bytes} bytes)`;
     }
-    if (!declined) {
-      if (r.ok) {
-        // Words, run 0026: "Sent to <code> as <label>", the brief's exact
-        // phrasing (run 0025's "Published as… to…, version N" carried the
-        // same facts in session wording; the version now shows only when it
-        // moved, since "version 1" says nothing a first send doesn't already
-        // imply).
-        let line = `Sent to ${session.code} as ${r.label}`;
-        if (r.version > 1) line += `, version ${r.version}`;
-        const preview = captureFlatPreview();
-        if (preview.dataUrl.startsWith("data:image/jpeg") && preview.bytes >= 1000) {
-          const jpeg = await fetch(preview.dataUrl).then((res) => res.blob());
-          const pr = await publishPreview(doFetch, "", session.code, r.id, jpeg);
-          if (!pr.ok) line += ` (preview not sent — ${pr.reason})`;
-        } else {
-          line += ` (preview not sent — read back ${preview.bytes} bytes)`;
-        }
-        // Names the next step (run 0025, UX pass — "end flows memorably",
-        // "make completion feel closer"): where to go and check it landed.
-        line += " · open Units to see your group.";
-        setSaveResult("publish", "written", line);
-        sendState = "sent"; // the button below now reads "Go to your group"
-        saveReplaceInput.checked = false; // one deliberate tick per takeover, not a standing default
-        void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
-      } else {
-        const detail =
-          r.ownerResident !== undefined
-            ? `not published — ${r.ownerResident} already owns ${unitName} in ${session.code}; tick Replace to take it over`
-            : `not published — ${r.status ? `${r.status} ` : ""}${r.reason}`;
-        setSaveResult("publish", "failed", detail);
-      }
-    }
+    line += " · open Units to see your group.";
+    setSaveResult("publish", "written", line);
+    sendState = "sent"; // the button now reads "Go to your group"
+    void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
+  } else {
+    const detail =
+      r.ownerResident !== undefined
+        ? `not sent — ${r.ownerResident} already has ${unitName} in ${session.code}`
+        : `not sent — ${r.status ? `${r.status} ` : ""}${r.reason}`;
+    setSaveResult("publish", "failed", detail);
   }
-
-  syncSaveDialog(); // the label may have just become "Go to your group"
+  syncSaveDialog();
 }
+
+// `runSave` was here until run 0036. It wrote whichever of four outputs were
+// ticked: a project download, a unit download, a library entry and a publish,
+// with all four ticked by default. One press therefore put two files in a
+// resident's Downloads folder they had not asked for. Sending is now sending
+// (`runSend` above), and the writing that a resident may still want lives
+// under More as three separate, named choices.
 
 /**
  * The library entry: the unit file plus a canvas JPEG preview plus a manifest
@@ -2026,16 +1950,59 @@ async function saveLibraryEntry(
   }
 }
 
-saveNumberInput.addEventListener("input", syncSaveDialog);
-saveColorInput.addEventListener("input", () => (saveColorTouched = true));
-for (const input of Object.values(saveWhatInputs))
-  input.addEventListener("change", syncSaveDialog);
+saveColorInput.addEventListener("input", () => {
+  saveColorTouched = true;
+  syncSaveDialog();
+});
+
+// The three things under More, each its own press (run 0036). None of them is
+// needed to send, and none of them happens unless it is pressed.
+saveProjectCopyBtn.addEventListener("click", () => {
+  const n = saveDesignNumber();
+  const text = projectFileText(
+    serializeProject(floors.floors, floors.northAngle, floors.orientationPreference)
+  );
+  const name = projectFileName(n);
+  downloadAs(URL.createObjectURL(new Blob([text], { type: "application/json" })), name, true);
+  setSaveResult("project", "written", `${name} saved — ${floors.floors.length} floor(s), ${text.length} bytes`);
+});
+
+saveUnitFileBtn.addEventListener("click", () => {
+  const n = saveDesignNumber();
+  const built = buildUnitExport(floors, unitNameFor(n), saveColorInput.value);
+  if (!built.ok) {
+    setSaveResult("unit", "failed", `not saved — ${built.reason}`);
+    return;
+  }
+  const text = unitFileText(built.file);
+  const name = unitFileName(n);
+  downloadAs(URL.createObjectURL(new Blob([text], { type: "application/json" })), name, true);
+  setSaveResult("unit", "written", `${name} saved — ${built.file.storeys.length} storey(s), ${text.length} bytes`);
+});
+
+saveLibraryBtn.addEventListener("click", () => {
+  const n = saveDesignNumber();
+  const color = saveColorInput.value;
+  const built = buildUnitExport(floors, unitNameFor(n), color);
+  if (!built.ok) {
+    setSaveResult("library", "failed", `not written — ${built.reason}`);
+    return;
+  }
+  void saveLibraryEntry(unitNameFor(n), color, built.file);
+});
 saveGoBtn.addEventListener("click", () => {
   if (sendState === "sent") {
     window.open(groupUrl(), "_blank", "noopener");
     return;
   }
-  void runSave();
+  // There is no group yet, so there is nowhere to send. The landing's join is
+  // where that is answered, and it is where the button goes (run 0036).
+  if (!whoLine(session).ready) {
+    showLanding();
+    document.getElementById("landing-join")!.click();
+    return;
+  }
+  void runSend();
 });
 
 /** Nothing authored yet: one floor, nothing placed, no doors, no entrances. Used
