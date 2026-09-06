@@ -62,7 +62,9 @@ describe("routing", () => {
     const res = await call(new MemoryKV(), "GET", "/api/session/Fresh-1");
     expect(res.status).toBe(200);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
-    expect(await res.json()).toEqual({ code: "fresh-1", flats: [], residents: [], building: null, messages: [] });
+    expect(await res.json()).toEqual({
+      code: "fresh-1", exists: false, flats: [], residents: [], building: null, messages: [],
+    });
   });
 
   it("rejects unknown routes, bad codes and wrong methods, each with a message", async () => {
@@ -274,6 +276,87 @@ describe("the two square-metre answers (run 0030)", () => {
     expect(polled.messages).toEqual([]);
     const exported = await (await call(kv, "GET", "/api/session/abc/export")).json();
     expect(exported.residents).toEqual(polled.residents);
+  });
+});
+
+describe("starting a group (run 0032)", () => {
+  const start = (kv: MemoryKV, code: string) => call(kv, "POST", `/api/session/${code}`);
+
+  it("answers 201 with the group's state on a free code", async () => {
+    const kv = new MemoryKV();
+    const res = await start(kv, "willow-42");
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      code: "willow-42", exists: true, flats: [], residents: [], building: null, messages: [],
+    });
+  });
+
+  it("answers 409 naming the code on one already started", async () => {
+    const kv = new MemoryKV();
+    await start(kv, "willow-42");
+    const res = await start(kv, "willow-42");
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'group "willow-42" has already been started' });
+  });
+
+  it("writes the timestamp once and never overwrites it", async () => {
+    const kv = new MemoryKV();
+    await start(kv, "willow-42");
+    const first = JSON.parse((await kv.get("willow-42/index"))!).startedAt;
+    expect(typeof first).toBe("string");
+    // A refused second start must not touch it, and neither must ordinary use.
+    await start(kv, "willow-42");
+    await put(kv, "/api/session/willow-42/residents/Ana", { ballot: [] });
+    expect(JSON.parse((await kv.get("willow-42/index"))!).startedAt).toBe(first);
+  });
+
+  it("refuses the wrong method with a message naming both", async () => {
+    const kv = new MemoryKV();
+    expect((await call(kv, "PUT", "/api/session/willow-42")).status).toBe(405);
+    expect(await (await call(kv, "PUT", "/api/session/willow-42")).text()).toContain("GET or POST only");
+  });
+});
+
+describe("exists (run 0032)", () => {
+  const get = async (kv: MemoryKV, code: string) =>
+    (await call(kv, "GET", `/api/session/${code}`)).json();
+
+  it("is false on a code nobody has touched", async () => {
+    expect((await get(new MemoryKV(), "untouched")).exists).toBe(false);
+  });
+
+  it("is true after a POST", async () => {
+    const kv = new MemoryKV();
+    await call(kv, "POST", "/api/session/willow-42");
+    expect((await get(kv, "willow-42")).exists).toBe(true);
+  });
+
+  it("is true on a group holding a flat but no startedAt", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/old-1/flats/u9?resident=Ana", UNIT_TEXT);
+    // The index it wrote is a PRE-0032 one: it has a flat and no startedAt,
+    // which is what every group live in the store looks like today.
+    const index = JSON.parse((await kv.get("old-1/index"))!);
+    expect(index.startedAt).toBeUndefined();
+    expect((await get(kv, "old-1")).exists).toBe(true);
+  });
+
+  it("is true on a group holding a resident but no startedAt", async () => {
+    const kv = new MemoryKV();
+    await put(kv, "/api/session/old-2/residents/Ana", { ballot: ["garden"] });
+    const index = JSON.parse((await kv.get("old-2/index"))!);
+    expect(index.startedAt).toBeUndefined();
+    expect((await get(kv, "old-2")).exists).toBe(true);
+  });
+
+  it("adds itself BESIDE everything the poll already returned", async () => {
+    // The building app polls this call. Every field it read before run 0032 is
+    // still here and still means the same thing; exists is the only addition.
+    const kv = new MemoryKV();
+    await call(kv, "POST", "/api/session/willow-42");
+    expect(Object.keys(await get(kv, "willow-42")).sort()).toEqual(
+      ["building", "code", "exists", "flats", "messages", "residents"]
+    );
   });
 });
 
