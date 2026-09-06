@@ -170,11 +170,32 @@ resident's side. Everything else goes behind Architect.
 
 Flat app: a landing screen and one working screen.
 
-The landing carries the headline, three doors (Start a flat, Join a
-group, Open a file) and, along the bottom, the whole journey as six
-dots: draw your flat, send it, your wishes, the group, your flat in
-it, vote. The current dot is red, the ones ahead are hollow. It is
-also the user-journey slide for the presentation.
+The landing carries the headline, the doors and, along the bottom, the
+whole journey as six dots: draw your flat, send it, your wishes, the
+group, your flat in it, vote. It is also the user-journey slide for the
+presentation.
+
+Both apps have the same landing (settled 6 September). Same headline,
+same three lines under it, same two discs, same journey strip. Only the
+doors differ: the flat app's are Start a flat, Start a group, Join a
+group, Open a file; the building app's are Join a group, Open a
+building, Look at the example.
+
+The six dots are always all six. The dots that belong to the app you
+are in are ink; the dots that belong to the other app are dim. The dot
+for where you are now is red. So on the flat app the first two are ink
+and the last four dim; on the building app the first two are dim and
+the last four ink.
+
+How the landing arrives (settled 6 September). Nothing for about a
+second, one to two at most. Then the yellow disc grows out of its
+top-left corner and the blue disc out of its bottom-right, together,
+in about 0.6 s. Then the headline arrives one line at a time, each
+fading in after the one before, about 150 ms apart. Then the paragraph
+under it. Then the doors rise in one after another, about 100 ms
+apart. Then the journey strip. The order is the point: the graphics
+first, then what the app is, then what you can do with it, so a person
+knows what to read first without being told.
 
 The two steps in the bar are real screens, and only one panel is on
 screen at a time.
@@ -225,31 +246,28 @@ apps draw on; a bay is 8 cells, 4.8 m.
 
 ## What the runs do, in order
 
-1. Flat 0026, small: the store's building entry carries the plot;
-   resident names match trimmed and case-insensitive.
-2. Packer 0055, the ballot decides (sent 4 September): the ballot
-   spends the budget first, programme by programme in share order,
-   and only the leftover goes to site score, marked as the packer's
-   own choice; Regenerate writes and reads the plot the store now
-   carries; the shared-space list reads the wireframe's way. The
-   logic runs before the skin so the later run restyles a panel
-   whose content is settled.
-3. Packer 0056, everyone equal (sent 4 September): the budget from
-   square metres per person, the whole ballot pooled with equal say,
-   the split fitted storey by storey, paying for more after the vote,
-   the panel in the app's own voice, metres in the Architect drawer,
-   and the "volume" rename.
-4. Packer 0057, the skin and the first two steps: fonts, colours,
-   the bar with steps, buttons, the Wishes screen with the radar,
-   the group screen as above, the Architect drawer. The current
-   panel's content moves; nothing is invented.
-5. Packer 0058, steps four and five: the card with the building
-   view, the vote between two buildings with five checkboxes, the
+Updated 6 September. Done: flat 0026, 0027, 0028, 0029, 0030, 0031, 0032,
+0033; packer 0055, 0056, 0057 (the skin, the landing and four of the five
+steps as screens), 0058 (the screens stop stuttering, the drawer tidied,
+the chat and the wishes travel, the audit's cuts).
+
+Next, in this order:
+
+1. Packer 0059, one person one flat: the head count is the flat count,
+   one definition of who is in the group, rename and leave, the toggles
+   and the ballot paint themselves, the radar at its size, one clear
+   button from every step to the next, and step four rebuilt around the
+   building with the resident's own flat red and everyone else's quiet.
+2. Packer 0060, everyone fits and the search gets honest: measure first,
+   a penalty that makes an unplaced flat a failure, storeys that grow on
+   their own until everyone fits (the plot never changes), a progress
+   bar instead of a thousand messages, simulated annealing with a plain
+   control, and a search that settles and wakes.
+3. Packer, the vote: two buildings side by side, five checkboxes, the
    round counter, votes weighted into the next batch.
-6. Packer 0059, display: shadows, three lights, ground plane, the
-   three views, same-perspective screenshots.
-7. Flat 0027 (done, 4 September): the landing screen, the two real
-   steps, the redundancy cull and the empty state.
+4. Packer, display: shadows, three lights, ground plane, the three
+   views, same-perspective screenshots.
+5. Both apps, the window rule: burial becomes the building code.
 
 The journey's six steps are copied into each app, not imported across
 the two repos. The list is: draw your flat, send it, your wishes, the
