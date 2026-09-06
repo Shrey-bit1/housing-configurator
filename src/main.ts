@@ -54,7 +54,7 @@ import {
   NO_WAY_IN,
   type FlatPhase,
 } from "./core/flatState";
-import { JOURNEY, journeyMarks } from "./core/journey";
+import { JOURNEY, journeyTones } from "./core/journey";
 import { slugifyUnitName } from "./library/ids";
 import { projectNameFor, unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
 import { parseUnitLibraryIndex, type UnitManifestEntry } from "./library/manifest";
@@ -1411,7 +1411,10 @@ function hideLanding(): void {
  *  steps from the same array. */
 function renderJourney(): void {
   const strip = document.getElementById("journey-strip") as HTMLElement;
-  const marks = journeyMarks("draw");
+  // Run 0034, the brief: all six dots always, the two this app owns in ink,
+  // the building app's four dim, and the one a resident is on in red. The
+  // building app calls the same function with "building" and gets the mirror.
+  const tones = journeyTones("draw", "flat");
   const parts: HTMLElement[] = [];
   JOURNEY.forEach((s, i) => {
     if (i > 0) {
@@ -1420,7 +1423,7 @@ function renderJourney(): void {
       parts.push(rule);
     }
     const el = document.createElement("div");
-    el.className = `journey-step ${marks[i]}`;
+    el.className = `journey-step ${tones[i]}`;
     const dot = document.createElement("span");
     dot.className = "journey-dot";
     const label = document.createElement("span");

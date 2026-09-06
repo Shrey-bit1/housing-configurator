@@ -3006,17 +3006,23 @@ body[data-step="send"] #drop-hint {
   color: var(--dim);
   white-space: nowrap;
 }
+/* Three tones, from `journeyTones` (run 0034, the brief). The dot for where
+   the resident is now is red. The dots this app owns are ink. The building
+   app's four are dim, which is what `.journey-dot` and `.journey-label`
+   already are above, so `elsewhere` needs no rule of its own. */
 .journey-step.now .journey-dot {
   background: var(--accent);
-  border-color: var(--ink);
+  border-color: var(--accent);
 }
-.journey-step.now .journey-label,
-.journey-step.done .journey-label {
-  color: var(--ink);
+.journey-step.now .journey-label {
+  color: var(--accent);
 }
-.journey-step.done .journey-dot {
+.journey-step.here .journey-dot {
   background: var(--ink);
   border-color: var(--ink);
+}
+.journey-step.here .journey-label {
+  color: var(--ink);
 }
 .journey-rule {
   flex: 1;
