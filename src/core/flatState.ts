@@ -64,23 +64,62 @@ export const DASH = "—";
 export const EMPTY_HINT = "Drag a room onto the grid to start. Nothing is checked until you do.";
 
 /**
+ * How far this flat has got towards the group, in this visit (run 0035).
+ *
+ * ONE value rather than two booleans. Run 0034 had a single `hasSent` flag,
+ * which cannot tell a flat that was never sent from one that was sent and
+ * then edited, because both leave it false. Those two want different words
+ * on the screen, so the flag grew a third state instead of gaining a
+ * neighbour: two booleans would have four combinations and only three of
+ * them mean anything.
+ *
+ *   never    nothing has gone to the group yet
+ *   sent     the group has this flat, exactly as it is here
+ *   edited   the group has an older version of this flat
+ */
+export type SendState = "never" | "sent" | "edited";
+
+/**
  * Step 02's one red button, in its two moments (run 0034). Before a flat
  * has reached the group it is the send button; after, it is the way to the
  * group, where the resident goes on with the same flat. One button rather
  * than two, so the screen never offers a choice a resident has no way to
- * make.
+ * make. A flat edited after a send is a flat with something to send again,
+ * so the button goes back to being the send button.
  */
 export const SEND_IT = "Send it";
 export const GO_TO_GROUP = "Go to your group";
 
-/** @param hasSent whether this flat has reached the group in this visit. */
-export function sendButtonLabel(hasSent: boolean): string {
-  return hasSent ? GO_TO_GROUP : SEND_IT;
+export function sendButtonLabel(state: SendState): string {
+  return state === "sent" ? GO_TO_GROUP : SEND_IT;
 }
 
-/** Why step 02 is locked, said in the resident's own terms. */
-export const NO_WAY_IN =
-  "Place an entrance on an outside edge first, so the flat has a way in.";
+/** What the group is looking at, when it is not what is on the screen. */
+export const GROUP_HAS_OLDER =
+  "Your group still has this flat as you sent it. Sending again replaces it.";
+
+/**
+ * The line under step 02's button, or an empty string when there is nothing
+ * to say. It says something only once a flat has been sent AND changed since,
+ * which is the one moment a resident can be wrong about what their neighbours
+ * are looking at.
+ */
+export function staleNotice(state: SendState): string {
+  return state === "edited" ? GROUP_HAS_OLDER : "";
+}
+
+/** Where an edit leaves it. A flat nobody has sent is still a flat nobody has
+ *  sent, however much it changes. */
+export function afterEdit(state: SendState): SendState {
+  return state === "never" ? "never" : "edited";
+}
+
+/** Why step 02 is locked, and why the forward button is asleep. It names
+ *  what the entrance is FOR rather than where it goes (run 0035): a
+ *  resident who has not placed one needs the reason they should care, and
+ *  the editor already refuses an entrance anywhere but an outside edge, so
+ *  saying where to put it was answering a question nobody had. */
+export const NO_WAY_IN = "Place an entrance to send the flat to the group.";
 
 /**
  * Whether the landing screen shows at all. A URL that already names a

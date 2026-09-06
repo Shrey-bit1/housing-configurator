@@ -45,6 +45,9 @@ import {
   flatPhase,
   canSend,
   sendButtonLabel,
+  staleNotice,
+  afterEdit,
+  type SendState,
   showsDropHint,
   checksRun,
   showsLanding,
@@ -998,11 +1001,14 @@ const saveNamesLine = document.getElementById("save-names") as HTMLElement;
 const saveResultsEl = document.getElementById("save-results") as HTMLElement;
 const saveGoBtn = document.getElementById("save-go") as HTMLButtonElement;
 const saveGoLabelEl = document.getElementById("save-go-label") as HTMLElement;
-/** Whether this flat has reached the group in this visit (run 0034). It is
- *  what turns step 02's one red button from the send button into the way to
- *  the group. Any edit to the flat clears it (`refreshFlatFigures`), because
- *  a changed flat has not been sent. */
-let hasSent = false;
+const sendStaleEl = document.getElementById("send-stale") as HTMLElement;
+/** How far this flat has got towards the group, in this visit (run 0034, a
+ *  third state in run 0035). It is what turns step 02's one red button from
+ *  the send button into the way to the group, and what puts the line under it
+ *  saying the group is looking at an older flat. ONE value: the rules that
+ *  read it are `sendButtonLabel` and `staleNotice` in src/core/flatState.ts,
+ *  and `afterEdit` is the only thing that moves it on an edit. */
+let sendState: SendState = "never";
 
 // ---- "More": folded by default (run 0026), holding the design number,
 // colour and the five checkboxes that used to be the whole dialog. ----
@@ -1204,9 +1210,10 @@ let phase: FlatPhase = "empty";
  * gate's own reason when the unit cannot be built yet.
  */
 function refreshFlatFigures(): void {
-  // A flat that has been edited has not been sent, whatever went before, so
-  // step 02's button goes back to being the send button (run 0034).
-  hasSent = false;
+  // A flat that has been edited has not been sent as it now stands, so step 02's
+  // button goes back to being the send button and, if something DID go to the
+  // group before this edit, says so underneath (run 0034, run 0035).
+  sendState = afterEdit(sendState);
   const rooms = placedRooms();
   const built = buildUnitExport(floors, "", "#000000");
   phase = flatPhase(rooms, built.ok);
@@ -1671,8 +1678,9 @@ function syncSaveDialog(): void {
   // Two moments, one button (run 0034). Once the flat has gone to the group
   // the button stops being a send and becomes the way onward, so the send's
   // own gates no longer apply to it.
-  saveGoLabelEl.textContent = sendButtonLabel(hasSent);
-  saveGoBtn.disabled = hasSent ? false : isEmptySelection(sel) || !canSend(phase);
+  saveGoLabelEl.textContent = sendButtonLabel(sendState);
+  sendStaleEl.textContent = staleNotice(sendState);
+  saveGoBtn.disabled = sendState === "sent" ? false : isEmptySelection(sel) || !canSend(phase);
 }
 
 /** The library manifest, or an empty one when it cannot be read. The dialog
@@ -1888,7 +1896,7 @@ async function runSave(): Promise<void> {
         // "make completion feel closer"): where to go and check it landed.
         line += " · open Units to see your group.";
         setSaveResult("publish", "written", line);
-        hasSent = true; // the button below now reads "Go to your group"
+        sendState = "sent"; // the button below now reads "Go to your group"
         saveReplaceInput.checked = false; // one deliberate tick per takeover, not a standing default
         void unitBrowser.refresh(); // an open panel shows the neighbours' list with this flat in it
       } else {
@@ -1996,7 +2004,7 @@ saveColorInput.addEventListener("input", () => (saveColorTouched = true));
 for (const input of Object.values(saveWhatInputs))
   input.addEventListener("change", syncSaveDialog);
 saveGoBtn.addEventListener("click", () => {
-  if (hasSent) {
+  if (sendState === "sent") {
     window.open(groupUrl(), "_blank", "noopener");
     return;
   }

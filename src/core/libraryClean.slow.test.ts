@@ -24,23 +24,25 @@ import type { DwellingUnitFile } from "./unitExport";
  * library is covered the moment it lands, and a flat that cannot pass cannot be
  * added quietly.
  *
- * ONE FLAT IS ALREADY ROTTEN. `unit-5.json` was in the library before this test
- * existed and fails four rules: it has no bathroom, its second storey is cut off
- * because no stair reaches it, and the rooms up there are orphaned. Run 0028
- * found it and was not allowed to touch the seven flats that were already
- * there, so it is quarantined below by name and by the exact four rules it
- * breaks. That is deliberately brittle. Fixing the flat breaks this test, which
- * is the reminder to delete the quarantine; a fifth failure appearing breaks it
- * too. Nothing else in the library gets this treatment.
+ * THE LIBRARY IS NOW CLEAN THROUGHOUT. One flat used to be rotten: `unit-5.json`
+ * was there before this test existed and failed four rules, having no bathroom
+ * and a second storey no stair reached, with the rooms up there orphaned. Run
+ * 0028 found it and was not allowed to touch the seven flats already in the
+ * library, so it was quarantined by name and by the exact four rule ids it
+ * broke. That quarantine was written to be brittle in both directions, and its
+ * own note said that fixing the flat would break this test and that breaking it
+ * was the reminder to delete the entry. The flat was redrawn and now reports
+ * zero must-fix violations, so run 0035 deleted the entry. QUARANTINE is kept as
+ * an empty table rather than removed, because the next flat that arrives rotten
+ * will want the same shape.
  *
  * Slow suite, because a real {@link FloorManager} pulls in the three.js render
  * layer. Same stubs and the same reason as libraryRoundTrip.slow.test.ts.
  */
 
-/** file name → the must-fix rule ids it is known to break, newest first. */
-const QUARANTINE: Record<string, string[]> = {
-  "unit-5.json": ["P1", "H1", "ST3", "ST2"],
-};
+/** file name → the must-fix rule ids it is known to break, newest first.
+ *  Empty since run 0035: every flat in the library passes. */
+const QUARANTINE: Record<string, string[]> = {};
 
 const UNITS = import.meta.glob<DwellingUnitFile>("../../public/units/*.json", {
   eager: true,

@@ -275,6 +275,11 @@
             <button id="save-go" class="btn-send" type="button">
               <span id="save-go-label">Send it</span><span aria-hidden="true">→</span>
             </button>
+            <!-- Run 0035: the group is looking at the flat as it was sent, and
+                 the resident has changed it since. Empty at every other moment,
+                 and `:empty` in style.css takes it out of the layout, so the
+                 panel does not carry a gap waiting for a sentence. -->
+            <p id="send-stale" class="send-stale"></p>
             <p id="save-names" class="save-names"></p>
             <p class="group-hint">Your neighbours see it within seconds.</p>
             <div id="save-results" role="status" aria-live="polite"></div>

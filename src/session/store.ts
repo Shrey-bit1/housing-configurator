@@ -32,7 +32,12 @@
  * an accident of two residents proposing the same design number.
  */
 
-/** The three calls the handler makes on storage; `@netlify/blobs`' `Store` has this shape. */
+/** The four calls the handler makes on storage; `@netlify/blobs`' `Store` has
+ *  this shape. `delete` joined in run 0035, when leaving a group started
+ *  taking the person's flats with it: a flat withdrawn has to stop existing
+ *  rather than become an empty body, because `/export` reads every blob and an
+ *  empty string there would read as a flat nobody can open. Deleting a key
+ *  that is not there is not an error, in Blobs and here alike. */
 export interface KV {
   get(key: string): Promise<string | null>;
   getWithMetadata(key: string): Promise<{ data: string; etag?: string } | null>;
@@ -41,6 +46,7 @@ export interface KV {
     value: string,
     options?: { onlyIfMatch?: string; onlyIfNew?: boolean },
   ): Promise<{ modified: boolean }>;
+  delete(key: string): Promise<void>;
 }
 
 /** What the polling call says about one flat. Never the flat itself. */
@@ -186,7 +192,11 @@ function groupExists(index: SessionIndex): boolean {
 const CORS = {
   "access-control-allow-origin": "*",
   // POST joined in run 0031 for the messages route, the store's first.
-  "access-control-allow-methods": "GET, POST, PUT, OPTIONS",
+  // DELETE joined in run 0035. It has to be named here or a browser never
+  // sends the call at all: the preflight fails and `fetch` rejects with
+  // `TypeError: Failed to fetch`, which is what the building app's run 0059
+  // measured when it tried to remove a resident.
+  "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
   "access-control-allow-headers": "content-type",
 };
 
@@ -194,6 +204,55 @@ const CORS = {
 const CODE = /^[a-z0-9_-]{1,32}$/;
 const ID = /^[a-z0-9_-]{1,64}$/i;
 const INDEX_ATTEMPTS = 4;
+
+/**
+ * A resident name off the wire, checked once (run 0035). It was written out
+ * twice before, at the PUT and in the messages route, and leaving and renaming
+ * would have made it four. The rule has not changed: trimmed, 1 to 64
+ * characters, nothing a terminal would swallow.
+ */
+function residentName(raw: string): string {
+  const who = raw.trim();
+  if (who.length === 0 || who.length > 64 || /[\p{C}]/u.test(who)) {
+    return fail(400, "resident name must be 1-64 printable characters");
+  }
+  return who;
+}
+
+/**
+ * The key a resident's row is filed under, found the way ownership is decided
+ * (run 0035). The row is keyed by the name AS TYPED, so "ana" must still find
+ * "Ana"'s row, and `sameResident` is the one rule that says those are one
+ * person. Undefined when nobody has a row.
+ */
+function residentKey(index: SessionIndex, who: string): string | undefined {
+  return Object.keys(index.residents).find((k) => sameResident(k, who));
+}
+
+/**
+ * The spelling this group already has for this person, which is what a removal
+ * and a rename report back (run 0035). Their row's key when they have a row,
+ * otherwise the name recorded against a flat they own, otherwise the name as
+ * it was typed. The middle case is the one worth having: somebody who
+ * published a flat and never sent any wishes has no row, and answering
+ * `DELETE .../residents/dan` with "dan" would tell the caller a spelling the
+ * store never held.
+ */
+function storedName(index: SessionIndex, who: string, owned: string[]): string {
+  const key = residentKey(index, who);
+  if (key !== undefined) return key;
+  const first = owned[0];
+  return first === undefined ? who : index.flats[first].resident;
+}
+
+/** Every flat this person owns, by the same one rule (run 0035). Sorted, so a
+ *  removal and a rename report the same list in the same order every time. */
+function flatsOwnedBy(index: SessionIndex, who: string): string[] {
+  return Object.entries(index.flats)
+    .filter(([, f]) => sameResident(f.resident, who))
+    .map(([id]) => id)
+    .sort();
+}
 
 /** Two resident names as the same person (run 0026): trimmed, case-insensitive.
  *  A republish by "ben" over a flat recorded as "Ben" is not a conflict — only
@@ -337,11 +396,73 @@ async function route(req: Request, kv: KV): Promise<Response> {
   }
 
   if (rest[0] === "residents") {
-    if (req.method !== "PUT") return fail(405, "PUT only");
-    const who = decodeSegment(rest[1] ?? "").trim();
-    if (who.length === 0 || who.length > 64 || /[\p{C}]/u.test(who)) {
-      return fail(400, "resident name must be 1-64 printable characters");
+    const who = residentName(decodeSegment(rest[1] ?? ""));
+
+    // `residents/{name}/rename` (run 0035). One call rather than a PUT under
+    // the new name and a DELETE of the old, because between those two a
+    // person is at the table twice and the building app is polling.
+    if (rest.length === 3 && rest[2] === "rename") {
+      if (req.method !== "POST") return fail(405, "POST only");
+      const body = await req.json().catch(() => fail(400, "body must be JSON"));
+      if (!isRecord(body)) return fail(400, "body must be a JSON object");
+      if (typeof body.to !== "string") return fail(400, "body must carry a `to` name");
+      const to = residentName(body.to);
+      let moved!: { from: string; to: string; flats: string[] };
+      await updateIndex(kv, indexKey, (index) => {
+        const from = residentKey(index, who);
+        const owned = flatsOwnedBy(index, who);
+        if (from === undefined && owned.length === 0) {
+          return fail(404, `no resident "${who}" in session "${code}"`);
+        }
+        // A person renaming to another spelling of their own name is the case
+        // this call exists for, so it is not a clash with themselves. Anyone
+        // else holding the name, by a row or by a flat, is.
+        if (!sameResident(who, to)) {
+          const takenBy = residentKey(index, to);
+          if (takenBy !== undefined || flatsOwnedBy(index, to).length > 0) {
+            return fail(409, `"${to}" is already at the table in session "${code}"`);
+          }
+        }
+        const name = storedName(index, who, owned);
+        const record = from === undefined ? undefined : index.residents[from];
+        if (from !== undefined) delete index.residents[from];
+        if (record !== undefined) index.residents[to] = record;
+        for (const id of owned) index.flats[id].resident = to;
+        moved = { from: name, to, flats: owned };
+      });
+      return json(moved);
     }
+
+    if (rest.length !== 2) return fail(404, "no such route; see docs/store.md");
+
+    // Leaving takes the flat with it (run 0035, Shrey's decision of
+    // 6 September). One person is one profile is one flat, so a person who
+    // goes cannot leave a flat behind for the building to keep packing.
+    if (req.method === "DELETE") {
+      let gone!: { resident: string; flats: string[] };
+      await updateIndex(kv, indexKey, (index) => {
+        const key = residentKey(index, who);
+        const owned = flatsOwnedBy(index, who);
+        if (key === undefined && owned.length === 0) {
+          return fail(404, `no resident "${who}" in session "${code}"`);
+        }
+        const name = storedName(index, who, owned);
+        if (key !== undefined) delete index.residents[key];
+        for (const id of owned) delete index.flats[id];
+        gone = { resident: name, flats: owned };
+      });
+      // The index is the record of what exists, so it loses the flats first
+      // and the blobs go afterwards. A crash between the two leaves orphaned
+      // bytes nothing points at, which is the harmless order; the reverse
+      // leaves the index promising a flat that `/export` cannot read.
+      for (const id of gone.flats) {
+        await kv.delete(`${code}/flats/${id}`);
+        await kv.delete(`${code}/flats/${id}.preview`);
+      }
+      return json(gone);
+    }
+
+    if (req.method !== "PUT") return fail(405, "PUT, DELETE or POST .../rename only");
     const patch = parseResidentPatch(await req.json().catch(() => fail(400, "body must be JSON")));
     let record!: Resident;
     await updateIndex(kv, indexKey, (index) => {
@@ -367,10 +488,8 @@ async function route(req: Request, kv: KV): Promise<Response> {
     // 1 to 64 characters, nothing a terminal would swallow. It is deliberately
     // NOT checked against the resident list, because somebody may say something
     // before they have published a flat.
-    const who = typeof body.who === "string" ? body.who.trim() : "";
-    if (who.length === 0 || who.length > 64 || /[\p{C}]/u.test(who)) {
-      return fail(400, "who must be 1-64 printable characters");
-    }
+    if (typeof body.who !== "string") return fail(400, "who must be 1-64 printable characters");
+    const who = residentName(body.who);
     // `text` is NOT trimmed before the length check the way `who` is, because
     // the leading and trailing spaces of a message are the sender's business.
     // It is only rejected for being empty or too long.

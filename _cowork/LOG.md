@@ -43,3 +43,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0032 | 2026-09-06 | Starting a group, and a code that does not exist says so | complete | 0032-starting-a-group.report.md |
 | 0033 | 2026-09-06 | One command to start, and a clear word when the store is not there | complete | 0033-one-command-to-start.report.md |
 | 0034 | 2026-09-06 | One way forward, and the landing arrives in order | complete | 0034-one-way-forward.report.md |
+| 0035 | 2026-09-06 | Leaving takes the flat, renaming keeps it, and the library counts from one | complete | 0035-leaving-takes-the-flat.report.md |

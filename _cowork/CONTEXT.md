@@ -217,6 +217,24 @@ a `from` and no `to`, so nothing is missing if the animation never runs.
 Nothing about the repo's shape changed: no new directory, no new entry
 point, no new dependency and no new run step. PROJECT_STATE §14.
 
+Run 0035 gave the store two calls it did not have and renamed the whole
+library. A person can now leave a group, and their flats leave with them:
+`DELETE /api/session/{code}/residents/{name}` removes the row and every flat
+that person owns, each flat's picture with it. A person can rename and keep
+their flat: `POST .../residents/{name}/rename` moves the row and retags the
+flats in one write, so nobody is at the table twice while the building app
+polls. Both refuse by the same one ownership rule the publish check has used
+since run 0026. `OPTIONS` now names DELETE, without which a browser never
+sends the call at all. The library counts from one: every entry reads Flat 1
+to Flat 30, in the manifest and in each file, while ids and filenames stay
+exactly as they were because the live store links by id. The descriptors are
+gone, since a manifest row has nowhere to put a second line; every old name is
+in the run's report. Step 02 now says when the group is looking at an older
+flat than the one on the screen. The store contract changed only by those two
+calls and the CORS line; no new directory, no new entry point, no new
+dependency and no new run step. PROJECT_STATE new §16, and docs/store.md is
+still the contract's source of truth.
+
 **Last updated:** 2026-09-06
 
 ## What this project is

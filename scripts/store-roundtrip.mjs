@@ -9,7 +9,8 @@
  * two resident names, sets each resident's counts, share and ballot, reads the
  * session state back and checks the summaries, reads each flat back and checks
  * it byte for byte against the file that was sent, writes a building run and
- * checks that `changed` cleared. Every response is printed; the two flat bodies
+ * checks that `changed` cleared, then renames one resident and removes the other
+and checks that a person's flats follow them out. Every response is printed; the two flat bodies
  * are printed as their size and SHA-256 rather than 70 KB of JSON, and the
  * byte comparison is the check. Exit code 1 if any check fails.
  *
@@ -192,6 +193,76 @@ console.log(`  export with bodies abbreviated: ${JSON.stringify(abbreviated)}`);
 const opt = await fetch(`${base}/api/session/${code}/flats/flat-2`, { method: "OPTIONS" });
 console.log(`\nOPTIONS ${base}/api/session/${code}/flats/flat-2\n${opt.status} ${opt.statusText}  allow-methods=${opt.headers.get("access-control-allow-methods")}  allow-headers=${opt.headers.get("access-control-allow-headers")}`);
 check(opt.status === 204 && opt.headers.get("access-control-allow-origin") === "*", "preflight answers 204 with an open origin");
+// Run 0035: a method missing from this line is a call a browser never sends,
+// which is how the building app's run 0059 met `TypeError: Failed to fetch`.
+check((opt.headers.get("access-control-allow-methods") ?? "").includes("DELETE"), "preflight offers DELETE, so a browser can send the leave call");
+
+// 9. A new name keeps the flat, and leaving takes it (run 0035). Ben's flat
+// gets a picture first, so the removal has a preview to take with it.
+const shot = Buffer.from("ffd8ffe000104a46494600010100000100010000ffd9", "hex");
+const shotRes = await fetch(`${base}/api/session/${code}/flats/flat-3/preview`, { method: "PUT", body: shot, headers: { "content-type": "image/jpeg" } });
+console.log(`\nPUT ${base}/api/session/${code}/flats/flat-3/preview\n${shotRes.status} ${shotRes.statusText}  ${await shotRes.text()}`);
+check(shotRes.status === 200, "Ben's flat has a picture before he leaves");
+
+// The name in the URL is the wrong case on purpose: ownership folds case.
+const renamed = await call("POST", "/residents/ana/rename", JSON.stringify({ to: "Ana B" }));
+check(renamed.status === 200 && renamed.json?.from === "Ana" && renamed.json?.to === "Ana B", "ana renames to Ana B, and the stored spelling comes back as `from`");
+check(JSON.stringify(renamed.json?.flats) === JSON.stringify(["flat-2"]), "the rename reports flat-2 as hers");
+const afterRename = await call("GET", "", undefined, { quiet: true });
+const renamedFlat = (afterRename.json?.flats ?? []).find((f) => f.id === "flat-2");
+check(renamedFlat?.resident === "Ana B", "flat-2 is now recorded against Ana B");
+check((afterRename.json?.residents ?? []).some((r) => r.name === "Ana B"), "the row moved to Ana B");
+check(!(afterRename.json?.residents ?? []).some((r) => r.name === "Ana"), "and nobody is called Ana any more, so she is not at the table twice");
+const anaMoved = (afterRename.json?.residents ?? []).find((r) => r.name === "Ana B");
+check(anaMoved?.shareM2 === 7 && anaMoved?.wishes?.corner === true, "her answers came with her");
+console.log(`  Ana B, after the rename: ${JSON.stringify(anaMoved)}`);
+
+const taken = await call("POST", "/residents/Ana B/rename", JSON.stringify({ to: "ben" }));
+check(taken.status === 409, "renaming onto a name already at the table is refused with 409");
+console.log(`  the refusal: ${taken.status} ${JSON.stringify(taken.json)}`);
+
+const left = await call("DELETE", "/residents/BEN");
+check(left.status === 200 && left.json?.resident === "Ben", "BEN leaves, and the stored spelling comes back");
+check(JSON.stringify(left.json?.flats) === JSON.stringify(["flat-3"]), "his flat leaves with him");
+const twiceGone = await call("DELETE", "/residents/BEN");
+check(twiceGone.status === 404, `leaving twice is a 404, because he is not at the table any more (${twiceGone.status})`);
+
+const afterLeave = await call("GET", "", undefined, { quiet: true });
+check((afterLeave.json?.flats ?? []).length === 1 && afterLeave.json.flats[0].id === "flat-2", "one flat is left, and it is Ana B's");
+check((afterLeave.json?.residents ?? []).length === 1 && afterLeave.json.residents[0].name === "Ana B", "one resident is left, and it is Ana B");
+check(
+  !JSON.stringify(afterLeave.json?.residents).includes("Ben") && !JSON.stringify(afterLeave.json?.flats).includes("Ben") && !JSON.stringify(afterLeave.json?.flats).includes("flat-3"),
+  "no resident row and no flat summary mentions Ben or his flat"
+);
+// What he SAID stays. The messages are an append-only record of a
+// conversation and the building run records who asked for it; neither is
+// his profile or his flat, and run 0035 does not rewrite either.
+check(
+  (afterLeave.json?.messages ?? []).some((m) => m.who === "Ben") && afterLeave.json?.building?.by === "Ben",
+  "what he said and the run he asked for are still there, because leaving takes the profile and the flat and nothing else"
+);
+console.log(`  the state after he left: ${JSON.stringify(afterLeave.json)}`);
+
+const goneFlat = await call("GET", "/flats/flat-3", undefined, { quiet: true });
+// Checked as "not 200" rather than "404" on purpose. Under `netlify dev` a
+// 404 from the function is not the last word: the dev server retries the
+// same path with `.html` appended, and the client sees THAT response, which
+// is a 400 because a dot is not allowed in a flat id. Measured in this run,
+// in the dev server's own log: `GET /flats/nope` answered 404 and was
+// followed at once by `GET /flats/nope.html` answering 400. What matters is
+// that the body does not come back, and that is what is checked.
+check(goneFlat.status !== 200 && !goneFlat.text.includes("dwelling-unit"), `his flat is gone from the store, not merely unlisted (${goneFlat.status})`);
+const gonePreview = await fetch(`${base}/api/session/${code}/flats/flat-3/preview`);
+console.log(`\nGET ${base}/api/session/${code}/flats/flat-3/preview\n${gonePreview.status} ${gonePreview.statusText}`);
+check(gonePreview.status !== 200, `and so is its picture (${gonePreview.status})`);
+
+const expAfter = await call("GET", "/export", undefined, { quiet: true });
+check(Object.keys(expAfter.json?.bodies ?? {}).length === 1 && "flat-2" in (expAfter.json?.bodies ?? {}), "the export carries one body, Ana B's");
+check(
+  !JSON.stringify(expAfter.json?.residents).includes("Ben") && !JSON.stringify(expAfter.json?.flats).includes("Ben"),
+  "and the export carries no resident row and no flat summary for him"
+);
+console.log(`  the export after he left, bodies abbreviated: ${JSON.stringify({ ...expAfter.json, bodies: Object.fromEntries(Object.entries(expAfter.json?.bodies ?? {}).map(([k, v]) => [k, `<${Buffer.byteLength(String(v))} bytes>`])) })}`);
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) FAILED`} for session "${code}"`);
 process.exit(failures === 0 ? 0 : 1);
