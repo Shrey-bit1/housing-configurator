@@ -85,6 +85,7 @@ import {
   writeSession,
   normalizeCode,
   whyPublishDisabled,
+  whoLine,
   sessionLine,
   publishUnit,
   publishPreview,
@@ -1581,6 +1582,13 @@ let saveColorTouched = false;
 // Two fields at the top of the save dialog, remembered in localStorage under
 // one key and shown in the top bar. A `?session=` in the URL wins over the
 // stored code and is stored. Neither is ever written into a project file.
+const saveWhoLineEl = document.getElementById("save-who-line") as HTMLElement;
+const saveWhoChangeBtn = document.getElementById("save-who-change") as HTMLButtonElement;
+const saveSessionFields = document.getElementById("save-session-fields") as HTMLElement;
+/** Whether the resident asked to see the two fields again. Once open, they
+ *  stay open for the visit: somebody who pressed "change" is mid-correction and
+ *  should not have the fields fold under them on the next keystroke. */
+let whoFieldsOpen = false;
 const saveResidentInput = document.getElementById("save-resident") as HTMLInputElement;
 const saveCodeInput = document.getElementById("save-session") as HTMLInputElement;
 const savePublishNote = document.getElementById("save-publish-note") as HTMLElement;
@@ -1623,6 +1631,13 @@ let session: SessionSettings = readSession(sessionStorageArea, location.search);
  *  either is empty the checkbox is off, disabled, and its note says why; the
  *  moment both are filled it comes back with the remembered choice. */
 function syncSessionUI(): void {
+  // Who is sending and where to, answered once on the landing (run 0036). The
+  // fields are folded while the answer is complete, and open while it is not,
+  // because a resident who has not said who they are needs somewhere to say it.
+  const who = whoLine(session);
+  saveWhoLineEl.textContent = who.line;
+  saveWhoChangeBtn.hidden = !who.ready;
+  saveSessionFields.hidden = who.ready && !whoFieldsOpen;
   tbSession.textContent = sessionLine(session);
   tbSession.classList.toggle("set", session.code.length > 0);
   // The code itself, read from `session` rather than kept anywhere new, so
@@ -1644,6 +1659,11 @@ function onSessionInput(): void {
   syncSessionUI();
   syncSaveDialog();
 }
+saveWhoChangeBtn.addEventListener("click", () => {
+  whoFieldsOpen = true;
+  syncSessionUI();
+  saveCodeInput.focus();
+});
 saveResidentInput.addEventListener("input", onSessionInput);
 saveCodeInput.addEventListener("input", onSessionInput);
 saveResidentInput.value = session.resident;

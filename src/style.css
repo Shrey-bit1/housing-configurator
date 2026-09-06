@@ -511,6 +511,32 @@ button.primary:hover {
   color: var(--bg);
 }
 
+/* Who is sending and where to (run 0036). One quiet sentence where two open
+   fields used to be, with a small "change" that unfolds them. */
+.save-who {
+  margin: 0 0 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.save-who-change {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+}
+.save-session-fields[hidden] {
+  display: none;
+}
+
 /* The line under step 02's button, when the group has an older flat than the
    one on the screen (run 0035). Accent red rather than the meta grey the
    `save-names` line takes, because it is the one thing on that panel a

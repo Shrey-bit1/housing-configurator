@@ -218,6 +218,26 @@ export function whyPublishDisabled(s: SessionSettings): string | null {
   return null;
 }
 
+/**
+ * Who is sending and where to, as one sentence for step 02 (run 0036).
+ *
+ * Step 02 used to carry the same two fields the landing already asked for,
+ * open, every time. A resident who has joined a group has answered that
+ * question and should be told the answer rather than asked it again, so the
+ * fields fold away behind a "change" and this line stands in their place.
+ *
+ * `ready` is false when there is nobody or no group yet. The screen uses it for
+ * two things: the fields start open rather than folded, and the red button
+ * leads back to the landing's join instead of trying to send.
+ */
+export function whoLine(s: SessionSettings): { line: string; ready: boolean } {
+  const resident = s.resident.trim();
+  if (resident && s.code) return { line: `As ${resident}, to ${s.code}.`, ready: true };
+  if (!resident && !s.code) return { line: "You have not said who you are or which group.", ready: false };
+  if (!resident) return { line: `To ${s.code}, but you have not said who you are.`, ready: false };
+  return { line: `As ${resident}, but you have not joined a group.`, ready: false };
+}
+
 /** The top-bar line: which group, and who (words only, run 0026). */
 export function sessionLine(s: SessionSettings): string {
   const resident = s.resident.trim();

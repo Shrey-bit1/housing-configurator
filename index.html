@@ -264,7 +264,17 @@
                  Both fields stay open here, which retires run 0025's fold:
                  this screen exists to send, so the two things a send needs
                  are never one click away. -->
-            <div id="save-session-fields" class="save-session-fields">
+            <!-- Who is sending and where to, answered once on the landing and
+                 shown back here as one sentence (run 0036). The two fields the
+                 landing already asked for used to sit open on this screen every
+                 time. They are still here, folded, for the rare case; "change"
+                 is what unfolds them, and they start unfolded when there is
+                 nobody or no group yet. -->
+            <p id="save-who" class="save-who">
+              <span id="save-who-line"></span>
+              <button type="button" id="save-who-change" class="save-who-change">change</button>
+            </p>
+            <div id="save-session-fields" class="save-session-fields" hidden>
               <label>Your group
                 <input id="save-session" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
               </label>
