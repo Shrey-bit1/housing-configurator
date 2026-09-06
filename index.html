@@ -331,6 +331,9 @@
             <button id="landing-start" class="btn-send landing-primary" type="button">
               <span id="landing-start-label">Start a flat</span><span aria-hidden="true">→</span>
             </button>
+            <button id="landing-new" class="landing-door" type="button">
+              <span>Start a group</span><span aria-hidden="true">→</span>
+            </button>
             <button id="landing-join" class="landing-door" type="button">
               <span>Join a group</span><span aria-hidden="true">→</span>
             </button>
@@ -359,6 +362,25 @@
               <span>Join</span><span aria-hidden="true">→</span>
             </button>
             <button id="landing-join-back" class="landing-back" type="button">back</button>
+          </form>
+          <!-- "Start a group" invents a code, starts it in the store, and shows
+               it back. A plain screen in the app's own skin rather than a
+               dialog, for the reason the join form is one: a dialog cannot be
+               styled, cannot be tested, and returns nothing under scripting. -->
+          <form class="landing-join landing-new" id="landing-new-form" hidden>
+            <p class="landing-new-label">Your group code</p>
+            <p class="landing-new-code" id="landing-new-code">…</p>
+            <p class="landing-new-say" id="landing-new-say">
+              Pass this to the others so they can join. It is the only way in.
+            </p>
+            <label>Your name
+              <input id="landing-new-name" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
+            </label>
+            <p class="landing-join-why" id="landing-new-why"></p>
+            <button id="landing-new-go" class="btn-send" type="submit">
+              <span>Start drawing</span><span aria-hidden="true">→</span>
+            </button>
+            <button id="landing-new-back" class="landing-back" type="button">back</button>
           </form>
         </div>
         <div class="landing-journey">

@@ -2904,6 +2904,32 @@ body[data-step="send"] #drop-hint {
   font-size: 18px;
   caret-color: var(--accent);
 }
+/* The code has to be readable across a room, so it is the biggest thing on the
+   screen and set in the mono face the figures use, where a 0 and an O differ. */
+.landing-new-label {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+.landing-new-code {
+  margin: 2px 0 0;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-size: 44px;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  user-select: all;
+}
+.landing-new-say {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--meta);
+}
+
 /* The recall line sits above the error line and reads as quiet information
    rather than as a warning, so it takes the meta grey and not the accent red. */
 .landing-join-recall {

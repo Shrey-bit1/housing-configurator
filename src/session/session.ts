@@ -80,6 +80,15 @@ export function inventCode(
   return null;
 }
 
+/** Start a group at `code`. True on 201, false on 409 or anything else. */
+export async function startGroup(code: string, f: typeof fetch = fetch): Promise<boolean> {
+  try {
+    return (await f(`/api/session/${encodeURIComponent(code)}`, { method: "POST" })).status === 201;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The stored settings, with a `?session=` in the URL winning over the stored
  * code and being stored at once. Storage that is missing or refuses (a private
