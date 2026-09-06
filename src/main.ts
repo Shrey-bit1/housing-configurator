@@ -1046,7 +1046,55 @@ const frStoreysEl = document.getElementById("fr-storeys") as HTMLElement;
 const frGlazingEl = document.getElementById("fr-glazing") as HTMLElement;
 const frRoomsEl = document.getElementById("fr-rooms") as HTMLElement;
 const frCheckEl = document.getElementById("fr-check") as HTMLButtonElement;
-const dropHintEl = document.getElementById("drop-hint") as HTMLElement;
+const dropHintEl = document.getElementById("drop-hint") as unknown as SVGSVGElement;
+const dropHintShape = document.getElementById("drop-hint-shape") as unknown as SVGPolygonElement;
+const dropHintLabel = document.getElementById("drop-hint-label") as unknown as SVGTextElement;
+
+/**
+ * Trace the ACTIVE floor's grid onto the screen, so the empty state's hint is
+ * the plate's own size and shape.
+ *
+ * It was a CSS diamond of a fixed 190px, which could not be either: how big the
+ * plate looks depends on the grid dimensions and on where the camera is, and a
+ * box in the page knows neither. So the four corners are projected through the
+ * camera every frame the hint is up, which is only ever an empty flat.
+ *
+ * The grid is centred on the world origin (`sizeGroundPlane` above scales a
+ * unit plane, and `floorManager.ts:917` reads the same half-extents), so the
+ * corners are ±half the world width by ±half the world depth at the floor's
+ * own height.
+ */
+const dropHintCorner = new THREE.Vector3();
+function syncDropHint(): void {
+  if (!dropHintEl.classList.contains("show")) return;
+  // The hint is also drawn outside the loop, on the frame it appears, when the
+  // renderer may not have run since the camera last moved. `project` reads
+  // `matrixWorldInverse`, which only the renderer maintains, so refresh both
+  // here rather than trusting whatever the last render left behind.
+  camera.updateMatrixWorld();
+  camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+  const grid = floors.active.grid;
+  const halfW = grid.worldWidth / 2;
+  const halfD = grid.worldDepth / 2;
+  const y = floors.active.group.position.y;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  let cx = 0;
+  let cy = 0;
+  const points: string[] = [];
+  // Wound in order, so the polygon is the quadrilateral and not a bow tie.
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+    dropHintCorner.set(sx * halfW, y, sz * halfD).project(camera);
+    const px = (dropHintCorner.x * 0.5 + 0.5) * w;
+    const py = (-dropHintCorner.y * 0.5 + 0.5) * h;
+    points.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+    cx += px / 4;
+    cy += py / 4;
+  }
+  dropHintShape.setAttribute("points", points.join(" "));
+  dropHintLabel.setAttribute("x", cx.toFixed(1));
+  dropHintLabel.setAttribute("y", cy.toFixed(1));
+}
 
 /** Where each animated element's tween currently is, and its in-flight
  *  frame handle, so a second call retargets instead of restarting: found
@@ -1213,6 +1261,9 @@ function refreshFlatFigures(): void {
   }
 
   dropHintEl.classList.toggle("show", showsDropHint(phase));
+  // Once on the way in, so it is right on the frame it appears rather than one
+  // frame later; `animate` keeps it right after that.
+  syncDropHint();
   syncStepTabs();
   syncSaveDialog();
 }
@@ -2350,6 +2401,12 @@ function animate(): void {
   updateCutaway(scene, camera.position, controls.target);
   updateNorthBadge();
   renderer.render(scene, camera);
+  // AFTER the render, not before. `Vector3.project` reads
+  // `camera.matrixWorldInverse`, which the renderer refreshes as part of
+  // rendering, so projecting first uses the PREVIOUS frame's matrix and the
+  // outline lags a frame behind the plate under it, which reads as a drift
+  // during an orbit. No-op unless the flat is empty and the hint is up.
+  syncDropHint();
 }
 
 animate();
