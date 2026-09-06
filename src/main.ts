@@ -87,6 +87,8 @@ import {
   landingRecall,
   inventCode,
   startGroup,
+  groupIsStarted,
+  noSuchGroupText,
   decideTakeover,
   type FetchLike,
   type SessionSettings,
@@ -1414,7 +1416,7 @@ document.getElementById("landing-join-back")!.addEventListener("click", () => {
   landingJoinForm.hidden = true;
   landingDoors.hidden = false;
 });
-landingJoinForm.addEventListener("submit", (e) => {
+landingJoinForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   // The SAME two values the send panel's own fields hold, written through
   // the same `writeSession`, so joining here and typing there leave state
@@ -1424,6 +1426,14 @@ landingJoinForm.addEventListener("submit", (e) => {
   const why = whyPublishDisabled(next);
   if (why !== null) {
     landingWhy.textContent = why;
+    return;
+  }
+  // Joining means joining (run 0032). Before this a code nobody had started was
+  // conjured on the spot, so one typo started an empty group of one while the
+  // resident believed they had joined the twenty.
+  landingWhy.textContent = "";
+  if (!(await groupIsStarted(next.code))) {
+    landingWhy.textContent = noSuchGroupText(next.code);
     return;
   }
   session = next;

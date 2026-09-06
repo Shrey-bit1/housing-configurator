@@ -80,6 +80,19 @@ export function inventCode(
   return null;
 }
 
+/** Whether the store says this group has been started (run 0032). Anything
+ *  other than a clean 200 carrying `exists: true` reads as "not started", so a
+ *  store that is down refuses a join rather than inventing one. */
+export async function groupIsStarted(code: string, f: typeof fetch = fetch): Promise<boolean> {
+  try {
+    const res = await f(`/api/session/${encodeURIComponent(code)}`);
+    if (!res.ok) return false;
+    return ((await res.json()) as { exists?: boolean }).exists === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Start a group at `code`. True on 201, false on 409 or anything else. */
 export async function startGroup(code: string, f: typeof fetch = fetch): Promise<boolean> {
   try {
@@ -87,6 +100,12 @@ export async function startGroup(code: string, f: typeof fetch = fetch): Promise
   } catch {
     return false;
   }
+}
+
+/** What a resident is told when they join a code nobody has started. Pure, for
+ *  the same reason every other sentence in this file is. */
+export function noSuchGroupText(code: string): string {
+  return `No group called ${code}. Check the code for a typo, or ask whoever started the group for it.`;
 }
 
 /**
