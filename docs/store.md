@@ -44,6 +44,11 @@ A `GET` on a code nobody has started still answers `200` with an empty group and
 polls a code continuously, including before anybody has published anything, and
 a `404` there would be a poll that fails for a group that is merely young.
 
+**A person's flats leave with them.** One person is one profile is one flat, so
+`DELETE /api/session/{code}/residents/{name}` removes that person's row and
+every flat they own in the same call, and nothing is left behind for the
+building to keep packing.
+
 **There is no login and no password: anyone who knows a session code can read
 and overwrite everything in it, including flats published by others.** A
 resident is a name typed in. That is accepted for a five-person test in one
@@ -56,7 +61,10 @@ configurator, so on a Netlify deploy the base is
 `https://<deploy>.netlify.app/api/session/`. The building configurator runs on
 another origin, so every response carries
 `Access-Control-Allow-Origin: *`, and `OPTIONS` on any path answers `204`
-with methods `GET, PUT, OPTIONS` and the header `content-type` allowed.
+with methods `GET, POST, PUT, DELETE, OPTIONS` and the header `content-type`
+allowed. Every method the store answers has to be named there or a browser
+never sends the call: the preflight fails and `fetch` rejects with
+`TypeError: Failed to fetch`, which says nothing about what was wrong.
 
 A site-wide Netlify password gates these paths too: as of run 0022 the
 `reconfigure-flat` site answers `401` to every request, preflights included,
@@ -77,6 +85,8 @@ There are four things in a session: **flats**, **residents**, the last
 | `GET` | `/api/session/{code}/flats/{id}/preview` | none | the flat's JPEG picture |
 | `PUT` | `/api/session/{code}/flats/{id}/preview` | the JPEG bytes | `{ ok, bytes }` |
 | `PUT` | `/api/session/{code}/residents/{name}` | any of `counts`, `share`, `ballot`, `shareM2`, `extraM2`, `wishes` | that resident's whole record after the merge |
+| `DELETE` | `/api/session/{code}/residents/{name}` | none | `{ resident, flats }`, naming what was removed; `404` if that name has neither a row nor a flat |
+| `POST` | `/api/session/{code}/residents/{name}/rename` | `to` | `{ from, to, flats }`; `409` if the new name is already at the table |
 | `POST` | `/api/session/{code}/messages` | `who`, `text` | the stored message with the store's `at`; `201` |
 | `GET` | `/api/session/{code}/building` | none | the last run, or `null` |
 | `PUT` | `/api/session/{code}/building` | `genome`, `summary`, `by` | the stored run with its `at` timestamp |
@@ -303,6 +313,67 @@ content-type: application/json
 
 Here Ben's `counts` came from an earlier body that sent only `counts`, and his
 `share` is `null` because he has never sent one.
+
+### `DELETE /api/session/{code}/residents/{name}` — leaving
+
+Removes that person from the group and takes their flats with them. The row
+goes, every flat they own goes, and each flat's picture goes with its flat.
+Afterwards nothing in the session state, and nothing in `/export`, mentions
+them.
+
+Who owns a flat is the same rule the publish check uses: two names are one
+person when they match after trimming and folding case. So `DELETE
+.../residents/ana` removes the row filed under `Ana` and the flats published as
+`Ana`. The name in the answer is the name as it was stored, not as it was
+typed in the URL.
+
+The call answers `404` when that name has neither a row nor a flat, so a person
+who is not at the table cannot be removed twice. It answers `200` when either
+one is there, which means a person who published a flat and never sent any
+wishes can still leave, and so can a person who sent wishes and never published.
+
+```
+DELETE /api/session/room-42/residents/ben
+```
+
+```json
+200 OK
+{ "resident": "Ben", "flats": ["flat-3"] }
+```
+
+`flats` is sorted, and it is empty when that person had a row but no flat.
+
+### `POST /api/session/{code}/residents/{name}/rename` — a new name
+
+Moves a person's row to a new name and retags every flat they own, in one
+write. It is one call rather than a `PUT` under the new name followed by a
+`DELETE` of the old one, because between those two calls the person is at the
+table twice and the building configurator is polling.
+
+The body is `{ "to": "the new name" }`, checked by the same rule as the name in
+the URL: 1 to 64 printable characters after trimming. Both names are stored as
+typed; only the comparison folds case.
+
+It answers `409` when the new name is already at the table, whether that is a
+row or a published flat. Renaming to another spelling of one's own name is not
+a clash with oneself, and it is the case this call mostly exists for: it is how
+somebody who typed `ana` once and `Ana` the next time stops being two people.
+It answers `404` when the name being renamed has neither a row nor a flat.
+
+```
+POST /api/session/room-42/residents/ana/rename
+content-type: application/json
+
+{ "to": "Ana B" }
+```
+
+```json
+200 OK
+{ "from": "Ana", "to": "Ana B", "flats": ["flat-2"] }
+```
+
+`from` is the name as it was stored. A flat's `id` never changes here, only the
+`resident` recorded against it, so a link to a flat survives a rename.
 
 ### `POST /api/session/{code}/messages` — what the group said
 
