@@ -382,6 +382,40 @@ async function route(req: Request, kv: KV): Promise<Response> {
   if (rest[0] === "residents") {
     const who = residentName(decodeSegment(rest[1] ?? ""));
 
+    // `residents/{name}/rename` (run 0035). One call rather than a PUT under
+    // the new name and a DELETE of the old, because between those two a
+    // person is at the table twice and the building app is polling.
+    if (rest.length === 3 && rest[2] === "rename") {
+      if (req.method !== "POST") return fail(405, "POST only");
+      const body = await req.json().catch(() => fail(400, "body must be JSON"));
+      if (!isRecord(body)) return fail(400, "body must be a JSON object");
+      if (typeof body.to !== "string") return fail(400, "body must carry a `to` name");
+      const to = residentName(body.to);
+      let moved!: { from: string; to: string; flats: string[] };
+      await updateIndex(kv, indexKey, (index) => {
+        const from = residentKey(index, who);
+        const owned = flatsOwnedBy(index, who);
+        if (from === undefined && owned.length === 0) {
+          return fail(404, `no resident "${who}" in session "${code}"`);
+        }
+        // A person renaming to another spelling of their own name is the case
+        // this call exists for, so it is not a clash with themselves. Anyone
+        // else holding the name, by a row or by a flat, is.
+        if (!sameResident(who, to)) {
+          const takenBy = residentKey(index, to);
+          if (takenBy !== undefined || flatsOwnedBy(index, to).length > 0) {
+            return fail(409, `"${to}" is already at the table in session "${code}"`);
+          }
+        }
+        const record = from === undefined ? undefined : index.residents[from];
+        if (from !== undefined) delete index.residents[from];
+        if (record !== undefined) index.residents[to] = record;
+        for (const id of owned) index.flats[id].resident = to;
+        moved = { from: from ?? who, to, flats: owned };
+      });
+      return json(moved);
+    }
+
     if (rest.length !== 2) return fail(404, "no such route; see docs/store.md");
 
     // Leaving takes the flat with it (run 0035, Shrey's decision of
