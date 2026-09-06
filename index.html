@@ -97,12 +97,21 @@
         <canvas id="scene"></canvas>
         <canvas id="graph-canvas"></canvas>
         <!-- The empty state's one ghost tile (run 0027, FlatEmpty.dc.html):
-             a dashed diamond on the grid saying where the first room goes.
+             a dashed outline on the grid saying where the first room goes.
              It is drawn in the DOM rather than in the scene because it is
              chrome rather than geometry, and it never takes a pointer event,
              so a drag can land straight through it. `showsDropHint` in
-             src/core/flatState.ts is the only thing that decides it. -->
-        <div id="drop-hint" aria-hidden="true"><span>Drop a room here</span></div>
+             src/core/flatState.ts is the only thing that decides it.
+
+             An SVG polygon rather than a CSS diamond (run 0033): it traces the
+             ACTIVE floor's four grid corners projected through the camera, so
+             it is the plate's own size and follows every orbit and zoom. A
+             fixed CSS box cannot, since the plate's size on screen depends on
+             the grid dimensions and the camera. -->
+        <svg id="drop-hint" aria-hidden="true">
+          <polygon id="drop-hint-shape" />
+          <text id="drop-hint-label" text-anchor="middle">Drop a room here</text>
+        </svg>
         <!-- Step 02's read-out (FlatSend.dc.html): the flat shown whole with
              its numbers underneath. Same figures as the bar's strip, which
              is hidden in this step, so a resident reads them in exactly one

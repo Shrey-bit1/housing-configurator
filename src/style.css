@@ -2679,83 +2679,35 @@ body[data-step="send"] #drop-hint {
   display: none;
 }
 
-/* The flat's figures under the drawing in step 02, centred with the
-   drawing above them. */
-#flat-readout {
-  position: absolute;
-  left: 50%;
-  bottom: 28px;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: flex;
-  align-items: flex-end;
-  gap: 28px;
-  padding: 14px 22px;
-  background: var(--card);
-  border-top: 3px solid var(--ink);
-  box-shadow: 0 1px 0 var(--line-paper);
-}
-#flat-readout .fr-name {
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: 26px;
-  line-height: 1;
-  text-transform: uppercase;
-}
-#send-caption {
-  position: absolute;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
-  margin: 0;
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--meta);
-}
-
-/* The empty state's one ghost tile (FlatEmpty.dc.html): a dashed red
-   diamond where the first room goes. Rotated and squashed rather than
-   drawn as an SVG polygon, which keeps it one element and lets it sit on
-   the same isometric angle the grid reads at. Never takes a pointer
-   event, so a drag lands straight through it onto the grid below. */
+/* The empty state's hint. An SVG over the whole viewport whose polygon traces
+   the active floor's grid corners, projected each frame in main.ts, so it is
+   the plate's own size and follows the camera. `overflow: visible` because the
+   polygon is written in the element's own pixel coordinates and a corner may
+   sit a fraction outside the box. */
 #drop-hint {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 190px;
-  height: 190px;
-  margin: -95px 0 0 -95px;
+  inset: 0;
   z-index: 3;
   display: none;
-  place-items: center;
-  border: 2px dashed var(--accent);
-  background: rgba(214, 52, 28, 0.06);
-  /* ORDER MATTERS. CSS applies these right to left, so this squashes the
-     square to 190x110 and THEN turns it 45 degrees, which is a tilted
-     rectangle. Rotating first and squashing after is what puts a diamond flat
-     on the grid, and 0.58 is the plate's own height-to-width ratio. */
-  transform: scale(1, 0.58) rotate(45deg);
   pointer-events: none;
+  overflow: visible;
 }
 #drop-hint.show {
-  display: grid;
+  display: block;
 }
-#drop-hint span {
-  /* The exact inverse of the parent's, so the label reads level and unsquashed:
-     inverting `scale(S) rotate(R)` gives `rotate(-R) scale(1/S)`, and
-     1 / 0.58 is 1.7241. */
-  transform: rotate(-45deg) scale(1, 1.7241);
+#drop-hint-shape {
+  fill: rgba(214, 52, 28, 0.06);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+}
+#drop-hint-label {
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--accent);
-  white-space: nowrap;
+  fill: var(--accent);
 }
 
 /* ============================================================
