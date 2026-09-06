@@ -84,6 +84,7 @@ import {
   publishUnit,
   publishPreview,
   takeoverConfirmText,
+  landingRecall,
   decideTakeover,
   type FetchLike,
   type SessionSettings,
@@ -1286,6 +1287,7 @@ const landingStartLabel = document.getElementById("landing-start-label") as HTML
 const landingCode = document.getElementById("landing-code") as HTMLInputElement;
 const landingName = document.getElementById("landing-name") as HTMLInputElement;
 const landingWhy = document.getElementById("landing-join-why") as HTMLElement;
+const landingRecallLine = document.getElementById("landing-join-recall") as HTMLElement;
 const landingGroupLink = document.getElementById("landing-group") as HTMLAnchorElement;
 
 function showLanding(): void {
@@ -1296,8 +1298,14 @@ function showLanding(): void {
   // will really do: open an empty grid the first time, and hand back an
   // afternoon's work every time after that.
   landingStartLabel.textContent = isEmptyProject() ? "Start a flat" : "Back to your flat";
-  landingCode.value = session.code;
-  landingName.value = session.resident;
+  // One rule, one place (src/session/session.ts): a first visit shows two empty
+  // fields and says nothing, and a return visit says plainly that it is picking
+  // up rather than guessing at the person in front of it.
+  const recall = landingRecall(session);
+  landingCode.value = recall.code;
+  landingName.value = recall.name;
+  landingRecallLine.textContent = recall.line;
+  landingRecallLine.hidden = recall.line.length === 0;
   landingWhy.textContent = "";
   landingGroupLink.href = session.code
     ? `${BUILDING_APP_URL}?session=${encodeURIComponent(session.code)}`
