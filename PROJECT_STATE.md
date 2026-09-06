@@ -3889,6 +3889,7 @@ without Netlify.
 | `PUT` | `…/flats/{id}?resident=…&label=…` | body = the `dwelling-unit` JSON as Export writes it. `parseUnit` checks only `format`, `storeys[].cells` as `[int,int]`; `measure` derives `bbox [minX,minZ,maxX,maxZ]`, `floors`, `areaCells`, `preview` (carried across a republish). Existing id, same resident → version+1, `changed: true`, 200; existing id, DIFFERENT resident → 409 unless `?replace=1` (run 0024, `store.ts:180`, body `{error, resident: <owner>}`); new → version 1, 201. `label` falls back to the unit's `name`. |
 | `GET`/`PUT` | `…/flats/{id}/preview` | Run 0024. GET returns the flat's JPEG (`content-type: image/jpeg`); PUT takes the JPEG as the raw body, 404 if the flat itself does not exist yet. Base64 under a key that is a SIBLING of the flat's own (`{code}/flats/{id}.preview`, not a child of it — see Storage layout). Sets `preview: true` on the flat's summary. |
 | `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[], since run 0030 `shareM2`/`extraM2` whole ints ≥0 or null, since run 0031 `wishes` null or all three booleans); each present key replaced whole. Returns `{name, …record}`. |
+| `POST` | `…/{code}` | run 0032. Starts the group: writes `startedAt` and answers `201` with its state, or `409` naming the code if `groupExists` was already true. No body, no owner. |
 | `POST` | `…/messages` | run 0031. `{who, text}` appended with the store's own `at`; `who` 1-64 printable trimmed, `text` 1-500 stored verbatim and untrimmed. Capped at the last `MESSAGE_CAP` = 200, oldest dropped. Returns the stored message, `201`. |
 | `GET`/`PUT` | `…/building` | PUT stores `{genome, summary, by, at: now}` and sets `changed = false` on every flat; GET returns it or `null`. |
 | `GET` | `…/export` | Run 0023 (`store.ts:185-195`). The session state plus `bodies: {id: <flat text>}` (every flat blob, as a STRING so the bytes survive; `null` if a blob is missing) and `exportedAt`. The only call that reads every blob; for the end of a session, never for polling. |
@@ -3953,6 +3954,24 @@ second module needs the same answer.
 **Proof.** `scripts/store-roundtrip.mjs <base-url>` (plain Node, no deps):
 fresh session per run, publishes `public/units/flat-2-single-storey.json`
 (37484 bytes) as Ana and `public/units/flat-3-terrace.json` (33388 bytes) as
+**A group is started on purpose (run 0032).** Before it, a `GET` on an unused
+code conjured a group, so one typo started an empty group of one while the
+resident believed they had joined the twenty, and nothing could tell the two
+apart afterwards. `POST /api/session/{code}` now starts one and `GET` carries
+`exists`.
+
+`groupExists(index)` is THE ONE RULE: `startedAt` present, OR at least one flat,
+OR at least one resident. The second and third clauses are what make this need no
+migration, since every group live in the store was created by the old behaviour
+and carries no `startedAt`. The taken-check runs INSIDE the `updateIndex` mutate,
+because `updateIndex` re-runs it on a lost ETag race, so two people starting the
+same code at once cannot both be told they won.
+
+`exists` was added BESIDE every field the poll already returned and in place of
+none, which `store.test.ts` pins by asserting the poll's whole key set. A `GET` on
+an unstarted code still answers `200` rather than `404`, because the building app
+polls a code before anybody has published to it.
+
 **The three wishes and the group's messages (run 0031).** `Resident` gains
 `wishes`, either null or `{corner, terrace, quiet}` all boolean. A PARTIAL object
 is a 400 rather than a merge, because a wish that is absent and one that is false
@@ -4226,6 +4245,16 @@ unit export"), which describes where a setting is stored.
 **Retired:** run 0025's fold over the two group fields. On step 02 they ARE
 the screen, next to the button that uses them (FlatSend.dc.html), so both
 stay open and `syncSessionFold`/`unfoldSessionFields` are gone.
+
+**Four doors, and joining means joining (run 0032).** The landing's doors are
+Start a flat, Start a group, Join a group, Open a file. Start a group calls
+`inventCode` (`src/session/session.ts`), which makes a code from a 58-word list
+and two digits so it can be said across a table, starts it in the store, and
+shows it at 44px in the mono face. A code the store refuses is one somebody else
+took, so it tries again rather than reporting a collision the resident did not
+cause. Join a group now calls `groupIsStarted` and refuses an unstarted code with
+`noSuchGroupText`, which names the code the resident typed. Both sentences are
+pure functions for the reason every other sentence in that file is.
 
 **A first visit starts empty (run 0031).** The landing used to fill its code and
 name from `localStorage` every time, so a person who had never used the app could

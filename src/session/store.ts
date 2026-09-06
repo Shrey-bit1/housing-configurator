@@ -161,6 +161,26 @@ interface SessionIndex {
   /** Optional in the type because an index written before run 0031 has none,
    *  and the store reads a record back as it found it rather than backfilling. */
   messages?: Message[];
+  /** When somebody started this group on purpose, or absent if nobody did.
+   *  Written once by `POST /api/session/{code}` and never overwritten. */
+  startedAt?: string;
+}
+
+/**
+ * Whether this group exists, which is THE ONE RULE the whole feature turns on.
+ *
+ * True when somebody started it on purpose, and ALSO when it already holds a
+ * flat or a resident. The second half is there so that every group already live
+ * in the store reads as existing without a migration: they were all created by
+ * the old behaviour, where a `GET` on an unused code conjured one, and none of
+ * them carries `startedAt`.
+ */
+function groupExists(index: SessionIndex): boolean {
+  return (
+    typeof index.startedAt === "string" ||
+    Object.keys(index.flats).length > 0 ||
+    Object.keys(index.residents).length > 0
+  );
 }
 
 const CORS = {
@@ -230,7 +250,23 @@ async function route(req: Request, kv: KV): Promise<Response> {
   const indexKey = `${code}/index`;
 
   if (rest.length === 0) {
-    if (req.method !== "GET") return fail(405, "GET only");
+    // Starting a group is the one call that must fail when it would otherwise
+    // succeed silently. Before run 0032 a `GET` on an unused code conjured a
+    // group, so one typo in a code started an empty group of one while the
+    // resident believed they had joined the twenty.
+    if (req.method === "POST") {
+      let started = false;
+      await updateIndex(kv, indexKey, (index) => {
+        // Re-checked INSIDE the mutate rather than before it, because
+        // updateIndex re-reads and re-runs this on a lost ETag race, so two
+        // people starting the same code at once cannot both be told they won.
+        started = !groupExists(index);
+        if (started) index.startedAt = new Date().toISOString();
+      });
+      if (!started) return fail(409, `group "${code}" has already been started`);
+      return json(sessionView(code, await readIndex(kv, indexKey)), 201);
+    }
+    if (req.method !== "GET") return fail(405, "GET or POST only");
     return json(sessionView(code, await readIndex(kv, indexKey)));
   }
 
@@ -476,6 +512,10 @@ function sessionView(code: string, index: SessionIndex) {
     flats: Object.values(index.flats),
     residents: Object.entries(index.residents).map(([name, r]) => ({ name, ...r })),
     building: index.building,
+    // Added in run 0032 BESIDE everything else, never in place of it: the
+    // building app polls this call continuously and treats what it already
+    // reads the way it always has. `exists` is the one rule, `groupExists`.
+    exists: groupExists(index),
     // Named one by one here, unlike a resident's fields, which ride in on the
     // spread above. So a top-level addition like this one DOES need a line, and
     // it defaults to an empty list rather than being absent, so a group with

@@ -11,6 +11,9 @@ import {
   publishPreview,
   takeoverConfirmText,
   landingRecall,
+  inventCode,
+  noSuchGroupText,
+  groupIsStarted,
   decideTakeover,
   type KeyValue,
   type PublishResult,
@@ -308,5 +311,63 @@ describe("landingRecall — what the landing fills in and what it says about it"
 
   it("treats whitespace as nothing, so a stored blank is still a first visit", () => {
     expect(landingRecall(settings("   ", "  "))).toEqual({ code: "", name: "", line: "" });
+  });
+});
+
+describe("inventCode — a group code worth reading aloud", () => {
+  it("is a word, a hyphen and two digits, inside the store's own code rule", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const code = inventCode(() => false);
+      expect(code).not.toBeNull();
+      expect(code!).toMatch(/^[a-z]+-\d\d$/);
+      expect(isValidCode(code!)).toBe(true);
+      seen.add(code!);
+    }
+    // 200 draws off 58 words and 100 numbers should not collapse to a handful.
+    expect(seen.size).toBeGreaterThan(100);
+  });
+
+  it("tries again when the code it invented is taken", () => {
+    // A random that walks the wordlist one step at a time, so the sequence is
+    // known: the first two are refused and the third is the one returned.
+    let n = 0;
+    const random = () => [0, 0, 0.02, 0, 0.04, 0][n++] ?? 0;
+    const offered: string[] = [];
+    const taken = (c: string) => {
+      offered.push(c);
+      return offered.length < 3;
+    };
+    const code = inventCode(taken, random);
+    expect(offered).toHaveLength(3);
+    expect(code).toBe(offered[2]);
+  });
+
+  it("gives up rather than looping when every attempt is taken", () => {
+    expect(inventCode(() => true, Math.random, 4)).toBeNull();
+  });
+});
+
+describe("noSuchGroupText — what a resident reads on a code nobody started", () => {
+  it("names the code they typed and says what to do", () => {
+    expect(noSuchGroupText("zinc-99")).toBe(
+      "No group called zinc-99. Check the code for a typo, or ask whoever started the group for it."
+    );
+  });
+});
+
+describe("groupIsStarted — the one field the landing reads", () => {
+  const res = (body: unknown, ok = true) =>
+    Promise.resolve({ ok, json: () => Promise.resolve(body) } as Response);
+
+  it("is true only when the store says exists", async () => {
+    expect(await groupIsStarted("a", () => res({ exists: true }))).toBe(true);
+    expect(await groupIsStarted("a", () => res({ exists: false }))).toBe(false);
+  });
+
+  it("treats a missing field, a bad status and a dead store as not started", async () => {
+    expect(await groupIsStarted("a", () => res({}))).toBe(false);
+    expect(await groupIsStarted("a", () => res({ exists: true }, false))).toBe(false);
+    expect(await groupIsStarted("a", () => Promise.reject(new Error("offline")))).toBe(false);
   });
 });

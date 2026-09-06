@@ -23,9 +23,26 @@ One store serves many sessions. A session is a short code in the URL, chosen
 by whoever starts it and told to the others: 1 to 32 characters from `a-z`,
 `0-9`, `-` and `_`, compared case-insensitively (the store lowercases it), so
 `Studio-3` and `studio-3` are the same room. Something like `room-42` or
-`thesis-sep` is the intent. A session exists the moment someone asks for it:
-`GET` on a code nobody has used returns an empty session rather than an
-error, so the first resident can arrive before anyone else.
+`thesis-sep` is the intent.
+
+**A group is started on purpose.** `POST /api/session/{code}` starts one and is
+the only call that does. Before run 0032 a session existed the moment anybody
+asked for it, which meant one typo in a code started an empty group of one while
+the resident believed they had joined the twenty, and nothing could tell the two
+apart afterwards.
+
+`GET /api/session/{code}` therefore carries `exists`. **It is true when the
+group carries `startedAt`, and also when it already holds at least one flat or
+one resident.** The second half of that rule is there because every group live in
+the store before run 0032 was created by the old behaviour and carries no
+`startedAt`, and all of them should read as existing; without it they would all
+have needed a migration, and a migration of other people's data is a worse thing
+to ship than a two-part rule.
+
+A `GET` on a code nobody has started still answers `200` with an empty group and
+`exists` false, rather than `404`. That is deliberate: the building configurator
+polls a code continuously, including before anybody has published anything, and
+a `404` there would be a poll that fails for a group that is merely young.
 
 **There is no login and no password: anyone who knows a session code can read
 and overwrite everything in it, including flats published by others.** A
@@ -53,7 +70,8 @@ There are four things in a session: **flats**, **residents**, the last
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| `GET` | `/api/session/{code}` | none | the session state: flat summaries, residents, last run |
+| `GET` | `/api/session/{code}` | none | the session state: `exists`, flat summaries, residents, messages, last run |
+| `POST` | `/api/session/{code}` | none | starts the group; `201` with its state, `409` if already started |
 | `GET` | `/api/session/{code}/flats/{id}` | none | one flat's `dwelling-unit` JSON, byte for byte |
 | `PUT` | `/api/session/{code}/flats/{id}?resident=…&label=…` | the `dwelling-unit` JSON | the flat's summary; `201` created, `200` replaced, `409` refused |
 | `GET` | `/api/session/{code}/flats/{id}/preview` | none | the flat's JPEG picture |
@@ -84,6 +102,7 @@ GET /api/session/room-42
 ```json
 {
   "code": "room-42",
+  "exists": true,
   "flats": [
     {
       "id": "flat-2",
@@ -112,6 +131,30 @@ over the union of every storey, in the file's own normalized space;
 `floors` is the storey count; `areaCells` is the number of occupied cells
 over all storeys (multiply by 0.36 for m²); `publishedAt` is when the store
 received it.
+
+`exists` is described above. `startedAt` is the store's own timestamp for when
+somebody started the group, written once by the `POST` and never overwritten. It
+is held in the index rather than returned by the poll, because what a client
+needs is the answer and not the date.
+
+### `POST /api/session/{code}` — start a group
+
+No body. `201` with the same shape the `GET` returns when the code was free,
+and `409` when it was already started, with a message naming the code.
+
+```
+POST /api/session/room-42
+```
+
+```json
+409 Conflict
+{ "error": "group \"room-42\" has already been started" }
+```
+
+There is no owner and no password. Anybody who knows the code can still do
+everything, which is the store's one recorded limit and this run does not change
+it. Starting a group only makes the difference between a code that exists and a
+code that does not visible, so joining can mean joining.
 
 ### `GET /api/session/{code}/flats/{id}` — one flat
 

@@ -40,3 +40,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0029 | 2026-09-04 | Fifteen more flats, a bedroom in every one, and a way to delete | complete | 0029-fifteen-more.report.md |
 | 0030 | 2026-09-04 | The two fields travel | complete | 0030-the-two-fields-travel.report.md |
 | 0031 | 2026-09-06 | The store carries the wishes and the group's messages, and a first visit starts empty | complete | 0031-wishes-messages-and-a-clean-first-visit.report.md |
+| 0032 | 2026-09-06 | Starting a group, and a code that does not exist says so | complete | 0032-starting-a-group.report.md |

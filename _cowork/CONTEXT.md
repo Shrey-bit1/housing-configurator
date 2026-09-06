@@ -283,7 +283,9 @@ rules engine and the export format are the mature parts, the UI is not.
   `C:\Program Files\nodejs` and had to be prepended, which `.claude/dev.cmd`
   worked around; that is history unless the repo moves back to that machine.
 - **There are TWO test suites as of run 0014.** `npm test` is the fast one, under
-  a second over 275 cases in eighteen files as of run 0031 (ten more in
+  a second over 290 cases in eighteen files as of run 0032 (nine in
+  `store.test.ts` for starting a group and `exists`, six in `session.test.ts` for
+  the code generator and the join refusal); 275 in eighteen as of run 0031 (ten more in
   `store.test.ts` for the wishes and the messages, four in `session.test.ts` for
   the landing rule); 261 in eighteen as of run 0030; 256 in eighteen as of run 0029 (P4's four in
   `rules.test.ts`, six for the delete helpers in `unitBrowser.test.ts`, and two

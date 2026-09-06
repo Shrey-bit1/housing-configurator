@@ -60,9 +60,23 @@ const safeJson = (t) => {
 
 console.log(`session store round trip against ${base}, session "${code}"`);
 
-// 1. The session exists the moment someone asks for it.
+// 1. A code nobody has started still ANSWERS, because the building app polls it
+//    before anybody has published anything, but it says it does not exist yet.
 const empty = await call("GET", "");
 check(empty.status === 200 && empty.json?.flats?.length === 0, "unknown session reads as empty");
+check(empty.json?.exists === false, "and says exists false, because nobody started it");
+console.log(`  before starting: ${JSON.stringify(empty.json)}`);
+
+// 1b. Start it on purpose (run 0032), then start it again and be refused.
+const started = await call("POST", "");
+check(started.status === 201 && started.json?.exists === true, "POST starts the group, 201, exists true");
+console.log(`  the POST that started it: ${started.status} ${JSON.stringify(started.json)}`);
+const twice = await call("POST", "");
+check(twice.status === 409, "starting it twice is refused with 409");
+console.log(`  starting it twice: ${twice.status} ${JSON.stringify(twice.json)}`);
+const afterStart = await call("GET", "", undefined, { quiet: true });
+check(afterStart.json?.exists === true, "exists is true after the start");
+console.log(`  after starting: ${JSON.stringify(afterStart.json)}`);
 
 // 2. Publish both fixtures, one per resident, then republish the first to see the version move.
 const sent = {};

@@ -85,6 +85,10 @@ import {
   publishPreview,
   takeoverConfirmText,
   landingRecall,
+  inventCode,
+  startGroup,
+  groupIsStarted,
+  noSuchGroupText,
   decideTakeover,
   type FetchLike,
   type SessionSettings,
@@ -1288,12 +1292,17 @@ const landingCode = document.getElementById("landing-code") as HTMLInputElement;
 const landingName = document.getElementById("landing-name") as HTMLInputElement;
 const landingWhy = document.getElementById("landing-join-why") as HTMLElement;
 const landingRecallLine = document.getElementById("landing-join-recall") as HTMLElement;
+const landingNewForm = document.getElementById("landing-new-form") as HTMLFormElement;
+const landingNewCode = document.getElementById("landing-new-code") as HTMLElement;
+const landingNewName = document.getElementById("landing-new-name") as HTMLInputElement;
+const landingNewWhy = document.getElementById("landing-new-why") as HTMLElement;
 const landingGroupLink = document.getElementById("landing-group") as HTMLAnchorElement;
 
 function showLanding(): void {
   landingEl.hidden = false;
   landingDoors.hidden = false;
   landingJoinForm.hidden = true;
+  landingNewForm.hidden = true;
   // Nothing is destroyed on the way here, so the primary door says what it
   // will really do: open an empty grid the first time, and hand back an
   // afternoon's work every time after that.
@@ -1351,6 +1360,53 @@ document.getElementById("landing-open")!.addEventListener("click", () => {
   // file actually loads, which `readAndImport` reports through `importProjectText`.
   fileInput.click();
 });
+// Start a group: invent a code, start it in the store, show it back. A code
+// the store refuses is one somebody else already took, so it tries again with
+// another rather than telling the resident about a collision they did not cause.
+document.getElementById("landing-new")!.addEventListener("click", async () => {
+  landingDoors.hidden = true;
+  landingNewForm.hidden = false;
+  landingNewWhy.textContent = "";
+  landingNewCode.textContent = "…";
+  landingNewName.value = session.resident;
+
+  const tried = new Set<string>();
+  let code: string | null = null;
+  for (let i = 0; i < 5 && code === null; i++) {
+    const candidate = inventCode((c) => tried.has(c));
+    if (candidate === null) break;
+    tried.add(candidate);
+    if (await startGroup(candidate)) code = candidate;
+  }
+  if (code === null) {
+    landingNewCode.textContent = "—";
+    landingNewWhy.textContent = "Could not reach the store to start a group. Try again in a moment.";
+    return;
+  }
+  landingNewCode.textContent = code;
+  landingNewName.focus();
+});
+document.getElementById("landing-new-back")!.addEventListener("click", () => {
+  landingNewForm.hidden = true;
+  landingDoors.hidden = false;
+});
+landingNewForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const next = { resident: landingNewName.value, code: normalizeCode(landingNewCode.textContent ?? "") };
+  const why = whyPublishDisabled(next);
+  if (why !== null) {
+    landingNewWhy.textContent = why;
+    return;
+  }
+  session = next;
+  writeSession(sessionStorageArea, session);
+  saveResidentInput.value = session.resident;
+  saveCodeInput.value = session.code;
+  syncSessionUI();
+  syncSaveDialog();
+  hideLanding();
+  setStep("draw");
+});
 document.getElementById("landing-join")!.addEventListener("click", () => {
   landingDoors.hidden = true;
   landingJoinForm.hidden = false;
@@ -1360,7 +1416,7 @@ document.getElementById("landing-join-back")!.addEventListener("click", () => {
   landingJoinForm.hidden = true;
   landingDoors.hidden = false;
 });
-landingJoinForm.addEventListener("submit", (e) => {
+landingJoinForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   // The SAME two values the send panel's own fields hold, written through
   // the same `writeSession`, so joining here and typing there leave state
@@ -1370,6 +1426,14 @@ landingJoinForm.addEventListener("submit", (e) => {
   const why = whyPublishDisabled(next);
   if (why !== null) {
     landingWhy.textContent = why;
+    return;
+  }
+  // Joining means joining (run 0032). Before this a code nobody had started was
+  // conjured on the spot, so one typo started an empty group of one while the
+  // resident believed they had joined the twenty.
+  landingWhy.textContent = "";
+  if (!(await groupIsStarted(next.code))) {
+    landingWhy.textContent = noSuchGroupText(next.code);
     return;
   }
   session = next;
