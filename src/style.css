@@ -2734,14 +2734,21 @@ body[data-step="send"] #drop-hint {
   place-items: center;
   border: 2px dashed var(--accent);
   background: rgba(214, 52, 28, 0.06);
-  transform: rotate(45deg) scale(1, 0.58);
+  /* ORDER MATTERS. CSS applies these right to left, so this squashes the
+     square to 190x110 and THEN turns it 45 degrees, which is a tilted
+     rectangle. Rotating first and squashing after is what puts a diamond flat
+     on the grid, and 0.58 is the plate's own height-to-width ratio. */
+  transform: scale(1, 0.58) rotate(45deg);
   pointer-events: none;
 }
 #drop-hint.show {
   display: grid;
 }
 #drop-hint span {
-  transform: scale(1, 1.72) rotate(-45deg);
+  /* The exact inverse of the parent's, so the label reads level and unsquashed:
+     inverting `scale(S) rotate(R)` gives `rotate(-R) scale(1/S)`, and
+     1 / 0.58 is 1.7241. */
+  transform: rotate(-45deg) scale(1, 1.7241);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 11px;
