@@ -3888,7 +3888,8 @@ without Netlify.
 | `GET` | `…/flats/{id}` | the stored text, byte for byte, `content-type: application/json`; 404 if absent. |
 | `PUT` | `…/flats/{id}?resident=…&label=…` | body = the `dwelling-unit` JSON as Export writes it. `parseUnit` checks only `format`, `storeys[].cells` as `[int,int]`; `measure` derives `bbox [minX,minZ,maxX,maxZ]`, `floors`, `areaCells`, `preview` (carried across a republish). Existing id, same resident → version+1, `changed: true`, 200; existing id, DIFFERENT resident → 409 unless `?replace=1` (run 0024, `store.ts:180`, body `{error, resident: <owner>}`); new → version 1, 201. `label` falls back to the unit's `name`. |
 | `GET`/`PUT` | `…/flats/{id}/preview` | Run 0024. GET returns the flat's JPEG (`content-type: image/jpeg`); PUT takes the JPEG as the raw body, 404 if the flat itself does not exist yet. Base64 under a key that is a SIBLING of the flat's own (`{code}/flats/{id}.preview`, not a child of it — see Storage layout). Sets `preview: true` on the flat's summary. |
-| `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[], and since run 0030 `shareM2`/`extraM2` whole ints ≥0 or null); each present key replaced whole. Returns `{name, …record}`. |
+| `PUT` | `…/residents/{name}` | `parseResidentPatch`: only keys present are merged (`counts` map of ints ≥0, `share` 0..1 or null, `ballot` string[], since run 0030 `shareM2`/`extraM2` whole ints ≥0 or null, since run 0031 `wishes` null or all three booleans); each present key replaced whole. Returns `{name, …record}`. |
+| `POST` | `…/messages` | run 0031. `{who, text}` appended with the store's own `at`; `who` 1-64 printable trimmed, `text` 1-500 stored verbatim and untrimmed. Capped at the last `MESSAGE_CAP` = 200, oldest dropped. Returns the stored message, `201`. |
 | `GET`/`PUT` | `…/building` | PUT stores `{genome, summary, by, at: now}` and sets `changed = false` on every flat; GET returns it or `null`. |
 | `GET` | `…/export` | Run 0023 (`store.ts:185-195`). The session state plus `bodies: {id: <flat text>}` (every flat blob, as a STRING so the bytes survive; `null` if a blob is missing) and `exportedAt`. The only call that reads every blob; for the end of a session, never for polling. |
 | `OPTIONS` | anything | 204, `access-control-allow-origin: *`, methods `GET, PUT, OPTIONS`, headers `content-type`. Every other response carries the same CORS headers, errors included. |
@@ -3952,6 +3953,22 @@ second module needs the same answer.
 **Proof.** `scripts/store-roundtrip.mjs <base-url>` (plain Node, no deps):
 fresh session per run, publishes `public/units/flat-2-single-storey.json`
 (37484 bytes) as Ana and `public/units/flat-3-terrace.json` (33388 bytes) as
+**The three wishes and the group's messages (run 0031).** `Resident` gains
+`wishes`, either null or `{corner, terrace, quiet}` all boolean. A PARTIAL object
+is a 400 rather than a merge, because a wish that is absent and one that is false
+are the same thing to whoever reads them and letting them differ would invent a
+third state; `WISH_KEYS` names the three once so the check, the message and
+`docs/store.md` agree. Separately, `POST …/messages` appends
+`{who, text, at}` to an append-only list capped at 200, oldest dropped. It is the
+store's first POST, so `CORS` gained the method. `text` is stored verbatim and
+never interpreted, and is NOT trimmed before its length check the way `who` is.
+
+**`sessionView` names its OWN keys one by one.** Run 0030's `shareM2` needed no
+line there because it rides in on the resident spread; run 0031's `messages` is
+top-level and did need one, reading `index.messages ?? []` so a group that has
+said nothing reads as an empty list rather than a missing key and an index
+written before the run stays readable. Check which kind of field you are adding.
+
 **The two square-metre answers (run 0030).** `Resident` carries `shareM2` and
 `extraM2`, both `number | null`: how many square metres of shared space this
 resident thinks each person should pay for, and how many they offered to pay for
@@ -4209,6 +4226,18 @@ unit export"), which describes where a setting is stored.
 **Retired:** run 0025's fold over the two group fields. On step 02 they ARE
 the screen, next to the button that uses them (FlatSend.dc.html), so both
 stay open and `syncSessionFold`/`unfoldSessionFields` are gone.
+
+**A first visit starts empty (run 0031).** The landing used to fill its code and
+name from `localStorage` every time, so a person who had never used the app could
+not tell a field holding their own name from one holding somebody else's.
+`landingRecall` in `src/session/session.ts` is now THE ONLY place that decides
+it: it returns what to put in each field and one sentence about having done so.
+Nothing known gives two empty fields and no sentence; anything known fills what
+it recognised and says which, so the app is picking up rather than guessing. Pure,
+so `session.test.ts` pins the sentence rather than a screen reading it, the same
+reason `takeoverConfirmText` and `deleteConfirmText` are pure. The sentence has
+its own element, `#landing-join-recall`, in the meta grey rather than the accent
+red, because it is information and not a warning.
 
 **Verified live** against `netlify dev`, at 1440×900, in the Browser pane:
 the landing's own computed values (title Big Shoulders Display 78px, ink
