@@ -69,7 +69,7 @@ work-in-progress research artifact, not a production app.
 | Interaction | `src/interaction/picker.ts`, `dragDrop.ts`, `selection.ts` | Raycast picking (`cellAt`/`groupAt`/`groundPoint`, scoped to the ACTIVE floor's store — this is also why floor visibility needs no picker-side filtering, see §5), palette→canvas placement, select/**multi-select**/move/**group-move**/rotate/**mirror**/delete/**group-delete**/**Shift+D-duplicate** (any count) of modules, plus entrance AND door select/delete (two `MarkerSelectionAdapter`s — mutually exclusive singletons, excluded from multi-select). `R`/`M` work on the palette ghost, the move ghost, the duplicate ghost, and a SINGLE selected instance — no-op on 2+ (§2h). `dragDrop.cancelPlacement()`/`selection.cancelDuplicate()`/`entranceController.cancel()` are public, no-argument, and NOT wired to their own Escape listeners — Escape is arbitrated centrally by main.ts (§2h). `dragDrop`/`selection` take an `onAfterAction` callback (fires after a committed mutation → undo snapshot, see §2f); `selection` also takes `onSelectionChange`/`onNoopHint` callbacks and an `EntranceSelectionAdapter`. |
 | **Group-move ghost** | `src/scene/groupGhostPreview.ts` | `GroupGhostPreview`: one translucent ghost mesh per selected member, positioned by its cell offset from the grabbed member's target origin, tinted green/red as ONE unit (mirrors `GhostPreview`'s shape/API). See §2h. |
 | Wiring / render loop / view-mode orchestration, **dev-only `?project=` loader + `window.__app` capture handle** | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
-| **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. `sameResident(a, b)` (run 0026: trimmed, case-insensitive) is the ownership check's rule; a building run's optional `plot` (run 0026, opaque) rides alongside `genome`/`summary`. See §12. |
+| **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`/`delete`, the last added in run 0035) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. `sameResident(a, b)` (run 0026: trimmed, case-insensitive) is the ownership check's rule, and run 0035's leave and rename calls reach it through `residentKey`, `flatsOwnedBy` and `storedName` rather than answering the same question a second time; a building run's optional `plot` (run 0026, opaque) rides alongside `genome`/`summary`. See §12. |
 | **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
 | **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by `refreshFlatFigures` (`main.ts`), which writes the bar's strip in step 01 and the read-out under the drawing in step 02. See §11, §14. |
 | **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, `showsLanding(search)`, and (run 0034) `sendButtonLabel(hasSent)` with `SEND_IT` and `GO_TO_GROUP`. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
@@ -3872,8 +3872,10 @@ was NOT added (the entry needs no types from it). There is still no
 `netlify.toml`: Netlify finds `netlify/functions/` by default and `netlify dev`
 detects Vite on its own.
 
-**The `KV` seam** (`store.ts:30-38`): `get(key)`, `getWithMetadata(key) →
-{data, etag?}`, `set(key, text, {onlyIfMatch?|onlyIfNew?}) → {modified}`.
+**The `KV` seam** (`store.ts:35-51`): `get(key)`, `getWithMetadata(key) →
+{data, etag?}`, `set(key, text, {onlyIfMatch?|onlyIfNew?}) → {modified}`, and
+since run 0035 `delete(key)`, which a withdrawn flat needs: an emptied body
+would still be a body, and `/export` reads every one of them.
 A Netlify `Store` satisfies it structurally (method-parameter bivariance),
 so the entry passes the store straight in and `store.test.ts` passes a
 `MemoryKV` over a `Map`. This is the one seam that lets the routes be tested
@@ -4474,11 +4476,107 @@ non-orthogonal outline, because every module is an axis-aligned rectangle on the
 0.6 m grid. `_cowork/outbox/0029-reference-plans-2.md` names the built projects
 each of those shapes comes from.
 
-**The library has one rotten flat, quarantined.**
+**The library is clean throughout, and the quarantine is gone (run 0035).**
 `src/core/libraryClean.slow.test.ts` walks every file in `public/units/` and
-asserts zero must-fix. `unit-5.json` fails four rules (P1, H1, ST2, ST3): it is a
-four-instance scratch unit with zero doors, a retired `stair` module on floor 0
-and one bedroom on floor 1 that no stair reaches. Run 0028 was told the seven
-existing flats stay exactly as they are, so the test quarantines it by name and
-by its exact four rule ids. Fixing the flat breaks the test, which is the
-reminder to delete the quarantine.
+asserts zero must-fix. `unit-5.json` used to fail four rules (P1, H1, ST2, ST3),
+being a four-instance scratch unit with zero doors, a retired `stair` module on
+floor 0 and one bedroom on floor 1 that no stair reached. Run 0028 was told the
+seven existing flats stay exactly as they are, so the test quarantined it by
+name and by its exact four rule ids, and said in its own header that fixing the
+flat would break the test and that breaking it was the reminder to delete the
+entry. The flat was redrawn on 6 September and now reports zero must-fix, so
+run 0035 deleted the entry. `QUARANTINE` stays as an empty table, because the
+next flat that arrives rotten will want the same shape.
+---
+
+## 16. Leaving, renaming, and a library that counts from one (run 0035)
+
+**Leaving takes the flat with it.** One person is one profile is one flat, so
+`DELETE /api/session/{code}/residents/{name}` removes that person's row and
+every flat they own, each flat's blob and its preview blob with it. It answers
+`200` with `{ resident, flats }` and `404` when that name has neither a row nor
+a flat. The building app asked for this: its run 0059 could not remove a
+resident at all, so "leave" only emptied the answers and the building went on
+packing a flat nobody stood behind.
+
+**Renaming keeps it.** `POST /api/session/{code}/residents/{name}/rename` with
+`{ to }` moves the row and retags every flat that person owns, in one index
+write. One call rather than a `PUT` under the new name and a `DELETE` of the
+old, because between those two the person is at the table twice and the
+building app is polling. `409` when the new name already holds a row or a flat.
+Renaming to another spelling of one's own name is not a clash with oneself, and
+is the case the call mostly exists for.
+
+**One ownership rule, reached three ways.** `sameResident` has decided who owns
+a flat since run 0026 and still does. Run 0035 added three helpers over it
+rather than a second answer: `residentKey(index, who)` finds the key a row is
+filed under, `flatsOwnedBy(index, who)` finds that person's flats sorted, and
+`storedName(index, who, owned)` gives the spelling the store already holds, from
+the row when there is one and from a flat they own when there is not. That last
+case is why a person who published and never sent wishes gets their own
+spelling back rather than the one typed in the URL.
+
+**Order of writes.** The index loses the flats first and the blobs go
+afterwards. A crash between the two leaves bytes nothing points at, which is
+harmless; the reverse would leave the index promising a flat `/export` cannot
+read.
+
+**CORS.** `OPTIONS` now answers `GET, POST, PUT, DELETE, OPTIONS`. A method
+missing from that line is a call a browser never sends: the preflight fails and
+`fetch` rejects with `TypeError: Failed to fetch`, which says nothing about what
+was wrong. `docs/store.md`'s CORS line had also drifted, still naming
+`GET, PUT, OPTIONS` after run 0031 added `POST`, and was corrected.
+
+**What leaving does NOT take.** The messages and the building run stay. A
+message is an append-only record of a conversation and a run records who asked
+for it; neither is a profile or a flat. So after Ben leaves, `messages` still
+carries what he said and `building.by` still reads "Ben".
+
+**A dev-server trap, measured in this run.** Under `netlify dev` a `404` from
+the function is not the last word: the dev server retries the same path with
+`.html` appended and again as `/index.html`, and the client sees THAT response.
+`GET /flats/nope` answers `404` and `GET /flats/nope.html` answers `400`,
+because a dot is not a legal flat id, so a caller that reads only the status
+sees a `400` it cannot explain. `scripts/store-roundtrip.mjs` checks that a
+withdrawn flat's body does not come back rather than checking for a bare `404`,
+and says why in a comment.
+
+**Step 02 says when the group has an older flat.** `SendState` in
+`src/core/flatState.ts` is `never`, `sent` or `edited`, ONE value rather than
+two booleans. Run 0034's single `hasSent` boolean could not tell a flat that was
+never sent from one sent and then edited, because both leave it false, and those
+two want different words on the screen. `afterEdit` is the only thing that moves
+it on an edit; `sendButtonLabel` and `staleNotice` are the two pure rules that
+read it. The sentence is `GROUP_HAS_OLDER`, "Your group still has this flat as
+you sent it. Sending again replaces it.", in `#send-stale` under the button, in
+accent red, and `:empty` takes it out of the layout at every other moment.
+
+**`NO_WAY_IN` now reads "Place an entrance to send the flat to the group."** It
+names what the entrance is for rather than where it goes. The editor already
+refuses an entrance anywhere but an outside edge, so the old wording was
+answering a question nobody had. One constant, so the sentence under step 01's
+forward button, the bar's step 02 title and the toast an asleep press raises all
+move together.
+
+**The library counts from one.** Every entry reads `Flat N`, in
+`public/units/index.json` and in each file's own `name` field. Ids and
+filenames do not change, because the live store references them by id.
+The order: `unit-8` to `unit-27`, the twenty this project designed, are Flat 1
+to Flat 20; then `flat-2-single-storey`, `flat-3-terrace` and `unit-1` to
+`unit-7` are Flat 21 to Flat 29; then `unit-29`, saved from the app on
+6 September, is Flat 30. The descriptors each designed flat carried ("one
+bedroom, corner") are gone: `checkEntry` in `src/library/manifest.ts` accepts
+only id, name, color, file, preview, storeys, areaM2 and savedAt, so a row has
+nowhere to put a second line. Every old name is listed in
+`_cowork/outbox/0035-leaving-takes-the-flat.report.md`.
+`src/library/libraryNames.test.ts` pins the thirty names, the order and the
+unchanged ids in the FAST suite.
+
+**Verified live (run 0035)** against `netlify dev`. The round trip
+(`scripts/store-roundtrip.mjs`, 64 checks, all passing) renames Ana through a
+URL spelling her name in the wrong case and her flat and her answers follow,
+refuses a rename onto Ben's name with `409`, then removes `BEN` and finds his
+row, his flat gone from the state and from the export and his preview gone from
+the store. In the browser at 1440x900, step 02 showed no sentence before a send,
+none after a send with no edit, the sentence in `rgb(214, 52, 28)` directly
+under the button after a send and an edit, and none again after a second send.
