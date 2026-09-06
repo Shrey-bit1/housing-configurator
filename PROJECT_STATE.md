@@ -72,8 +72,8 @@ work-in-progress research artifact, not a production app.
 | **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. `sameResident(a, b)` (run 0026: trimmed, case-insensitive) is the ownership check's rule; a building run's optional `plot` (run 0026, opaque) rides alongside `genome`/`summary`. See §12. |
 | **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
 | **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by `refreshFlatFigures` (`main.ts`), which writes the bar's strip in step 01 and the read-out under the drawing in step 02. See §11, §14. |
-| **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, and `showsLanding(search)`. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
-| **The journey, as data** (run 0027) | `src/core/journey.ts` | `JOURNEY`, six ordered steps across the two apps, with `journeyIndex(id)` and `journeyMarks(currentId)` → `done` / `now` / `ahead`. The landing renders it and the building app is expected to render the same array, which is why it is exported data rather than markup. Pure, no DOM; `journey.test.ts` pins the order and the marks. See §14. |
+| **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, `showsLanding(search)`, and (run 0034) `sendButtonLabel(hasSent)` with `SEND_IT` and `GO_TO_GROUP`. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
+| **The journey, as data** (run 0027) | `src/core/journey.ts` | `JOURNEY`, six ordered steps across the two apps, with `journeyIndex(id)` and (run 0034) `journeyTones(currentId, thisApp)` → `now` / `here` / `elsewhere`, which replaced run 0027's `journeyMarks` and its `done` / `now` / `ahead`. The landing renders it and the building app is expected to render the same array, which is why it is exported data rather than markup. Pure, no DOM; `journey.test.ts` pins the order and the tones. See §14. |
 | **The session settings + the publish call** (who, which group, the fourth output, and the takeover confirm, runs 0023-0026) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, `publishUnit(fetchLike, base, settings, id, label, text, replace?)` which PUTs the unit bytes and never throws, `takeoverConfirmText(owner)` and `decideTakeover(r, replaceTicked, confirmed)` (run 0025: the post-409 decision — retry, decline with its exact line, or proceed — pulled out so `window.confirm` never has to be driven in a test). Pure; `session.test.ts` drives it with a Map and a stub. Its OWN strings say "group", never "session" or "room" (run 0026, words only — the module, the type, the storage key and every `/api/session/…` path keep their names). See §10, §11, §12. |
 
 **Concave-corner wall logic** (part of `buildBoundaryWalls`): walls are inset to
@@ -4221,9 +4221,11 @@ and the canvas only resizes.
 **The empty state** (FlatEmpty.dc.html). With nothing placed the three
 numbers read `—`, the name reads "Untitled", the check chip drops its pill
 and reads "Drag a room onto the grid to start. Nothing is checked until you
-do." as plain muted text, Send is asleep, and one dashed red diamond on the
-grid reads "Drop a room here" (`#drop-hint`, a DOM overlay rotated onto the
-isometric angle, `pointer-events: none` so a drag lands through it). A
+do." as plain muted text, Send is asleep, and one dashed red outline on the
+grid reads "Drop a room here" (`#drop-hint`, an SVG polygon whose
+four points are the ACTIVE floor's grid corners projected through the camera
+every frame in `syncDropHint`, so it is the plate's own size and follows every
+orbit; `pointer-events: none` so a drag lands through it). A
 figure is now shown ONLY when the unit builds: run 0026 showed `0 m²` for a
 flat with rooms but no way in, which reads as a measurement rather than as
 the absence of one, so that case reads dashes too and the chip beside it
@@ -4299,6 +4301,74 @@ framing the flat, hiding the palette and the bar strip, and reading
 "Unit 6 · 70 m² · 1 · 3.6 m · 7 rooms"; and a real send answering
 "Sent to run0027 as Unit 6 · open Units to see your group" with the store's
 poll showing the flat at version 1 with its preview.
+
+**One way forward, and the landing arrives in order (run 0034).**
+
+Step 01 now ends with a button rather than with a number in the bar.
+`#forward` sits at the bottom centre of the viewport, which is the one free
+edge: `#bottom-left` holds undo and redo, `#view-controls` holds Display, and
+the palette is outside the viewport, so nothing a resident needs is covered.
+It reads "Send it to your group", saying where it goes rather than "next".
+While the flat is not ready it carries `aria-disabled="true"`, takes the
+`--dim` fill through `.btn-send[aria-disabled="true"]`, and shows `NO_WAY_IN`
+in `#forward-why` above it; ready, it is `--accent` red and the sentence
+element is empty and so `display: none` through `#forward-why:empty`.
+`style.css` hides `#forward` in step 02 and `#save-column` in step 01, so
+exactly one `.btn-send` is on screen at a time. `syncStepTabs` in `main.ts`
+makes ONE `canSend(phase)` call and hands the same `open` to both the bar's
+step 02 and this button; `chromeWiring.test.ts` pins that shape, since this
+project has no jsdom and the wiring cannot be driven and asked.
+
+Step 02's one red button has two moments. Before a send it is the send
+button. After a successful publish `hasSent` flips, `sendButtonLabel(true)`
+relabels `#save-go-label` to "Go to your group", and the click opens
+`groupUrl()`, which is now the one place the building-app link is built and
+is read by the landing's own "Go to your group" as well. Any edit clears
+`hasSent` in `refreshFlatFigures`, because a changed flat has not been sent.
+
+The journey strip keeps all six dots and drops run 0027's done/ahead.
+`journeyTones(currentId, thisApp)` gives `now` for the dot a resident is on,
+`here` for the dots this app owns and `elsewhere` for the other app's, so the
+flat app shows the first two in ink and the last four dim and the building
+app shows the mirror image from the same function. The current dot and its
+label are `--accent`; `here` is `--ink`; `elsewhere` needs no rule, since
+`--dim` is what `.journey-dot` and `.journey-label` already are.
+
+The landing arrives in a fixed order, all in CSS. Nothing for 1000 ms; then
+both discs grow out of their own corners over 600 ms (`transform-origin: top
+left` for the yellow, `bottom right` for the blue); then the headline line by
+line at 1600, 1750 and 1900 ms; the paragraph at 2200; the four doors at
+2500, 2600, 2700 and 2800 with the aside line at 2900; the journey strip at
+3200. Every arrival lasts 300 ms. The headline is three `<span>`s rather than
+three `<br>`s, because a `<br>` is not an element a delay can sit on.
+
+It is honest if it never runs: every keyframe has a `from` and no `to`, so
+the resting state is the finished state and an engine that ignores the
+animation leaves the landing whole rather than blank.
+`prefers-reduced-motion: reduce` turns the whole sequence off. Nothing takes
+a pointer event or leaves its own place, so a door clicked at 1200 ms is the
+door that answers. Coming back from the join or the new-group form re-shows
+`#landing-doors`, and a `display` change restarts a CSS animation, so
+`showLandingDoors` in `main.ts` marks that path `.no-arrive` and the stagger
+plays once per visit.
+
+**Verified live (run 0034)** against `netlify dev` on 8888 at 1440×900 in the
+Browser pane. Step 01 empty: `#forward-go` `aria-disabled="true"`,
+`background-color: rgb(163, 156, 141)`, `#forward-why` reading "Place an
+entrance on an outside edge first, so the flat has a way in.", and
+`#step-send` carrying the same `aria-disabled="true"`. The same flat loaded
+with a way in: both read `aria-disabled="false"` and the button is
+`rgb(214, 52, 28)` with the sentence gone. In both, the only visible
+`.btn-send` is `forward-go`. Pressing it moves to step 02, where the only
+visible `.btn-send` is `save-go` reading "Send it". A real publish into
+`run-0034` answered "Sent to run-0034 as Unit 29 · open Units to see your
+group", the label became "Go to your group", and the click opened
+`http://localhost:5182/?session=run-0034`. Deleting a room and returning to
+step 02 put the label back to "Send it". The landing's computed delays read
+1s/0.6s for the discs and 1.6/1.75/1.9/2.2/2.5/2.6/2.7/2.8/2.9/3.2s at 0.3s
+each for the rest, and screenshots at about 1.2 s and 2.3 s show the discs
+mid-growth with no headline, then the headline in with the paragraph still
+fading and no doors yet.
 
 ---
 
