@@ -44,8 +44,7 @@ import { unitStats } from "./core/unitStats";
 import {
   flatPhase,
   canSend,
-  sendButtonLabel,
-  staleNotice,
+  sendButton,
   afterEdit,
   type SendState,
   showsDropHint,
@@ -66,7 +65,6 @@ import {
   planOutputs,
   isEmptySelection,
   needsUnitBuild,
-  needsRuleConfirm,
   unitGateResults,
   outputLabel,
   type OutputKind,
@@ -1015,6 +1013,10 @@ const sendStaleEl = document.getElementById("send-stale") as HTMLElement;
  *  read it are `sendButtonLabel` and `staleNotice` in src/core/flatState.ts,
  *  and `afterEdit` is the only thing that moves it on an edit. */
 let sendState: SendState = "never";
+/** How many things the layout check has to say about this flat. Counted once
+ *  in `refreshFlatFigures`, where the chip already counts them, and read by
+ *  the one button rule (run 0036). */
+let complaints = 0;
 
 // ---- "More": folded by default (run 0026), holding the design number,
 // colour and the five checkboxes that used to be the whole dialog. ----
@@ -1258,12 +1260,14 @@ function refreshFlatFigures(): void {
   let cls: string;
   let title: string;
   if (!checksRun(phase)) {
+    complaints = 0;
     // A hint, carrying no fault: it drops the pill outline entirely and
     // reads as the muted sentence FlatEmpty.dc.html shows in its card.
     label = EMPTY_HINT;
     cls = "chip chip-hint";
     title = EMPTY_HINT;
   } else if (!built.ok) {
+    complaints = 1;
     label = "1 must fix";
     cls = "chip chip-acc";
     title = built.reason;
@@ -1272,6 +1276,9 @@ function refreshFlatFigures(): void {
       computeDwellingGraph(floors.floors),
       floors.orientationPreference
     ).filter((v) => v.severity === "hard");
+    // The same count the chip shows, kept for step 02's button so the two can
+    // never disagree about how many things there are to look at (run 0036).
+    complaints = hard.length;
     label = hard.length ? `${hard.length} must fix` : "All checks pass";
     cls = hard.length ? "chip chip-acc" : "chip chip-ok";
     title = hard.length ? `${hard[0].description} — open the layout report` : "Open the layout report";
@@ -1710,12 +1717,13 @@ function syncSaveDialog(): void {
     ? `It becomes ${parts.join(" and ")}` + (numberCountsSession ? `, next free in the library and ${session.code}` : "")
     : "Nothing selected";
   if (!saveColorTouched) saveColorInput.value = defaultUnitColor(unitNameFor(n));
-  // Two moments, one button (run 0034). Once the flat has gone to the group
-  // the button stops being a send and becomes the way onward, so the send's
-  // own gates no longer apply to it.
-  saveGoLabelEl.textContent = sendButtonLabel(sendState);
-  sendStaleEl.textContent = staleNotice(sendState);
-  saveGoBtn.disabled = sendState === "sent" ? false : isEmptySelection(sel) || !canSend(phase);
+  // ONE rule for the button and the line under it (run 0036), over three
+  // facts: whether the flat is ready, how far it has got towards the group,
+  // and what the layout check has to say. Nothing here decides any of it.
+  const button = sendButton(phase, sendState, complaints);
+  saveGoLabelEl.textContent = button.label;
+  sendStaleEl.textContent = button.notice;
+  saveGoBtn.disabled = sendState === "sent" ? false : !button.awake || isEmptySelection(sel);
 }
 
 /** The library manifest, or an empty one when it cannot be read. The dialog
@@ -1833,28 +1841,12 @@ async function runSave(): Promise<void> {
         if (r.status === "failed") setSaveResult(r.kind, "failed", r.detail);
   }
 
-  // ONE advisory confirm for the whole save, and only when a unit is actually
-  // being written: rules describe the dwelling the unit promises the building,
-  // so a project save alone never asks.
-  if (unitFile) {
-    const hard = validate(
-      computeDwellingGraph(floors.floors),
-      floors.orientationPreference
-    ).filter((v) => v.severity === "hard");
-    if (needsRuleConfirm(sel, hard.length)) {
-      const ok = window.confirm(
-        `Check Layout reports ${hard.length} MUST FIX issue(s) in this dwelling.\n` +
-          `The unit will be written anyway (rules are advisory). Continue?`
-      );
-      if (!ok) {
-        unitFile = null;
-        const why = "not written — you chose not to continue past the layout check";
-        if (sel.unit) setSaveResult("unit", "skipped", why);
-        if (sel.library) setSaveResult("library", "skipped", why);
-        if (sel.publish) setSaveResult("publish", "skipped", why);
-      }
-    }
-  }
+  // The advisory confirm is gone (run 0036). It asked a browser dialog's
+  // question, "Check Layout reports N MUST FIX issue(s) ... Continue?", which a
+  // resident could not answer from inside it: the dialog covered the flat and
+  // named no issue. The button says it now, before the press rather than after
+  // it, reading "Send anyway \u00b7 N things to look at", and the check chip in
+  // the bar is one press from the report that lists them.
 
   // 1. The project file. Independent of everything above.
   if (sel.project) {

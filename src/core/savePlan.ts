@@ -60,15 +60,11 @@ export function needsUnitBuild(sel: SaveSelection): boolean {
   return sel.unit || sel.library || sel.publish;
 }
 
-/**
- * Whether to raise the advisory hard-rule confirm, and raise it ONCE. Rules
- * describe the dwelling the unit file promises to the building, so a project
- * save alone never asks. Three trips through the menu asked up to twice; one
- * dialog asks at most once.
- */
-export function needsRuleConfirm(sel: SaveSelection, hardViolations: number): boolean {
-  return needsUnitBuild(sel) && hardViolations > 0;
-}
+// `needsRuleConfirm` was here until run 0036. It decided whether to raise a
+// browser dialog before writing a unit with must-fix violations in it. There is
+// no dialog any more: the button reads "Send anyway · N things to look at"
+// before the press, which says the same thing at the moment a resident can act
+// on it, and `sendButton` in src/core/flatState.ts is the rule that writes it.
 
 /**
  * The results when `buildUnitExport` refuses at a hard gate (no usable

@@ -3,7 +3,6 @@ import {
   planOutputs,
   isEmptySelection,
   needsUnitBuild,
-  needsRuleConfirm,
   unitGateResults,
   outputLabel,
   type SaveSelection,
@@ -84,23 +83,6 @@ describe("needsUnitBuild", () => {
 
   it("is true for a publish-only save: the published flat IS the unit file", () => {
     expect(needsUnitBuild(sel(false, false, false, true))).toBe(true);
-  });
-});
-
-describe("needsRuleConfirm", () => {
-  it("asks once when a unit is being written and rules are failing", () => {
-    expect(needsRuleConfirm(sel(false, true, false), 3)).toBe(true);
-    expect(needsRuleConfirm(sel(false, false, true), 1)).toBe(true);
-    expect(needsRuleConfirm(sel(false, false, false, true), 1)).toBe(true);
-    expect(needsRuleConfirm(sel(true, true, true, true), 1)).toBe(true);
-  });
-
-  it("never asks for a project-only save — rules describe what the unit promises", () => {
-    expect(needsRuleConfirm(sel(true, false, false), 12)).toBe(false);
-  });
-
-  it("never asks when nothing is failing", () => {
-    for (const s of ALL) expect(needsRuleConfirm(s, 0)).toBe(false);
   });
 });
 

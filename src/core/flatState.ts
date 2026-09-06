@@ -90,22 +90,43 @@ export type SendState = "never" | "sent" | "edited";
 export const SEND_IT = "Send it";
 export const GO_TO_GROUP = "Go to your group";
 
-export function sendButtonLabel(state: SendState): string {
-  return state === "sent" ? GO_TO_GROUP : SEND_IT;
-}
-
 /** What the group is looking at, when it is not what is on the screen. */
 export const GROUP_HAS_OLDER =
   "Your group still has this flat as you sent it. Sending again replaces it.";
 
+/** Step 02's one red button, and the line under it, in every state it has. */
+export interface SendButton {
+  /** What the button reads. */
+  label: string;
+  /** The line under it, or an empty string when there is nothing to say. */
+  notice: string;
+  /** Whether pressing it does what it says. An asleep button still answers. */
+  awake: boolean;
+}
+
 /**
- * The line under step 02's button, or an empty string when there is nothing
- * to say. It says something only once a flat has been sent AND changed since,
- * which is the one moment a resident can be wrong about what their neighbours
- * are looking at.
+ * The whole rule for step 02's one button (run 0036), over three facts: whether
+ * the flat is ready, how far it has got towards the group, and how many things
+ * the layout check has to say about it.
+ *
+ * ONE function rather than three, which is `design-automation`'s §2.1 applied
+ * to a screen: run 0035 had a label rule and a notice rule and main.ts decided
+ * the enabled state on its own, and three answers to one question is how a
+ * button ends up saying one thing and doing another. `sendButton.test.ts`
+ * drives every combination.
+ *
+ * The complaints never stop a send. The rules are advisory, the check line in
+ * the bar already says what they are, and the button says plainly that it is
+ * sending anyway. That replaces run 0023's browser dialog, which asked a
+ * question a resident had no way to answer from inside it.
  */
-export function staleNotice(state: SendState): string {
-  return state === "edited" ? GROUP_HAS_OLDER : "";
+export function sendButton(phase: FlatPhase, state: SendState, complaints: number): SendButton {
+  if (!canSend(phase)) return { label: SEND_IT, notice: NO_WAY_IN, awake: false };
+  const notice = state === "edited" ? GROUP_HAS_OLDER : "";
+  if (state === "sent") return { label: GO_TO_GROUP, notice, awake: true };
+  const n = Math.max(0, Math.floor(complaints));
+  if (n === 0) return { label: SEND_IT, notice, awake: true };
+  return { label: `Send anyway \u00b7 ${n} thing${n === 1 ? "" : "s"} to look at`, notice, awake: true };
 }
 
 /** Where an edit leaves it. A flat nobody has sent is still a flat nobody has
