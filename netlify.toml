@@ -1,0 +1,21 @@
+# The dev server, written down (run 0033).
+#
+# The store is a Netlify function, so it exists only when Netlify serves the
+# app. Plain Vite on 5173 answers every /api/session/... call with index.html,
+# which used to reach a resident as a parser error. Pinning the command, the
+# port and both directories here means the address is the same on every machine
+# and does not move between CLI versions.
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[dev]
+  # `targetPort` is Vite's own; `port` is the one to open, and the one the
+  # building app's Store field must point at.
+  command = "npm run dev:vite"
+  targetPort = 5173
+  port = 8888
+  publish = "dist"
+  framework = "#custom"
+  autoLaunch = false
