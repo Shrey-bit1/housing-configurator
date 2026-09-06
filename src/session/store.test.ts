@@ -25,6 +25,9 @@ class MemoryKV implements KV {
     this.map.set(key, { data: value, etag: String(++this.writes) });
     return { modified: true };
   }
+  async delete(key: string) {
+    this.map.delete(key);
+  }
 }
 
 const UNIT = {
@@ -54,7 +57,7 @@ describe("routing", () => {
     const res = await call(new MemoryKV(), "OPTIONS", "/api/session/abc/flats/x");
     expect(res.status).toBe(204);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
-    expect(res.headers.get("access-control-allow-methods")).toBe("GET, POST, PUT, OPTIONS");
+    expect(res.headers.get("access-control-allow-methods")).toBe("GET, POST, PUT, DELETE, OPTIONS");
     expect(res.headers.get("access-control-allow-headers")).toBe("content-type");
   });
 
