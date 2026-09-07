@@ -1,0 +1,512 @@
+/*
+  The landing's styles, shared by both apps (run 0037 / bottom-up 0062).
+
+  SELF-CONTAINED on purpose. Every selector is scoped under `#landing` and
+  every colour, font and size it needs is declared on `#landing` itself rather
+  than read from either app's `:root`. So this file can be dropped into either
+  app in any order, cannot be reached by either app's own rules, and cannot
+  quietly inherit a value that differs between them.
+
+  The six colours, the three fonts and the paper are the brief's own. Nothing
+  outside them appears here.
+
+  The switch is `data-app` on the root. It appears in exactly two places: the
+  doors, and the six dots. Anything else that differed between the two apps was
+  drift, and drift is what this file exists to end.
+*/
+
+#landing {
+  /* --- The brief's own names, scoped to the landing ------------------ */
+  --bg: #ece6d8; /* ground / paper */
+  --ink: #161616; /* text, rules, filled controls */
+  --meta: #6b665c; /* captions, counts */
+  --dim: #a39c8d; /* what is not this app's */
+  --line-paper: #c9c5bb; /* hairlines on paper */
+
+  --accent: #d6341c; /* red: the one primary action, the resident's own */
+  --blue: #1d4fa3; /* the group's average */
+  --yellow: #f2b41c; /* shared spaces */
+
+  --font-display: "Big Shoulders Display", "Archivo Narrow", Impact, sans-serif;
+  --font-body: Jost, "Futura", "Century Gothic", sans-serif;
+
+  /* The brief's faint feTurbulence grain, tiled 180px, on the paper ground. */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.2  0 0 0 0 0.17  0 0 0 0 0.12  0 0 0 0.16 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+
+  --ease-out: cubic-bezier(0.22, 0.9, 0.24, 1);
+
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background-color: var(--bg);
+  background-image: var(--grain);
+  background-repeat: repeat;
+  background-size: 180px 180px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow: auto;
+}
+#landing[hidden] {
+  display: none;
+}
+
+/* The two discs and the red rule, the only decoration on the screen. Yellow
+   and blue are the brief's two remaining colours and appear here and nowhere
+   else in either app. */
+#landing .landing-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 10px;
+  background: var(--accent);
+}
+#landing .landing-disc {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+#landing .landing-disc-a {
+  left: -180px;
+  top: -140px;
+  width: 560px;
+  height: 560px;
+  background: var(--yellow);
+}
+#landing .landing-disc-b {
+  right: -90px;
+  bottom: -120px;
+  width: 340px;
+  height: 340px;
+  background: var(--blue);
+  opacity: 0.9;
+}
+
+#landing .landing-inner {
+  position: relative;
+  z-index: 1;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 56px 64px 0;
+  display: flex;
+  flex-direction: column;
+}
+#landing .landing-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+/* The brand: "(Re)" plain, "Configure" red. Both apps carry it, which is one
+   of the things that had drifted. */
+#landing .landing-brand {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 26px;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink);
+}
+#landing .landing-brand b {
+  color: var(--accent);
+  font-weight: 900;
+}
+#landing .landing-credit {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+
+#landing .landing-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 80px;
+  padding: 40px 0;
+  flex-wrap: wrap;
+}
+#landing .landing-copy {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+#landing .landing-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 78px;
+  line-height: 0.88;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+#landing .landing-title span {
+  display: block;
+}
+#landing .landing-lead {
+  max-width: 460px;
+  margin: 28px 0 0;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+/* The doors, in one column of a fixed width in both apps. This is the drift
+   Shrey found on 7 September: they sat at the far right edge in one app and in
+   the middle in the other, in columns of different widths. */
+#landing .landing-doors,
+#landing .landing-join {
+  width: 400px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#landing .landing-doors[hidden],
+#landing .landing-join[hidden] {
+  display: none;
+}
+/* The brief's outlined-black secondary button. */
+#landing .landing-door {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 16px;
+  background: none;
+  border: 2px solid var(--ink);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+#landing .landing-door:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+/* The one primary action on the screen: a red block with an arrow that nudges. */
+#landing .landing-primary {
+  height: 76px;
+  padding: 0 18px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-size: 24px;
+}
+#landing .landing-primary:hover {
+  background: transparent;
+  color: var(--accent);
+}
+#landing .landing-primary span:last-child {
+  font-family: var(--font-body);
+  animation: landing-nudge 1.6s ease-in-out infinite;
+}
+@keyframes landing-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(6px);
+  }
+}
+#landing .landing-aside {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--meta);
+}
+#landing .landing-aside a {
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* ============================================================
+   THE SWITCH, first half: which doors this app has.
+
+   One rule over one attribute. A door is `data-for="flat"`, `data-for="building"`
+   or `data-for="both"`, and the root says which app is looking. Adding a door to
+   one app is one attribute here and one handler there.
+   ============================================================ */
+#landing[data-app="flat"] [data-for="building"],
+#landing[data-app="building"] [data-for="flat"] {
+  display: none;
+}
+
+/* An app's own markup goes here and nowhere else. */
+#landing #landing-extra {
+  display: contents;
+}
+
+/* The shapes an app's own forms take, so the two apps' forms look alike
+   without either of them styling anything in here. */
+#landing .landing-join label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--meta);
+}
+#landing .landing-join input {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  padding: 8px 2px;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 18px;
+  caret-color: var(--accent);
+}
+/* A code has to be readable across a room, so it is the biggest thing on the
+   screen and set in the mono face the figures use, where a 0 and an O differ. */
+#landing .landing-new-label {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+#landing .landing-new-code {
+  margin: 2px 0 0;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 44px;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  user-select: all;
+}
+#landing .landing-new-say {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--meta);
+}
+/* Quiet information rather than a warning, so it takes the meta grey. */
+#landing .landing-join-recall {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--meta);
+}
+#landing .landing-join-why {
+  margin: 0;
+  min-height: 15px;
+  font-size: 12px;
+  color: var(--accent);
+}
+#landing .landing-back {
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--meta);
+  font-family: var(--font-body);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ============================================================
+   The journey strip: all six steps, always, in both apps.
+   ============================================================ */
+#landing .landing-journey {
+  padding: 0 0 28px;
+  border-top: 2px solid var(--ink);
+  margin-top: 8px;
+  padding-top: 14px;
+}
+#landing .landing-journey-label {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+#landing .journey {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+#landing .journey-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+#landing .journey-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  box-sizing: border-box;
+  border: 2px solid var(--dim);
+  background: transparent;
+}
+#landing .journey-label {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+  white-space: nowrap;
+}
+#landing .journey-rule {
+  flex: 1;
+  min-width: 20px;
+  height: 2px;
+  background: var(--line-paper);
+}
+
+/* ============================================================
+   THE SWITCH, second half: which dots are this app's.
+
+   The dots this app owns are ink. The other app's four are dim, which is what
+   `.journey-dot` and `.journey-label` already are, so `elsewhere` needs no
+   rule. The dot for where a resident is now is red, and on a landing that is
+   this app's own first step.
+   ============================================================ */
+#landing[data-app="flat"] .journey-step[data-owner="flat"] .journey-dot,
+#landing[data-app="building"] .journey-step[data-owner="building"] .journey-dot {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+#landing[data-app="flat"] .journey-step[data-owner="flat"] .journey-label,
+#landing[data-app="building"] .journey-step[data-owner="building"] .journey-label {
+  color: var(--ink);
+}
+#landing[data-app="flat"] #journey-draw .journey-dot,
+#landing[data-app="building"] #journey-wishes .journey-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+#landing[data-app="flat"] #journey-draw .journey-label,
+#landing[data-app="building"] #journey-wishes .journey-label {
+  color: var(--accent);
+}
+
+/* ============================================================
+   How the landing arrives (the brief, settled 6 September).
+
+   Nothing for a second, then the two discs out of their own corners, then the
+   headline line by line, then the paragraph, then the doors, then the journey
+   strip. The graphics first, then what the app is, then what a person can do
+   with it.
+
+   The eleven delays:
+
+     discs (both, together)   1000 ms   600 ms
+     headline line 1          1600 ms   300 ms
+     headline line 2          1750 ms   300 ms
+     headline line 3          1900 ms   300 ms
+     paragraph                2200 ms   300 ms
+     door 1                   2500 ms   300 ms
+     door 2                   2600 ms   300 ms
+     door 3                   2700 ms   300 ms
+     door 4 or the aside      2800 ms   300 ms
+     the aside (flat only)    2900 ms   300 ms
+     journey strip            3200 ms   300 ms
+
+   The doors take their delay by ID rather than by position, because the two
+   apps show different doors and `nth-child` counts the hidden ones too.
+
+   Honest if it never runs. Every keyframe here has a `from` and no `to`, so
+   the resting state IS the finished state: an engine that ignores the
+   animation, a reduced-motion setting, or a tab that never came forward all
+   leave the landing whole rather than blank. Nothing here takes a pointer
+   event or moves an element out of its own place, so a resident who clicks a
+   door at 1200 ms gets the door.
+   ============================================================ */
+@keyframes landing-disc {
+  from {
+    transform: scale(0);
+  }
+}
+@keyframes landing-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+#landing .landing-disc {
+  animation: landing-disc 600ms var(--ease-out) 1000ms both;
+}
+#landing .landing-disc-a {
+  transform-origin: top left;
+}
+#landing .landing-disc-b {
+  transform-origin: bottom right;
+}
+#landing .landing-title span,
+#landing .landing-lead,
+#landing .landing-doors > *,
+#landing .landing-journey {
+  animation: landing-arrive 300ms var(--ease-out) both;
+}
+#landing .landing-title span:nth-child(1) {
+  animation-delay: 1600ms;
+}
+#landing .landing-title span:nth-child(2) {
+  animation-delay: 1750ms;
+}
+#landing .landing-title span:nth-child(3) {
+  animation-delay: 1900ms;
+}
+#landing .landing-lead {
+  animation-delay: 2200ms;
+}
+#landing[data-app="flat"] #landing-start {
+  animation-delay: 2500ms;
+}
+#landing[data-app="flat"] #landing-new {
+  animation-delay: 2600ms;
+}
+#landing[data-app="flat"] #landing-join {
+  animation-delay: 2700ms;
+}
+#landing[data-app="flat"] #landing-open {
+  animation-delay: 2800ms;
+}
+#landing[data-app="flat"] .landing-aside {
+  animation-delay: 2900ms;
+}
+#landing[data-app="building"] #landing-open-building {
+  animation-delay: 2500ms;
+}
+#landing[data-app="building"] #landing-join {
+  animation-delay: 2600ms;
+}
+#landing[data-app="building"] #landing-example {
+  animation-delay: 2700ms;
+}
+#landing .landing-journey {
+  animation-delay: 3200ms;
+}
+/* Coming back from a form re-shows the doors, and a `display` change restarts a
+   CSS animation. Without this a resident pressing "back" would wait out the
+   stagger a second time. Each app adds this class on that path. */
+#landing .landing-doors.no-arrive > * {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  #landing .landing-disc,
+  #landing .landing-title span,
+  #landing .landing-lead,
+  #landing .landing-doors > *,
+  #landing .landing-journey {
+    animation: none;
+  }
+}
