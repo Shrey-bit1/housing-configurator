@@ -57,7 +57,13 @@ import {
   type FlatPhase,
 } from "./core/flatState";
 import { saveDraft, readDraft, DRAFT_RESTORED, type DraftStore } from "./core/draft";
-import { JOURNEY, journeyTones } from "./core/journey";
+// The landing, from the ONE shared fragment both apps render (run 0037).
+// `?raw` inlines the markup at build time and the stylesheet is bundled by
+// Vite, so neither is fetched and neither can be half-there when the app
+// starts. The Context folder holds the source of both; `landingShared.test.ts`
+// fingerprints this copy against the hash the brief records.
+import landingMarkup from "../_cowork/design/landing/landing.html?raw";
+import "../_cowork/design/landing/landing.css";
 import { slugifyUnitName } from "./library/ids";
 import { unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
 import { parseUnitLibraryIndex, type UnitManifestEntry } from "./library/manifest";
@@ -94,6 +100,20 @@ import {
 
 const DEFAULT_COLS = 16;
 const DEFAULT_ROWS = 16;
+
+// Before anything asks the document for a piece of the landing. The fragment
+// ships `hidden` and ships `data-app="flat"` already set, so this app never
+// shows the building app's doors for a frame and nothing is on screen until
+// `showLanding` decides it should be.
+document.body.insertAdjacentHTML("beforeend", landingMarkup);
+{
+  const forms = document.getElementById("landing-forms") as HTMLElement;
+  const slot = document.getElementById("landing-extra") as HTMLElement;
+  // The fragment lets an app put markup in exactly one place. These two forms
+  // are the only thing this app adds.
+  while (forms.firstElementChild) slot.append(forms.firstElementChild);
+  forms.remove();
+}
 
 const canvas = document.getElementById("scene") as HTMLCanvasElement;
 const sidebar = document.getElementById("sidebar") as HTMLElement;
@@ -1434,34 +1454,11 @@ function hideLanding(): void {
   landingEl.hidden = true;
 }
 
-/** The journey strip, rendered from src/core/journey.ts rather than written
- *  into the landing's markup, so the building app can render the same six
- *  steps from the same array. */
-function renderJourney(): void {
-  const strip = document.getElementById("journey-strip") as HTMLElement;
-  // Run 0034, the brief: all six dots always, the two this app owns in ink,
-  // the building app's four dim, and the one a resident is on in red. The
-  // building app calls the same function with "building" and gets the mirror.
-  const tones = journeyTones("draw", "flat");
-  const parts: HTMLElement[] = [];
-  JOURNEY.forEach((s, i) => {
-    if (i > 0) {
-      const rule = document.createElement("div");
-      rule.className = "journey-rule";
-      parts.push(rule);
-    }
-    const el = document.createElement("div");
-    el.className = `journey-step ${tones[i]}`;
-    const dot = document.createElement("span");
-    dot.className = "journey-dot";
-    const label = document.createElement("span");
-    label.className = "journey-label";
-    label.textContent = s.label;
-    el.append(dot, label);
-    parts.push(el);
-  });
-  strip.replaceChildren(...parts);
-}
+// The journey strip is markup in the shared fragment now (run 0037), with the
+// six dots' tones decided by `data-app` in CSS rather than by a render pass
+// here. `renderJourney` is gone with it. `src/core/journey.ts` is still the
+// record of what the six steps ARE, and `landingShared.test.ts` checks the
+// fragment's dots against it, so the two cannot drift apart either.
 
 document.getElementById("landing-start")!.addEventListener("click", () => {
   hideLanding();
@@ -2438,7 +2435,6 @@ if (draft !== null) {
 
 void openSaveDialog();
 refreshFlatFigures();
-renderJourney();
 setStep("draw");
 // The landing decides itself, from the URL alone (src/core/flatState.ts). A
 // link that already names a project or a group belongs to someone coming

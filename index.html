@@ -329,94 +329,56 @@
         </aside>
       </main>
     </div>
-    <!-- The landing (run 0027, Landing.dc.html). It covers the editor rather
-         than replacing it, so the scene behind it is already warm by the time
-         a resident picks a door. `showsLanding` in src/core/flatState.ts is
-         the only thing that decides whether it appears: a URL that already
-         names a project or a group skips it. The journey strip below is
-         rendered from src/core/journey.ts, never written out here. -->
-    <div id="landing" hidden>
-      <div class="landing-rule" aria-hidden="true"></div>
-      <div class="landing-disc landing-disc-a" aria-hidden="true"></div>
-      <div class="landing-disc landing-disc-b" aria-hidden="true"></div>
-      <div class="landing-inner">
-        <div class="landing-head">
-          <span class="tb-name landing-brand">(Re)<b>Configure</b></span>
-          <span class="card-label">ETH Zürich · MAS DFAB · Shrey Tatamiya</span>
-        </div>
-        <div class="landing-body">
-          <div class="landing-copy">
-            <!-- Three spans rather than three <br>s (run 0034): the headline
-                 arrives one line at a time, and a <br> is not an element CSS
-                 can hold a delay on. `.landing-title span` is display:block,
-                 so the three lines break exactly where they did. -->
-            <h1 class="landing-title"><span>Draw the flat</span><span>you want</span><span>to live in.</span></h1>
-            <p class="landing-lead">
-              Then the building arranges itself around everybody's flats. You and your
-              neighbours decide together how much is shared, and where it goes.
-            </p>
-          </div>
-          <div class="landing-doors" id="landing-doors">
-            <button id="landing-start" class="btn-send landing-primary" type="button">
-              <span id="landing-start-label">Start a flat</span><span aria-hidden="true">→</span>
-            </button>
-            <button id="landing-new" class="landing-door" type="button">
-              <span>Start a group</span><span aria-hidden="true">→</span>
-            </button>
-            <button id="landing-join" class="landing-door" type="button">
-              <span>Join a group</span><span aria-hidden="true">→</span>
-            </button>
-            <button id="landing-open" class="landing-door" type="button">
-              <span>Open a file</span><span aria-hidden="true">→</span>
-            </button>
-            <p class="landing-aside">
-              Already sent your flat? <a id="landing-group" href="#">Go to your group</a>
-            </p>
-          </div>
-          <!-- "Join a group" swaps the doors for these two fields rather than
-               opening a prompt: a prompt cannot be styled, cannot be tested,
-               and returns nothing under scripting (the trap run 0010 found).
-               They write through the same `writeSession` the send panel's own
-               fields use, so both routes leave identical state. -->
-          <form class="landing-join" id="landing-join-form" hidden>
-            <label>Your group
-              <input id="landing-code" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
-            </label>
-            <label>Your name
-              <input id="landing-name" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
-            </label>
-            <p class="landing-join-recall" id="landing-join-recall" hidden></p>
-            <p class="landing-join-why" id="landing-join-why"></p>
-            <button id="landing-join-go" class="btn-send" type="submit">
-              <span>Join</span><span aria-hidden="true">→</span>
-            </button>
-            <button id="landing-join-back" class="landing-back" type="button">back</button>
-          </form>
-          <!-- "Start a group" invents a code, starts it in the store, and shows
-               it back. A plain screen in the app's own skin rather than a
-               dialog, for the reason the join form is one: a dialog cannot be
-               styled, cannot be tested, and returns nothing under scripting. -->
-          <form class="landing-join landing-new" id="landing-new-form" hidden>
-            <p class="landing-new-label">Your group code</p>
-            <p class="landing-new-code" id="landing-new-code">…</p>
-            <p class="landing-new-say" id="landing-new-say">
-              Pass this to the others so they can join.
-            </p>
-            <label>Your name
-              <input id="landing-new-name" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
-            </label>
-            <p class="landing-join-why" id="landing-new-why"></p>
-            <button id="landing-new-go" class="btn-send" type="submit">
-              <span>Start drawing</span><span aria-hidden="true">→</span>
-            </button>
-            <button id="landing-new-back" class="landing-back" type="button">back</button>
-          </form>
-        </div>
-        <div class="landing-journey">
-          <p class="card-label">How it goes</p>
-          <div class="journey" id="journey-strip"></div>
-        </div>
-      </div>
+    <!-- The landing is not written here (run 0037). Both apps render it from
+         ONE shared fragment, `_cowork/design/landing/landing.html`, inlined at
+         build time by src/main.ts, with `data-app="flat"` picking this app's
+         doors and dots. A copy of that fragment lives in the Context folder
+         beside the brief and is the source; a test fingerprints this one
+         against the hash the brief records.
+
+         What stays here is only this app's own: the two forms its doors open
+         onto. `src/main.ts` moves them into the fragment's `#landing-extra`
+         slot, which is the one place the fragment lets an app put markup.
+         Their shapes are styled by the fragment, so the two apps' forms look
+         alike without either app styling anything inside it.
+
+         "Join a group" swaps the doors for two fields rather than opening a
+         prompt: a prompt cannot be styled, cannot be tested, and returns
+         nothing under scripting (the trap run 0010 found). They write through
+         the same `writeSession` the send panel's own fields use, so both
+         routes leave identical state. "Start a group" invents a code, starts
+         it in the store and shows it back, a plain screen for the same
+         reason. -->
+    <div id="landing-forms" hidden>
+      <form class="landing-join" id="landing-join-form" hidden>
+        <label>Your group
+          <input id="landing-code" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
+        </label>
+        <label>Your name
+          <input id="landing-name" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
+        </label>
+        <p class="landing-join-recall" id="landing-join-recall" hidden></p>
+        <p class="landing-join-why" id="landing-join-why"></p>
+        <button id="landing-join-go" class="landing-door landing-primary" type="submit">
+          <span>Join</span><span aria-hidden="true">→</span>
+        </button>
+        <button id="landing-join-back" class="landing-back" type="button">back</button>
+      </form>
+      <form class="landing-join landing-new" id="landing-new-form" hidden>
+        <p class="landing-new-label">Your group code</p>
+        <p class="landing-new-code" id="landing-new-code">…</p>
+        <p class="landing-new-say" id="landing-new-say">
+          Pass this to the others so they can join.
+        </p>
+        <label>Your name
+          <input id="landing-new-name" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
+        </label>
+        <p class="landing-join-why" id="landing-new-why"></p>
+        <button id="landing-new-go" class="landing-door landing-primary" type="submit">
+          <span>Start drawing</span><span aria-hidden="true">→</span>
+        </button>
+        <button id="landing-new-back" class="landing-back" type="button">back</button>
+      </form>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

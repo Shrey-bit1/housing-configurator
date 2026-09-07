@@ -208,7 +208,7 @@ two landings had drifted: the doors sat at the far right edge in one and
 in the middle in the other, the columns were different widths, and one
 carried a brand and a red rule the other lacked.
 
-LANDING FINGERPRINT sha256 1ee8bee827d02d577e15f84a582856e45f9f04bdaf625524caba8d7cd15ffe20
+LANDING FINGERPRINT sha256 908c7f9e20e8e89f3a36a766056c2659803e38dd266207dd9377ef19553ba419
 That is `landing.html` then `landing.css`, concatenated, with every
 CRLF read as LF, hashed as UTF-8. Each app has a test that computes it
 over its own copy and fails when the two disagree, which is how a copy
