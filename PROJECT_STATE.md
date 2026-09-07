@@ -73,7 +73,7 @@ work-in-progress research artifact, not a production app.
 | **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
 | **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by `refreshFlatFigures` (`main.ts`), which writes the bar's strip in step 01 and the read-out under the drawing in step 02. See §11, §14. |
 | **The flat is kept as you draw** (run 0036) | `src/core/draft.ts` | `saveDraft(store, snapshot)`, `readDraft(store, search)` and `draftHasRooms(text)`, over a two-method `DraftStore` that `localStorage` satisfies. The draft is the SAME string the undo history takes as a snapshot, so the app serializes once per action. `readDraft` is the one rule with three reasons to say no: no store, a URL naming a project, or a draft with no rooms. `draft.test.ts` drives it with a Map. See §17. |
-| **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, `showsLanding(search)`, and (run 0036) `sendButton(phase, state, complaints)`, the whole rule for step 02's one button, answering a label, a notice and whether it is awake. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
+| **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, `showsLanding(search)`, and (run 0036) `sendButton(phase, state, complaints)`, the whole rule for step 02's one button, answering a label, a notice, whether it is awake and (run 0038) the fault lines to list under it. It takes the lines rather than a count, so the number on the button is derived from the list it prints. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
 | **The landing, shared by both apps** (run 0037) | `_cowork/design/landing/landing.html`, `landing.css` | The whole landing as one fragment both repositories render, byte for byte, with `data-app="flat"` or `"building"` on the root picking the doors and the dot tones. Self-contained: every selector scoped under `#landing`, every colour and font declared on `#landing` itself. Inlined by `src/main.ts` with `?raw` at build time. The Context folder holds the source; `src/landingShared.test.ts` fingerprints this copy against the hash in the brief. See §18. |
 | **The journey, as data** (run 0027) | `src/core/journey.ts` | `JOURNEY`, six ordered steps across the two apps, with `journeyIndex(id)` and (run 0034) `journeyTones(currentId, thisApp)` → `now` / `here` / `elsewhere`, which replaced run 0027's `journeyMarks` and its `done` / `now` / `ahead`. Since run 0037 the landing does NOT render it: the six dots are markup in the shared fragment and their tones come from `data-app` in CSS. `JOURNEY` stays the record of what the six steps are, and `landingShared.test.ts` checks the fragment's dots against it in order and wording, so the two cannot part company. Pure, no DOM; `journey.test.ts` pins the order and the tones. See §14, §18. |
 | **The session settings + the publish call** (who, which group, the fourth output, and the takeover confirm, runs 0023-0026) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, `publishUnit(fetchLike, base, settings, id, label, text, replace?)` which PUTs the unit bytes and never throws, `takeoverConfirmText(owner)` and `decideTakeover(r, replaceTicked, confirmed)` (run 0025: the post-409 decision — retry, decline with its exact line, or proceed — pulled out so `window.confirm` never has to be driven in a test). Pure; `session.test.ts` drives it with a Map and a stub. Its OWN strings say "group", never "session" or "room" (run 0026, words only — the module, the type, the storage key and every `/api/session/…` path keep their names). See §10, §11, §12. |
@@ -4749,3 +4749,64 @@ under a 3 px rule, all as they were before the move. The eleven delays read
 back from computed styles unchanged. The join form landing at exactly the
 doors' place and "back" restoring them with `no-arrive`. The picture is
 `_cowork/outbox/0037-landing.png`, 1440 by 900.
+---
+
+## 19. A full group in one command, and the faults under the button (run 0038)
+
+**One command fills a group.** `node scripts/fill-group.mjs <store> <code>`
+starts the group if nobody has, publishes the library's twenty designed flats
+under twenty different resident names with their pictures, writes each
+resident's answers, and says three things in the chat. Then a twenty-first
+person joins the same code from the landing and can walk the whole journey
+against a room that looks like a room. Sending twenty flats by hand is not
+that.
+
+**It writes only through the store's public calls**, the five in
+`docs/store.md` that `scripts/store-roundtrip.mjs` already drives: `POST` to
+start a group, `PUT` a flat with `?resident=`, `PUT` its preview, `PUT` a
+resident's answers, `POST` a message. It never touches the store's files or its
+index, so a group it filled cannot be told from one twenty people filled.
+
+**The twenty are a fixed table**, `scripts/fillGroupTable.mjs`, in its own file
+so it can be checked without being run: importing the runner would fill a
+group. Same split as `scripts/flatLayout.ts` beside `scripts/gen-flat.mjs`. Two
+runs give the same group, so a screenshot taken today and one taken next week
+show the same room. Square metres run 3 to 12 with no two neighbours alike, the
+ballots are different orderings of the five shared spaces, and the wishes are
+set every way round; twenty identical answers would be one person twenty times
+and would tell the building app nothing.
+`scripts/fillGroupTable.test.ts` pins all of that in the FAST suite at 18
+cases, including that every ballot is a permutation of the five and that each
+wish is set both ways across the twenty.
+
+**It refuses a group that already holds flats** unless `--replace` is given, so
+it cannot trample a live room by accident.
+
+**It never exits hard.** `process.exitCode` rather than `process.exit`, because
+exiting while `fetch` still has a keep-alive socket closing aborts Node on
+Windows with `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`. The
+refusal did exactly that on its first run: it printed the right words and then
+crashed over the top of them.
+
+**The faults are under the button.** When step 02's button reads "Send anyway ·
+N things to look at", the N faults are listed under it, one line each, in the
+rules' own words and in the muted ink. They come from the same violations the
+check chip counts and the report lists, so the three cannot differ. That is run
+0036's own open question 3: the count was on the button and the list was behind
+the chip, in another corner of the screen and another step, so a resident who
+read the button and pressed it had sent a flat with faults they never saw.
+
+`sendButton` in `src/core/flatState.ts` now takes the fault LINES rather than a
+count and answers them beside the label, so the number on the button is derived
+from the list under it. A flat already in the group gets none, because it is not
+being sent and there is nothing to warn about sending. Nothing about the
+button's behaviour changed: the rules are advisory and it still sends.
+
+**Verified live (run 0038).** The script filled `walkthrough-0038` at
+`http://localhost:8888` in 72 lines of output with no failures, ending at 20
+residents, 20 flats, 3 messages, every flat carrying a picture, and the twenty
+square-metre figures reading 7, 4, 11, 6, 9, 3, 12, 5, 8, 10, 6, 4, 12, 7, 9, 3,
+11, 5, 8, 10. Run again on the same code without `--replace` it refused and
+exited 1. On a flat with two faults the button read "Send anyway · 2 things to
+look at", the chip read "2 must fix", and under the button stood "A dwelling
+needs a bathroom." and "A dwelling needs a kitchen." in `rgb(107, 102, 92)`.
