@@ -197,6 +197,23 @@ apart. Then the journey strip. The order is the point: the graphics
 first, then what the app is, then what you can do with it, so a person
 knows what to read first without being told.
 
+The landing is ONE FILE, not one description (settled 7 September). Both
+apps render it from `01-design/landing/landing.html` and
+`landing.css`, byte for byte, with one attribute on the root,
+`data-app="flat"` or `data-app="building"`, deciding which doors show
+and which of the six dots read ink, dim and red. Nothing else about the
+landing may differ between the two apps. A change goes to those files
+first, and each app then copies them in. They were split out because the
+two landings had drifted: the doors sat at the far right edge in one and
+in the middle in the other, the columns were different widths, and one
+carried a brand and a red rule the other lacked.
+
+LANDING FINGERPRINT sha256 908c7f9e20e8e89f3a36a766056c2659803e38dd266207dd9377ef19553ba419
+That is `landing.html` then `landing.css`, concatenated, with every
+CRLF read as LF, hashed as UTF-8. Each app has a test that computes it
+over its own copy and fails when the two disagree, which is how a copy
+edited by hand is caught. Change the files, then change this line.
+
 The two steps in the bar are real screens, and only one panel is on
 screen at a time.
 

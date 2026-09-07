@@ -135,15 +135,23 @@ const READY = flatPhase(6, true);
 const UNREADY = flatPhase(6, false);
 const EMPTY = flatPhase(0, false);
 
+/** Two real rule descriptions, the shape the check chip's report lists. */
+const ONE = ["A bedroom needs a window on an outside wall."];
+const TWO = [
+  "A bedroom needs a window on an outside wall.",
+  "The bathroom can only be reached through a bedroom.",
+];
+
 describe("sendButton, while the flat is not ready", () => {
   it("is asleep and says what to do about it, whatever else is true", () => {
     for (const phase of [EMPTY, UNREADY]) {
       for (const state of ["never", "sent", "edited"] as const) {
-        for (const complaints of [0, 1, 4]) {
+        for (const complaints of [[], ONE, TWO]) {
           expect(sendButton(phase, state, complaints)).toEqual({
             label: SEND_IT,
             notice: NO_WAY_IN,
             awake: false,
+            faults: [],
           });
         }
       }
@@ -153,44 +161,70 @@ describe("sendButton, while the flat is not ready", () => {
 
 describe("sendButton, once the flat is ready", () => {
   it("says Send it when nothing has gone and nothing is wrong", () => {
-    expect(sendButton(READY, "never", 0)).toEqual({ label: SEND_IT, notice: "", awake: true });
-  });
-
-  it("says it will send anyway, and counts what there is to look at", () => {
-    expect(sendButton(READY, "never", 1).label).toBe("Send anyway \u00b7 1 thing to look at");
-    expect(sendButton(READY, "never", 3).label).toBe("Send anyway \u00b7 3 things to look at");
-  });
-
-  it("stays awake with complaints, because the rules are advisory", () => {
-    expect(sendButton(READY, "never", 9).awake).toBe(true);
-  });
-
-  it("becomes the way to the group after a send", () => {
-    expect(sendButton(READY, "sent", 0)).toEqual({ label: GO_TO_GROUP, notice: "", awake: true });
-  });
-
-  it("stays the way to the group whatever the check says, because it no longer sends", () => {
-    expect(sendButton(READY, "sent", 5).label).toBe(GO_TO_GROUP);
-  });
-
-  it("goes back to sending after an edit, and says what the group still has", () => {
-    expect(sendButton(READY, "edited", 0)).toEqual({
+    expect(sendButton(READY, "never", [])).toEqual({
       label: SEND_IT,
-      notice: GROUP_HAS_OLDER,
+      notice: "",
       awake: true,
+      faults: [],
     });
   });
 
-  it("carries both the count and the sentence when both apply", () => {
-    const b = sendButton(READY, "edited", 2);
+  it("says it will send anyway, and counts what there is to look at", () => {
+    expect(sendButton(READY, "never", ONE).label).toBe("Send anyway \u00b7 1 thing to look at");
+    expect(sendButton(READY, "never", TWO).label).toBe("Send anyway \u00b7 2 things to look at");
+  });
+
+  it("names them under the button, in the rules' own words (run 0038)", () => {
+    expect(sendButton(READY, "never", TWO).faults).toEqual(TWO);
+  });
+
+  it("names as many as the label counts, always", () => {
+    for (const list of [[], ONE, TWO, [...TWO, "A third thing."]]) {
+      const b = sendButton(READY, "never", list);
+      expect(b.faults).toHaveLength(list.length);
+      if (list.length > 0) expect(b.label).toContain(String(list.length));
+    }
+  });
+
+  it("stays awake with complaints, because the rules are advisory", () => {
+    expect(sendButton(READY, "never", TWO).awake).toBe(true);
+  });
+
+  it("becomes the way to the group after a send", () => {
+    expect(sendButton(READY, "sent", [])).toEqual({
+      label: GO_TO_GROUP,
+      notice: "",
+      awake: true,
+      faults: [],
+    });
+  });
+
+  it("names nothing once the flat is in the group, because it is not sending", () => {
+    const b = sendButton(READY, "sent", TWO);
+    expect(b.label).toBe(GO_TO_GROUP);
+    expect(b.faults).toEqual([]);
+  });
+
+  it("goes back to sending after an edit, and says what the group still has", () => {
+    expect(sendButton(READY, "edited", [])).toEqual({
+      label: SEND_IT,
+      notice: GROUP_HAS_OLDER,
+      awake: true,
+      faults: [],
+    });
+  });
+
+  it("carries the count, the faults and the sentence when all three apply", () => {
+    const b = sendButton(READY, "edited", TWO);
     expect(b.label).toBe("Send anyway \u00b7 2 things to look at");
     expect(b.notice).toBe(GROUP_HAS_OLDER);
+    expect(b.faults).toEqual(TWO);
     expect(b.awake).toBe(true);
   });
 
-  it("treats a nonsense count as none rather than printing it", () => {
-    expect(sendButton(READY, "never", -3).label).toBe(SEND_IT);
-    expect(sendButton(READY, "never", 1.7).label).toBe("Send anyway \u00b7 1 thing to look at");
+  it("ignores an empty line rather than counting it", () => {
+    expect(sendButton(READY, "never", ["", "   "]).label).toBe(SEND_IT);
+    expect(sendButton(READY, "never", ["", ONE[0]]).faults).toEqual(ONE);
   });
 });
 
@@ -206,7 +240,7 @@ describe("afterEdit", () => {
   });
 
   it("is what puts the sentence under the button", () => {
-    expect(sendButton(READY, "sent", 0).notice).toBe("");
-    expect(sendButton(READY, afterEdit("sent"), 0).notice).toBe(GROUP_HAS_OLDER);
+    expect(sendButton(READY, "sent", []).notice).toBe("");
+    expect(sendButton(READY, afterEdit("sent"), []).notice).toBe(GROUP_HAS_OLDER);
   });
 });

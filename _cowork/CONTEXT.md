@@ -251,7 +251,37 @@ empty `who` so its own voice is distinguishable from a person's. No new
 directory, no new entry point, no new dependency and no new run step; the store
 contract changed only by that line. PROJECT_STATE new §17.
 
-**Last updated:** 2026-09-06
+Run 0037 made the landing ONE FILE that both repositories render. The two had
+drifted: put side by side on 7 September the doors sat at the far right edge in
+one app and in the middle in the other, the columns were different widths, and
+the flat app had a brand and a red rule the other lacked. There is now a
+`landing/` folder in the Context directory beside the brief, holding
+`landing.html` and `landing.css`, and each app carries a byte-for-byte copy and
+a test that hashes it against a LANDING FINGERPRINT line in the brief. One
+attribute on the root, `data-app="flat"` or `"building"`, picks the doors and
+the six dots' tones, and nothing else about the landing may differ. To change
+the landing you change the Context copy, copy it into each app, and update that
+line. This app now inlines the fragment at build time instead of carrying the
+markup in index.html and 9046 bytes of rules in style.css. That is a new shared
+directory outside either repository, which is the first thing the two apps have
+in common besides docs/store.md. PROJECT_STATE new §18.
+
+Run 0038 added a command that fills a group.
+`node scripts/fill-group.mjs <store> <code>` publishes the library's twenty
+designed flats under twenty different resident names, each with its picture and
+that resident's square-metre figure, ballot and three wishes, and says three
+things in the chat. It writes only through the store's public calls, so a group
+it filled cannot be told from one twenty people filled, and the twenty are a
+fixed table so two runs give the same room. It refuses a group that already
+holds flats unless `--replace` is given. That is how the whole journey gets
+walked: fill a code, then join it from the landing as the twenty-first. The run
+also put the layout check's faults under step 02's button, one line each in the
+rules' own words, where before the button carried only their number and the
+lines were behind the check chip in another corner. That is a new run step and
+a new script; nothing else about the repo's shape changed. PROJECT_STATE new
+§19.
+
+**Last updated:** 2026-09-07
 
 ## What this project is
 

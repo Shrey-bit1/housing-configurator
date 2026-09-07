@@ -1,0 +1,117 @@
+<!--
+  The landing, shared by both apps (run 0037 / bottom-up 0062).
+
+  ONE file, not one description. Both apps were written from the same
+  paragraph of the brief and drifted: the doors sat at the far right edge in
+  one and in the middle in the other, the columns were different widths, and
+  one had a brand and a red rule the other lacked. A paragraph leaves room, so
+  this file leaves none.
+
+  ONE SWITCH decides everything that differs: `data-app` on the root, either
+  "flat" or "building". It picks which doors show and which of the six dots
+  read ink, dim and red. Nothing else in this file may differ between the two
+  apps, and no app may style anything in here from its own CSS.
+
+  Each app SETS `data-app` at startup, before the landing is shown. The root
+  ships `hidden`, so nothing is on screen until the app has both set the
+  attribute and decided to show it, and neither app ever shows the other's
+  doors for a frame.
+
+  Every door carries a stable id. An app wires its own handlers to those ids
+  and never edits this markup. `#landing-extra` is the one place an app may put
+  markup of its own, such as its join form; the shapes it needs are styled in
+  landing.css so the two apps' forms look alike.
+
+  There are six door elements for seven door-appearances: "Join a group" is the
+  same door in both apps, which is the whole reason this is one file rather
+  than two.
+
+  The source of this file is
+  D:\_Studies\_DFAB\DFAB\_T3\Context\01-design\landing\. Change it there
+  first. Each app carries a byte-for-byte copy that its own test fingerprints
+  against the hash recorded in the brief.
+-->
+<div id="landing" data-app="flat" hidden>
+  <div class="landing-rule" aria-hidden="true"></div>
+  <div class="landing-disc landing-disc-a" aria-hidden="true"></div>
+  <div class="landing-disc landing-disc-b" aria-hidden="true"></div>
+  <div class="landing-inner">
+    <div class="landing-head">
+      <span class="landing-brand">(Re)<b>Configure</b></span>
+      <span class="landing-credit">ETH Zürich · MAS DFAB · Shrey Tatamiya</span>
+    </div>
+    <div class="landing-body">
+      <div class="landing-copy">
+        <!-- Three spans rather than three <br>s: the headline arrives one line
+             at a time, and a <br> is not an element a delay can sit on.
+             `.landing-title span` is display:block, so the lines break where
+             they read. -->
+        <h1 class="landing-title"><span>Draw the flat</span><span>you want</span><span>to live in.</span></h1>
+        <p class="landing-lead">
+          Then the building arranges itself around everybody's flats. You and your
+          neighbours decide together how much is shared, and where it goes.
+        </p>
+      </div>
+      <div class="landing-doors" id="landing-doors">
+        <button id="landing-start" class="landing-door landing-primary" type="button" data-for="flat">
+          <span id="landing-start-label">Start a flat</span><span aria-hidden="true">→</span>
+        </button>
+        <button id="landing-new" class="landing-door" type="button" data-for="flat">
+          <span>Start a group</span><span aria-hidden="true">→</span>
+        </button>
+        <button id="landing-join" class="landing-door" type="button" data-for="both">
+          <span>Join a group</span><span aria-hidden="true">→</span>
+        </button>
+        <button id="landing-open" class="landing-door" type="button" data-for="flat">
+          <span>Open a file</span><span aria-hidden="true">→</span>
+        </button>
+        <button id="landing-open-building" class="landing-door landing-primary" type="button" data-for="building">
+          <span>Open a building</span><span aria-hidden="true">→</span>
+        </button>
+        <button id="landing-example" class="landing-door" type="button" data-for="building">
+          <span>Look at the example</span><span aria-hidden="true">→</span>
+        </button>
+        <p class="landing-aside" data-for="flat">
+          Already sent your flat? <a id="landing-group" href="#">Go to your group</a>
+        </p>
+      </div>
+      <!-- The one place an app may add markup of its own: a join form, a
+           new-group form, whatever that app's doors open onto. It is empty
+           here and empty in both copies. -->
+      <div id="landing-extra"></div>
+    </div>
+    <div class="landing-journey">
+      <p class="landing-journey-label">How it goes</p>
+      <!-- The six steps, in order, across the two apps. `data-owner` is which
+           app owns a step and never changes; `data-app` on the root decides
+           which of them read ink and which dim, and which one reads red. The
+           red one is the step a resident is on when they are looking at this
+           landing, which is each app's own first step. -->
+      <div class="journey" id="journey-strip">
+        <div class="journey-step" id="journey-draw" data-owner="flat">
+          <span class="journey-dot"></span><span class="journey-label">Draw your flat</span>
+        </div>
+        <div class="journey-rule"></div>
+        <div class="journey-step" id="journey-send" data-owner="flat">
+          <span class="journey-dot"></span><span class="journey-label">Send it</span>
+        </div>
+        <div class="journey-rule"></div>
+        <div class="journey-step" id="journey-wishes" data-owner="building">
+          <span class="journey-dot"></span><span class="journey-label">Your wishes</span>
+        </div>
+        <div class="journey-rule"></div>
+        <div class="journey-step" id="journey-group" data-owner="building">
+          <span class="journey-dot"></span><span class="journey-label">The group</span>
+        </div>
+        <div class="journey-rule"></div>
+        <div class="journey-step" id="journey-your-flat" data-owner="building">
+          <span class="journey-dot"></span><span class="journey-label">Your flat in it</span>
+        </div>
+        <div class="journey-rule"></div>
+        <div class="journey-step" id="journey-vote" data-owner="building">
+          <span class="journey-dot"></span><span class="journey-label">Vote</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

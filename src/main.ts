@@ -57,7 +57,13 @@ import {
   type FlatPhase,
 } from "./core/flatState";
 import { saveDraft, readDraft, DRAFT_RESTORED, type DraftStore } from "./core/draft";
-import { JOURNEY, journeyTones } from "./core/journey";
+// The landing, from the ONE shared fragment both apps render (run 0037).
+// `?raw` inlines the markup at build time and the stylesheet is bundled by
+// Vite, so neither is fetched and neither can be half-there when the app
+// starts. The Context folder holds the source of both; `landingShared.test.ts`
+// fingerprints this copy against the hash the brief records.
+import landingMarkup from "../_cowork/design/landing/landing.html?raw";
+import "../_cowork/design/landing/landing.css";
 import { slugifyUnitName } from "./library/ids";
 import { unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
 import { parseUnitLibraryIndex, type UnitManifestEntry } from "./library/manifest";
@@ -94,6 +100,20 @@ import {
 
 const DEFAULT_COLS = 16;
 const DEFAULT_ROWS = 16;
+
+// Before anything asks the document for a piece of the landing. The fragment
+// ships `hidden` and ships `data-app="flat"` already set, so this app never
+// shows the building app's doors for a frame and nothing is on screen until
+// `showLanding` decides it should be.
+document.body.insertAdjacentHTML("beforeend", landingMarkup);
+{
+  const forms = document.getElementById("landing-forms") as HTMLElement;
+  const slot = document.getElementById("landing-extra") as HTMLElement;
+  // The fragment lets an app put markup in exactly one place. These two forms
+  // are the only thing this app adds.
+  while (forms.firstElementChild) slot.append(forms.firstElementChild);
+  forms.remove();
+}
 
 const canvas = document.getElementById("scene") as HTMLCanvasElement;
 const sidebar = document.getElementById("sidebar") as HTMLElement;
@@ -1004,6 +1024,7 @@ const saveResultsEl = document.getElementById("send-results") as HTMLElement;
 const saveGoBtn = document.getElementById("save-go") as HTMLButtonElement;
 const saveGoLabelEl = document.getElementById("save-go-label") as HTMLElement;
 const sendStaleEl = document.getElementById("send-stale") as HTMLElement;
+const sendFaultsEl = document.getElementById("send-faults") as HTMLElement;
 /** How far this flat has got towards the group, in this visit (run 0034, a
  *  third state in run 0035). It is what turns step 02's one red button from
  *  the send button into the way to the group, and what puts the line under it
@@ -1011,10 +1032,12 @@ const sendStaleEl = document.getElementById("send-stale") as HTMLElement;
  *  read it are `sendButtonLabel` and `staleNotice` in src/core/flatState.ts,
  *  and `afterEdit` is the only thing that moves it on an edit. */
 let sendState: SendState = "never";
-/** How many things the layout check has to say about this flat. Counted once
- *  in `refreshFlatFigures`, where the chip already counts them, and read by
- *  the one button rule (run 0036). */
-let complaints = 0;
+/** What the layout check has to say about this flat, in the rules' own words.
+ *  Collected once in `refreshFlatFigures`, from the same violations the chip
+ *  counts and the report lists, and read by the one button rule (run 0036,
+ *  the words themselves in run 0038). The chip shows how many; the button
+ *  shows how many and, under it, which. */
+let complaints: string[] = [];
 
 // ---- "More": folded by default (run 0026), holding the design number,
 // colour and the five checkboxes that used to be the whole dialog. ----
@@ -1258,14 +1281,14 @@ function refreshFlatFigures(): void {
   let cls: string;
   let title: string;
   if (!checksRun(phase)) {
-    complaints = 0;
+    complaints = [];
     // A hint, carrying no fault: it drops the pill outline entirely and
     // reads as the muted sentence FlatEmpty.dc.html shows in its card.
     label = EMPTY_HINT;
     cls = "chip chip-hint";
     title = EMPTY_HINT;
   } else if (!built.ok) {
-    complaints = 1;
+    complaints = [built.reason];
     label = "1 must fix";
     cls = "chip chip-acc";
     title = built.reason;
@@ -1274,9 +1297,10 @@ function refreshFlatFigures(): void {
       computeDwellingGraph(floors.floors),
       floors.orientationPreference
     ).filter((v) => v.severity === "hard");
-    // The same count the chip shows, kept for step 02's button so the two can
-    // never disagree about how many things there are to look at (run 0036).
-    complaints = hard.length;
+    // The same violations the chip counts and the report lists, kept for step
+    // 02's button so the three can never disagree about what there is to look
+    // at (run 0036, run 0038).
+    complaints = hard.map((v) => v.description);
     label = hard.length ? `${hard.length} must fix` : "All checks pass";
     cls = hard.length ? "chip chip-acc" : "chip chip-ok";
     title = hard.length ? `${hard[0].description} — open the layout report` : "Open the layout report";
@@ -1434,34 +1458,11 @@ function hideLanding(): void {
   landingEl.hidden = true;
 }
 
-/** The journey strip, rendered from src/core/journey.ts rather than written
- *  into the landing's markup, so the building app can render the same six
- *  steps from the same array. */
-function renderJourney(): void {
-  const strip = document.getElementById("journey-strip") as HTMLElement;
-  // Run 0034, the brief: all six dots always, the two this app owns in ink,
-  // the building app's four dim, and the one a resident is on in red. The
-  // building app calls the same function with "building" and gets the mirror.
-  const tones = journeyTones("draw", "flat");
-  const parts: HTMLElement[] = [];
-  JOURNEY.forEach((s, i) => {
-    if (i > 0) {
-      const rule = document.createElement("div");
-      rule.className = "journey-rule";
-      parts.push(rule);
-    }
-    const el = document.createElement("div");
-    el.className = `journey-step ${tones[i]}`;
-    const dot = document.createElement("span");
-    dot.className = "journey-dot";
-    const label = document.createElement("span");
-    label.className = "journey-label";
-    label.textContent = s.label;
-    el.append(dot, label);
-    parts.push(el);
-  });
-  strip.replaceChildren(...parts);
-}
+// The journey strip is markup in the shared fragment now (run 0037), with the
+// six dots' tones decided by `data-app` in CSS rather than by a render pass
+// here. `renderJourney` is gone with it. `src/core/journey.ts` is still the
+// record of what the six steps ARE, and `landingShared.test.ts` checks the
+// fragment's dots against it, so the two cannot drift apart either.
 
 document.getElementById("landing-start")!.addEventListener("click", () => {
   hideLanding();
@@ -1697,6 +1698,16 @@ function syncSaveDialog(): void {
   const button = sendButton(phase, sendState, complaints);
   saveGoLabelEl.textContent = button.label;
   sendStaleEl.textContent = button.notice;
+  // One line per fault, in the rule's own words, from the same list the report
+  // shows (run 0038). `replaceChildren` with nothing is what empties it, and
+  // `:empty` then takes it out of the layout.
+  sendFaultsEl.replaceChildren(
+    ...button.faults.map((f) => {
+      const li = document.createElement("li");
+      li.textContent = f;
+      return li;
+    })
+  );
   saveGoBtn.disabled = sendState === "sent" ? false : !button.awake;
 }
 
@@ -2438,7 +2449,6 @@ if (draft !== null) {
 
 void openSaveDialog();
 refreshFlatFigures();
-renderJourney();
 setStep("draw");
 // The landing decides itself, from the URL alone (src/core/flatState.ts). A
 // link that already names a project or a group belongs to someone coming

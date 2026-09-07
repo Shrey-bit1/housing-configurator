@@ -16,6 +16,20 @@ store. In the building app, set the Store field to the same address.
 `npm run dev:vite` is plain Vite on 5173, with no store, for working on the
 editor alone.
 
+To walk the whole journey you need a group with people already in it:
+
+```bash
+node scripts/fill-group.mjs http://localhost:8888 hall-14
+```
+
+That fills the group `hall-14` with twenty residents, one flat each from the
+library, each with a square-metre figure, a ballot over the five shared spaces
+and their three wishes, plus three messages in the chat. Then join `hall-14`
+from the landing as the twenty-first, send your own flat, and go on to the
+building app. It refuses a group that already holds flats unless you add
+`--replace`, and the twenty are a fixed table, so two runs give the same
+room.
+
 ## Current features
 
 - **Grid system** — 0.6 m cells; per-floor grid size is adjustable (width × depth) with live re-fit of placed items.
