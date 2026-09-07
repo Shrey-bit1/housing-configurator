@@ -46,3 +46,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0035 | 2026-09-06 | Leaving takes the flat, renaming keeps it, and the library counts from one | complete | 0035-leaving-takes-the-flat.report.md |
 | 0036 | 2026-09-06 | Sending is one press, and the store says who left | complete | 0036-sending-is-one-press.report.md |
 | 0037 | 2026-09-07 | One landing for both apps | complete | 0037-one-landing-for-both-apps.report.md |
+| 0038 | 2026-09-07 | A full group in one command, and the faults under the button | complete | 0038-a-full-group-in-one-command.report.md |
