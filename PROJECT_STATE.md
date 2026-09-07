@@ -74,7 +74,8 @@ work-in-progress research artifact, not a production app.
 | **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by `refreshFlatFigures` (`main.ts`), which writes the bar's strip in step 01 and the read-out under the drawing in step 02. See §11, §14. |
 | **The flat is kept as you draw** (run 0036) | `src/core/draft.ts` | `saveDraft(store, snapshot)`, `readDraft(store, search)` and `draftHasRooms(text)`, over a two-method `DraftStore` that `localStorage` satisfies. The draft is the SAME string the undo history takes as a snapshot, so the app serializes once per action. `readDraft` is the one rule with three reasons to say no: no store, a URL naming a project, or a draft with no rooms. `draft.test.ts` drives it with a Map. See §17. |
 | **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, `showsLanding(search)`, and (run 0036) `sendButton(phase, state, complaints)`, the whole rule for step 02's one button, answering a label, a notice and whether it is awake. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
-| **The journey, as data** (run 0027) | `src/core/journey.ts` | `JOURNEY`, six ordered steps across the two apps, with `journeyIndex(id)` and (run 0034) `journeyTones(currentId, thisApp)` → `now` / `here` / `elsewhere`, which replaced run 0027's `journeyMarks` and its `done` / `now` / `ahead`. The landing renders it and the building app is expected to render the same array, which is why it is exported data rather than markup. Pure, no DOM; `journey.test.ts` pins the order and the tones. See §14. |
+| **The landing, shared by both apps** (run 0037) | `_cowork/design/landing/landing.html`, `landing.css` | The whole landing as one fragment both repositories render, byte for byte, with `data-app="flat"` or `"building"` on the root picking the doors and the dot tones. Self-contained: every selector scoped under `#landing`, every colour and font declared on `#landing` itself. Inlined by `src/main.ts` with `?raw` at build time. The Context folder holds the source; `src/landingShared.test.ts` fingerprints this copy against the hash in the brief. See §18. |
+| **The journey, as data** (run 0027) | `src/core/journey.ts` | `JOURNEY`, six ordered steps across the two apps, with `journeyIndex(id)` and (run 0034) `journeyTones(currentId, thisApp)` → `now` / `here` / `elsewhere`, which replaced run 0027's `journeyMarks` and its `done` / `now` / `ahead`. Since run 0037 the landing does NOT render it: the six dots are markup in the shared fragment and their tones come from `data-app` in CSS. `JOURNEY` stays the record of what the six steps are, and `landingShared.test.ts` checks the fragment's dots against it in order and wording, so the two cannot part company. Pure, no DOM; `journey.test.ts` pins the order and the tones. See §14, §18. |
 | **The session settings + the publish call** (who, which group, the fourth output, and the takeover confirm, runs 0023-0026) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, `publishUnit(fetchLike, base, settings, id, label, text, replace?)` which PUTs the unit bytes and never throws, `takeoverConfirmText(owner)` and `decideTakeover(r, replaceTicked, confirmed)` (run 0025: the post-409 decision — retry, decline with its exact line, or proceed — pulled out so `window.confirm` never has to be driven in a test). Pure; `session.test.ts` drives it with a Map and a stub. Its OWN strings say "group", never "session" or "room" (run 0026, words only — the module, the type, the storage key and every `/api/session/…` path keep their names). See §10, §11, §12. |
 
 **Concave-corner wall logic** (part of `buildBoundaryWalls`): walls are inset to
@@ -4669,3 +4670,82 @@ the forward button and step 02 asleep with "Place an entrance to send the flat
 to the group." The round trip (`scripts/store-roundtrip.mjs`, 70 checks, all
 passing) printing the store's own line raw:
 `{"who":"","text":"Ben left the group.","at":"2026-09-06T16:45:55.852Z"}`.
+---
+
+## 18. One landing for both apps (run 0037)
+
+**The problem.** The two apps were meant to have the same landing and did not.
+Put side by side on 7 September, the doors sat at the far right edge in one and
+in the middle in the other, the columns were different widths, and this app had
+a brand and a red rule the other lacked. Both had been written from the same
+paragraph of the brief, and a paragraph leaves room.
+
+**The fix is one file, not one description.**
+`_cowork/design/landing/landing.html` and `landing.css` hold the whole landing.
+Both apps render from them byte for byte. The source is
+`D:\_Studies\_DFAB\DFAB\_T3\Context\01-design\landing\`, beside the
+brief; a change goes there first and each app copies it in.
+
+**The switch is one attribute.** `data-app` on the root, `"flat"` or
+`"building"`, and it reaches exactly two things.
+
+The doors. Each carries `data-for="flat"`, `"building"` or `"both"`, and one
+rule hides the ones this app does not have. Six door elements carry seven
+door-appearances, because "Join a group" is the same door in both apps, which
+is the whole reason this is one file rather than two.
+
+| id | label | shown in |
+|---|---|---|
+| `landing-start` | Start a flat | flat |
+| `landing-new` | Start a group | flat |
+| `landing-join` | Join a group | both |
+| `landing-open` | Open a file | flat |
+| `landing-open-building` | Open a building | building |
+| `landing-example` | Look at the example | building |
+| `landing-group` | the "Go to your group" link in the aside | flat |
+
+The six dots. All six always show. Each step carries `data-owner`, which never
+changes. This app's own steps are ink, the other app's are the dim they already
+are, and the dot for where a resident is now is red, which on a landing is each
+app's own first step: `journey-draw` here, `journey-wishes` there.
+
+**Self-contained means it.** Every selector in `landing.css` is scoped under
+`#landing` and every colour, font and size it needs is declared on `#landing`
+itself rather than read from either app's `:root`. So no app rule can reach
+into the fragment and the fragment inherits nothing that might differ between
+the two apps. `landingShared.test.ts` checks both of those properties by
+reading the file.
+
+**How this app renders it.** `src/main.ts` imports the markup with `?raw` and
+the stylesheet as a stylesheet, so Vite inlines both at build time and nothing
+is fetched at runtime. It inserts the markup before anything queries the
+document for a piece of the landing, then moves this app's own two forms, the
+join form and the new-group form, into the fragment's `#landing-extra` slot,
+which is the one place the fragment lets an app add markup. The fragment ships
+`hidden` and ships `data-app="flat"`, so this app never shows the building
+app's doors for a frame.
+
+**What left this app.** 9046 bytes of landing rules from `src/style.css`, the
+landing's markup from `index.html`, and `renderJourney` from `src/main.ts`.
+
+**The fingerprint.** The brief carries one line, under "The screens":
+
+```
+LANDING FINGERPRINT sha256 908c7f9e20e8e89f3a36a766056c2659803e38dd266207dd9377ef19553ba419
+```
+
+That is `landing.html` then `landing.css`, concatenated, with every CRLF read
+as LF, hashed as UTF-8. `src/landingShared.test.ts` computes it over this app's
+copy and fails when the two disagree, saying that the landing has drifted and
+where to put the change. The normalisation is not decoration: this repository
+checks the files out with CRLF while the Context copy has LF, so a hash over
+raw bytes would report two identical files as different.
+
+**Verified live (run 0037)** against `netlify dev` at 1440x900. The four flat
+doors and the aside shown and the two building doors not; the dots reading
+`rgb(214, 52, 28)`, `rgb(22, 22, 22)` and hollow, in that order; the doors 400
+px wide at x 966 to 1366; the headline 78 px; the journey strip 22px 0 34px
+under a 3 px rule, all as they were before the move. The eleven delays read
+back from computed styles unchanged. The join form landing at exactly the
+doors' place and "back" restoring them with `no-arrive`. The picture is
+`_cowork/outbox/0037-landing.png`, 1440 by 900.
