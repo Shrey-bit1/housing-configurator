@@ -5,8 +5,7 @@ import {
   showsDropHint,
   checksRun,
   showsLanding,
-  sendButtonLabel,
-  staleNotice,
+  sendButton,
   afterEdit,
   SEND_IT,
   GO_TO_GROUP,
@@ -126,64 +125,88 @@ describe("the readiness rule, on its three cases", () => {
   });
 });
 
-describe("sendButtonLabel", () => {
-  it("reads the send text before a send", () => {
-    expect(sendButtonLabel("never")).toBe("Send it");
-    expect(sendButtonLabel("never")).toBe(SEND_IT);
-  });
+/**
+ * The whole button rule (run 0036), over its three facts. Every combination is
+ * driven; `sendButton` is the only thing the screen reads, so a case missing
+ * here is a case nothing checks.
+ */
 
-  it("reads the group text after a send", () => {
-    expect(sendButtonLabel("sent")).toBe("Go to your group");
-    expect(sendButtonLabel("sent")).toBe(GO_TO_GROUP);
-  });
+const READY = flatPhase(6, true);
+const UNREADY = flatPhase(6, false);
+const EMPTY = flatPhase(0, false);
 
-  it("reads the send text again once the flat has been edited", () => {
-    expect(sendButtonLabel("edited")).toBe(SEND_IT);
-  });
-
-  it("says where it goes rather than saying next", () => {
-    expect(GO_TO_GROUP.toLowerCase()).not.toBe("next");
-    expect(GO_TO_GROUP).toContain("group");
+describe("sendButton, while the flat is not ready", () => {
+  it("is asleep and says what to do about it, whatever else is true", () => {
+    for (const phase of [EMPTY, UNREADY]) {
+      for (const state of ["never", "sent", "edited"] as const) {
+        for (const complaints of [0, 1, 4]) {
+          expect(sendButton(phase, state, complaints)).toEqual({
+            label: SEND_IT,
+            notice: NO_WAY_IN,
+            awake: false,
+          });
+        }
+      }
+    }
   });
 });
 
-/**
- * What step 02 says under its button (run 0035), over the four moments a flat
- * passes through. The state is one value, so the four moments are just the
- * three states plus the transition back into `sent`.
- */
-
-describe("the sentence under step 02's button", () => {
-  it("says nothing before a send, however much the flat is edited", () => {
-    expect(staleNotice("never")).toBe("");
-    expect(staleNotice(afterEdit("never"))).toBe("");
-    expect(staleNotice(afterEdit(afterEdit("never")))).toBe("");
+describe("sendButton, once the flat is ready", () => {
+  it("says Send it when nothing has gone and nothing is wrong", () => {
+    expect(sendButton(READY, "never", 0)).toEqual({ label: SEND_IT, notice: "", awake: true });
   });
 
-  it("says nothing after a send with no edit", () => {
-    expect(staleNotice("sent")).toBe("");
+  it("says it will send anyway, and counts what there is to look at", () => {
+    expect(sendButton(READY, "never", 1).label).toBe("Send anyway \u00b7 1 thing to look at");
+    expect(sendButton(READY, "never", 3).label).toBe("Send anyway \u00b7 3 things to look at");
   });
 
-  it("says the group has the older one after a send and an edit", () => {
-    expect(staleNotice(afterEdit("sent"))).toBe(GROUP_HAS_OLDER);
-    expect(GROUP_HAS_OLDER).toBe(
-      "Your group still has this flat as you sent it. Sending again replaces it."
-    );
+  it("stays awake with complaints, because the rules are advisory", () => {
+    expect(sendButton(READY, "never", 9).awake).toBe(true);
   });
 
-  it("says nothing again after a second send", () => {
-    // The edit put it in `edited`; the send puts it back in `sent`, which is
-    // the only way out of `edited` and is what main.ts does on a 200.
-    expect(staleNotice(afterEdit("sent"))).toBe(GROUP_HAS_OLDER);
-    expect(staleNotice("sent")).toBe("");
+  it("becomes the way to the group after a send", () => {
+    expect(sendButton(READY, "sent", 0)).toEqual({ label: GO_TO_GROUP, notice: "", awake: true });
   });
 
-  it("keeps saying it while the resident goes on editing", () => {
-    expect(staleNotice(afterEdit(afterEdit("sent")))).toBe(GROUP_HAS_OLDER);
+  it("stays the way to the group whatever the check says, because it no longer sends", () => {
+    expect(sendButton(READY, "sent", 5).label).toBe(GO_TO_GROUP);
   });
 
-  it("turns the button back into the send button in the same breath", () => {
-    expect(sendButtonLabel("sent")).toBe(GO_TO_GROUP);
-    expect(sendButtonLabel(afterEdit("sent"))).toBe(SEND_IT);
+  it("goes back to sending after an edit, and says what the group still has", () => {
+    expect(sendButton(READY, "edited", 0)).toEqual({
+      label: SEND_IT,
+      notice: GROUP_HAS_OLDER,
+      awake: true,
+    });
+  });
+
+  it("carries both the count and the sentence when both apply", () => {
+    const b = sendButton(READY, "edited", 2);
+    expect(b.label).toBe("Send anyway \u00b7 2 things to look at");
+    expect(b.notice).toBe(GROUP_HAS_OLDER);
+    expect(b.awake).toBe(true);
+  });
+
+  it("treats a nonsense count as none rather than printing it", () => {
+    expect(sendButton(READY, "never", -3).label).toBe(SEND_IT);
+    expect(sendButton(READY, "never", 1.7).label).toBe("Send anyway \u00b7 1 thing to look at");
+  });
+});
+
+describe("afterEdit", () => {
+  it("leaves a flat nobody sent alone, however much it changes", () => {
+    expect(afterEdit("never")).toBe("never");
+    expect(afterEdit(afterEdit("never"))).toBe("never");
+  });
+
+  it("moves a sent flat to edited, and keeps it there", () => {
+    expect(afterEdit("sent")).toBe("edited");
+    expect(afterEdit("edited")).toBe("edited");
+  });
+
+  it("is what puts the sentence under the button", () => {
+    expect(sendButton(READY, "sent", 0).notice).toBe("");
+    expect(sendButton(READY, afterEdit("sent"), 0).notice).toBe(GROUP_HAS_OLDER);
   });
 });

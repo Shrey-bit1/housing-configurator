@@ -682,6 +682,67 @@ describe("DELETE a resident", () => {
   });
 });
 
+describe("the line the store writes when somebody leaves", () => {
+  it("says so in the group's own chat", async () => {
+    const kv = await twoResidents();
+    await call(kv, "DELETE", "/api/session/g/residents/Ben");
+    const said = (await (await call(kv, "GET", "/api/session/g")).json()).messages;
+    expect(said).toHaveLength(1);
+    expect(said[0].text).toBe("Ben left the group.");
+  });
+
+  it("leaves `who` empty, which nothing a person sends may be", async () => {
+    const kv = await twoResidents();
+    await call(kv, "DELETE", "/api/session/g/residents/Ben");
+    const said = (await (await call(kv, "GET", "/api/session/g")).json()).messages;
+    expect(said[0].who).toBe("");
+    const refused = await call(kv, "POST", "/api/session/g/messages", JSON.stringify({ who: "", text: "hello" }));
+    expect(refused.status).toBe(400);
+  });
+
+  it("uses the stored spelling, not the one in the URL", async () => {
+    const kv = await twoResidents();
+    await call(kv, "DELETE", "/api/session/g/residents/%20bEn%20");
+    const said = (await (await call(kv, "GET", "/api/session/g")).json()).messages;
+    expect(said[0].text).toBe("Ben left the group.");
+  });
+
+  it("carries the store's own timestamp", async () => {
+    const kv = await twoResidents();
+    await call(kv, "DELETE", "/api/session/g/residents/Ben");
+    const said = (await (await call(kv, "GET", "/api/session/g")).json()).messages;
+    expect(Number.isNaN(Date.parse(said[0].at))).toBe(false);
+  });
+
+  it("sits after what the group already said, oldest first", async () => {
+    const kv = await twoResidents();
+    await call(kv, "POST", "/api/session/g/messages", JSON.stringify({ who: "Ana", text: "are you leaving?" }));
+    await call(kv, "DELETE", "/api/session/g/residents/Ben");
+    const said = (await (await call(kv, "GET", "/api/session/g")).json()).messages;
+    expect(said.map((m: { who: string }) => m.who)).toEqual(["Ana", ""]);
+  });
+
+  it("counts against the cap like anything else, so a churning group cannot grow the index", async () => {
+    const kv = await twoResidents();
+    for (let i = 0; i < MESSAGE_CAP; i++) {
+      await call(kv, "POST", "/api/session/g/messages", JSON.stringify({ who: "Ana", text: `m${i}` }));
+    }
+    await call(kv, "DELETE", "/api/session/g/residents/Ben");
+    const said = (await (await call(kv, "GET", "/api/session/g")).json()).messages;
+    expect(said).toHaveLength(MESSAGE_CAP);
+    // The oldest went to make room for it, and it is the newest.
+    expect(said[said.length - 1].text).toBe("Ben left the group.");
+    expect(said[0].text).toBe("m1");
+  });
+
+  it("says nothing when there was nobody to remove", async () => {
+    const kv = await twoResidents();
+    await call(kv, "DELETE", "/api/session/g/residents/Cara");
+    const said = (await (await call(kv, "GET", "/api/session/g")).json()).messages;
+    expect(said).toHaveLength(0);
+  });
+});
+
 describe("rename a resident", () => {
   it("moves the row and retags every flat they own", async () => {
     const kv = await twoResidents();

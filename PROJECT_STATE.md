@@ -72,7 +72,8 @@ work-in-progress research artifact, not a production app.
 | **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`/`delete`, the last added in run 0035) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. `sameResident(a, b)` (run 0026: trimmed, case-insensitive) is the ownership check's rule, and run 0035's leave and rename calls reach it through `residentKey`, `flatsOwnedBy` and `storedName` rather than answering the same question a second time; a building run's optional `plot` (run 0026, opaque) rides alongside `genome`/`summary`. See §12. |
 | **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
 | **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by `refreshFlatFigures` (`main.ts`), which writes the bar's strip in step 01 and the read-out under the drawing in step 02. See §11, §14. |
-| **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, `showsLanding(search)`, and (run 0034) `sendButtonLabel(hasSent)` with `SEND_IT` and `GO_TO_GROUP`. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
+| **The flat is kept as you draw** (run 0036) | `src/core/draft.ts` | `saveDraft(store, snapshot)`, `readDraft(store, search)` and `draftHasRooms(text)`, over a two-method `DraftStore` that `localStorage` satisfies. The draft is the SAME string the undo history takes as a snapshot, so the app serializes once per action. `readDraft` is the one rule with three reasons to say no: no store, a URL naming a project, or a draft with no rooms. `draft.test.ts` drives it with a Map. See §17. |
+| **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, `showsLanding(search)`, and (run 0036) `sendButton(phase, state, complaints)`, the whole rule for step 02's one button, answering a label, a notice and whether it is awake. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
 | **The journey, as data** (run 0027) | `src/core/journey.ts` | `JOURNEY`, six ordered steps across the two apps, with `journeyIndex(id)` and (run 0034) `journeyTones(currentId, thisApp)` → `now` / `here` / `elsewhere`, which replaced run 0027's `journeyMarks` and its `done` / `now` / `ahead`. The landing renders it and the building app is expected to render the same array, which is why it is exported data rather than markup. Pure, no DOM; `journey.test.ts` pins the order and the tones. See §14. |
 | **The session settings + the publish call** (who, which group, the fourth output, and the takeover confirm, runs 0023-0026) | `src/session/session.ts` | `readSession`/`writeSession` over a two-method `KeyValue` (localStorage key `reconfigure.session`, shape `{resident, code}`; `?session=` wins and is stored), `normalizeCode`/`isValidCode` (the store's rule mirrored), `whyPublishDisabled`, `sessionLine`, `publishUnit(fetchLike, base, settings, id, label, text, replace?)` which PUTs the unit bytes and never throws, `takeoverConfirmText(owner)` and `decideTakeover(r, replaceTicked, confirmed)` (run 0025: the post-409 decision — retry, decline with its exact line, or proceed — pulled out so `window.confirm` never has to be driven in a test). Pure; `session.test.ts` drives it with a Map and a stub. Its OWN strings say "group", never "session" or "room" (run 0026, words only — the module, the type, the storage key and every `/api/session/…` path keep their names). See §10, §11, §12. |
 
@@ -4580,3 +4581,91 @@ row, his flat gone from the state and from the export and his preview gone from
 the store. In the browser at 1440x900, step 02 showed no sentence before a send,
 none after a send with no edit, the sentence in `rgb(214, 52, 28)` directly
 under the button after a send and an edit, and none again after a second send.
+---
+
+## 17. Sending is one press (run 0036)
+
+**The flat survives a reload.** Before this run nothing wrote the project
+anywhere but a download, so a refresh, a closed tab or a crash cost the work.
+Measured on 6 September: loading a flat through `?project=`, then reloading,
+left `localStorage` holding only `reconfigure.session` and the flat's area
+reading a dash. It is now written under `reconfigure.draft` on every mutating
+action and restored on load with one line, "Your flat is as you left it."
+
+The draft is the same string the undo history takes. `History.commit` in
+`src/core/history.ts` now returns the snapshot it took, or `null` when it took
+none, so the app serializes once per action rather than twice and the draft is
+exactly what undo would restore. An undo writes it too, from the string
+`restoreState` already holds, because `commit` is deliberately a no-op while
+restoring. There is no `clearDraft`: emptying the grid writes an empty draft
+and `readDraft` refuses to restore one with no rooms, so it clears itself.
+
+**Who and where, once.** Step 02 no longer carries the two fields the landing
+already asked for. `whoLine(session)` in `src/session/session.ts` answers one
+sentence, "As Ana, to hall-14.", and whether the answer is complete. Complete
+folds the fields away behind a small "change"; incomplete leaves them open and
+says which half is missing. Pressing "change" keeps them open for the visit, so
+they cannot fold under somebody mid-correction. With no group at all the red
+button goes to the landing's join rather than trying to send.
+
+**One button, one rule.** `sendButton(phase, state, complaints)` in
+`src/core/flatState.ts` answers a label, a notice and whether the button is
+awake, over three facts: whether the flat is ready, how far it has got towards
+the group, and what the layout check has to say. Nothing on the screen decides
+any of those for itself. Run 0035 had a label rule and a notice rule with
+main.ts deciding the enabled state on its own, which is how a button ends up
+saying one thing and doing another.
+
+| ready | state | complaints | label | notice | awake |
+|---|---|---|---|---|---|
+| no | any | any | Send it | NO_WAY_IN | no |
+| yes | never | 0 | Send it | none | yes |
+| yes | never | n | Send anyway · n things to look at | none | yes |
+| yes | sent | any | Go to your group | none | yes |
+| yes | edited | 0 | Send it | GROUP_HAS_OLDER | yes |
+| yes | edited | n | Send anyway · n things to look at | GROUP_HAS_OLDER | yes |
+
+**No dialog.** The advisory `window.confirm` is gone, and `needsRuleConfirm` is
+deleted from `src/core/savePlan.ts`. It asked "Check Layout reports N MUST FIX
+issue(s) ... Continue?" AFTER the press, covering the flat and naming no issue,
+so a resident could not answer it from inside it. The button says the same
+thing before the press, and the check chip in the bar is one press from the
+report that lists them.
+
+**Sending sends.** `runSend` in `src/main.ts` publishes the flat and does
+nothing else. `runSave` did four things in order, all four ticked by default,
+so one press put two files in a resident's Downloads folder uninvited.
+Measured live: a send now creates zero object URLs where the same send used to
+create two. A resident's own earlier flat is replaced without asking, which is
+the store's `sameResident` rule and needed no change. The Replace tick and the
+takeover confirm are gone; the store still refuses somebody else's flat with a
+409, reported as it comes.
+
+**What is left under More.** The colour, chosen from the app's palette and
+changeable there; "Save a copy to my computer", which downloads the project
+file; and, in the dev build only, "Add to the library" and "Save the unit
+file", because a library entry is written by a Vite endpoint no deployed build
+has. The four "What to write" checkboxes and the design number left the screen.
+The number is chosen automatically, and once a flat has been sent it stops
+moving: found live, a flat sent as Unit 31 saved a copy as `flat-32.json`
+because opening More re-proposed the next free number after the send had taken
+one.
+
+**The store says who left.** `DELETE .../residents/{name}` appends one message
+to the group's chat, `{ who: "", text: "<name> left the group.", at }`, inside
+the same index write that removes them and trimmed by the same 200-message cap.
+`who` is empty on that one message and on no other, because a message from a
+person is refused unless `who` is 1 to 64 printable characters. It exists so
+the record of a session can tell "four took part" from "five took part and one
+left".
+
+**Verified live (run 0036)** against `netlify dev`. The reload check above.
+"As Ana, to hall-14." with the fields folded, "change" unfolding them, and "To
+hall-14, but you have not said who you are." with them open when the name is
+missing. A send answering "Sent to hall-14 as Unit 32 · open Units to see your
+group" while creating zero object URLs, followed by "Save a copy to my
+computer" creating one and writing `flat-32.json`. The empty flat leaving both
+the forward button and step 02 asleep with "Place an entrance to send the flat
+to the group." The round trip (`scripts/store-roundtrip.mjs`, 70 checks, all
+passing) printing the store's own line raw:
+`{"who":"","text":"Ben left the group.","at":"2026-09-06T16:45:55.852Z"}`.

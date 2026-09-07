@@ -223,6 +223,8 @@ console.log(`  the refusal: ${taken.status} ${JSON.stringify(taken.json)}`);
 
 const left = await call("DELETE", "/residents/BEN");
 check(left.status === 200 && left.json?.resident === "Ben", "BEN leaves, and the stored spelling comes back");
+// Run 0036: the store says so, in the group's own chat, with `who` empty so a
+// reader can tell its voice from a person's.
 check(JSON.stringify(left.json?.flats) === JSON.stringify(["flat-3"]), "his flat leaves with him");
 const twiceGone = await call("DELETE", "/residents/BEN");
 check(twiceGone.status === 404, `leaving twice is a 404, because he is not at the table any more (${twiceGone.status})`);
@@ -240,6 +242,19 @@ check(
 check(
   (afterLeave.json?.messages ?? []).some((m) => m.who === "Ben") && afterLeave.json?.building?.by === "Ben",
   "what he said and the run he asked for are still there, because leaving takes the profile and the flat and nothing else"
+);
+
+// The store says who left (run 0036), in the group's own chat.
+const said = afterLeave.json?.messages ?? [];
+const line = said[said.length - 1];
+console.log(`  the line the store wrote: ${JSON.stringify(line)}`);
+check(line?.text === "Ben left the group.", "the store wrote one line saying he left");
+check(line?.who === "", "with `who` empty, so a reader can tell the store's voice from a person's");
+check(typeof line?.at === "string" && !Number.isNaN(Date.parse(line.at)), "and the store's own timestamp on it");
+check(said.length === 3, `the two people said two things and the store said one, so the chat holds three (${said.length})`);
+check(
+  said.filter((m) => m.who === "").length === 1,
+  "and it is the only message with an empty `who`, because a person's message is refused without one"
 );
 console.log(`  the state after he left: ${JSON.stringify(afterLeave.json)}`);
 

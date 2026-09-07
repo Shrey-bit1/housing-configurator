@@ -19,6 +19,7 @@ import {
   decideTakeover,
   type KeyValue,
   type PublishResult,
+  whoLine,
 } from "./session";
 
 /**
@@ -439,5 +440,49 @@ describe("checkGroup — one call, three answers", () => {
       json: () => Promise.resolve({ error: "four attempts lost the race" }),
     } as unknown as Response);
     expect(await checkGroup("a", () => five)).toEqual({ failure: "error" });
+  });
+});
+
+/**
+ * Who is sending and where to (run 0036). Step 02 shows this instead of the
+ * two fields the landing already asked for, and `ready` is what decides
+ * whether the fields are folded and whether the red button sends or goes back
+ * to the landing's join.
+ */
+
+describe("whoLine", () => {
+  it("names the person and the group when it has both", () => {
+    expect(whoLine({ resident: "Ana", code: "hall-14" })).toEqual({
+      line: "As Ana, to hall-14.",
+      ready: true,
+    });
+  });
+
+  it("says which half is missing rather than saying nothing", () => {
+    expect(whoLine({ resident: "", code: "hall-14" })).toEqual({
+      line: "To hall-14, but you have not said who you are.",
+      ready: false,
+    });
+    expect(whoLine({ resident: "Ana", code: "" })).toEqual({
+      line: "As Ana, but you have not joined a group.",
+      ready: false,
+    });
+  });
+
+  it("says so plainly when it has neither", () => {
+    expect(whoLine({ resident: "", code: "" })).toEqual({
+      line: "You have not said who you are or which group.",
+      ready: false,
+    });
+  });
+
+  it("reads a name of only spaces as no name, the way the store would", () => {
+    expect(whoLine({ resident: "   ", code: "hall-14" }).ready).toBe(false);
+  });
+
+  it("trims the name into the sentence, so stray spaces do not read as a stutter", () => {
+    // What is STORED still keeps the spaces; only this sentence trims them,
+    // the same way `sameResident` trims only for its comparison.
+    expect(whoLine({ resident: "  Ana B  ", code: "hall-14" }).line).toBe("As Ana B, to hall-14.");
   });
 });

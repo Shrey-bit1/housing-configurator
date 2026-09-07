@@ -160,6 +160,20 @@ export const MESSAGE_CAP = 200;
 /** The longest one message may be. */
 export const MESSAGE_MAX = 500;
 
+/**
+ * What the store itself says when somebody leaves (run 0036). `who` is empty
+ * on this one, and only on this one, so a reader can tell the store's voice
+ * from a person's without a second field: every message a person sends is
+ * refused unless `who` is 1 to 64 printable characters.
+ *
+ * It exists so the record of a session can tell "four took part" from "five
+ * took part and one left". Without it an export after a departure is
+ * indistinguishable from one where that person never joined.
+ */
+export function leftMessage(name: string): Message {
+  return { who: "", text: `${name} left the group.`, at: new Date().toISOString() };
+}
+
 interface SessionIndex {
   flats: Record<string, FlatSummary>;
   residents: Record<string, Resident>;
@@ -449,6 +463,12 @@ async function route(req: Request, kv: KV): Promise<Response> {
         const name = storedName(index, who, owned);
         if (key !== undefined) delete index.residents[key];
         for (const id of owned) delete index.flats[id];
+        // The store says so, in the group's own chat (run 0036). Under the
+        // same cap as anything a person says, so a group that churns cannot
+        // grow the index without bound.
+        const said = index.messages ?? [];
+        said.push(leftMessage(name));
+        index.messages = said.slice(-MESSAGE_CAP);
         gone = { resident: name, flats: owned };
       });
       // The index is the record of what exists, so it loses the flats first

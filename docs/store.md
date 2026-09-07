@@ -343,6 +343,16 @@ DELETE /api/session/room-42/residents/ben
 
 `flats` is sorted, and it is empty when that person had a row but no flat.
 
+**The store says so afterwards.** Removing somebody appends one message to the
+group's chat, `{ "who": "", "text": "Ben left the group.", "at": … }`. `who` is
+empty on that one message and on no other, because every message a person
+sends is refused unless `who` is 1 to 64 printable characters, so a reader can
+tell the store's own voice from a person's without a second field. It is
+subject to the same 200-message cap as anything a person says. It exists so
+the record of a session can tell "four took part" from "five took part and one
+left": without it, an export after a departure is indistinguishable from one
+where that person never joined.
+
 ### `POST /api/session/{code}/residents/{name}/rename` — a new name
 
 Moves a person's row to a new name and retags every flat they own, in one
