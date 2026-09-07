@@ -94,7 +94,7 @@ export const GO_TO_GROUP = "Go to your group";
 export const GROUP_HAS_OLDER =
   "Your group still has this flat as you sent it. Sending again replaces it.";
 
-/** Step 02's one red button, and the line under it, in every state it has. */
+/** Step 02's one red button, and what is under it, in every state it has. */
 export interface SendButton {
   /** What the button reads. */
   label: string;
@@ -102,6 +102,18 @@ export interface SendButton {
   notice: string;
   /** Whether pressing it does what it says. An asleep button still answers. */
   awake: boolean;
+  /**
+   * The things the layout check has to say, in the rules' own words, to be
+   * listed under the button (run 0038). Empty unless the button is offering to
+   * send anyway.
+   *
+   * The button used to carry only the count, and the faults themselves were
+   * behind the check chip in another corner of the screen and another step. A
+   * resident who read "Send anyway · 2 things to look at" and pressed it had
+   * sent a flat with two faults they never saw. They are advisory, so this
+   * still never blocks a send. It only says.
+   */
+  faults: string[];
 }
 
 /**
@@ -120,13 +132,22 @@ export interface SendButton {
  * sending anyway. That replaces run 0023's browser dialog, which asked a
  * question a resident had no way to answer from inside it.
  */
-export function sendButton(phase: FlatPhase, state: SendState, complaints: number): SendButton {
-  if (!canSend(phase)) return { label: SEND_IT, notice: NO_WAY_IN, awake: false };
+export function sendButton(phase: FlatPhase, state: SendState, complaints: string[]): SendButton {
+  if (!canSend(phase)) return { label: SEND_IT, notice: NO_WAY_IN, awake: false, faults: [] };
   const notice = state === "edited" ? GROUP_HAS_OLDER : "";
-  if (state === "sent") return { label: GO_TO_GROUP, notice, awake: true };
-  const n = Math.max(0, Math.floor(complaints));
-  if (n === 0) return { label: SEND_IT, notice, awake: true };
-  return { label: `Send anyway \u00b7 ${n} thing${n === 1 ? "" : "s"} to look at`, notice, awake: true };
+  // A flat already in the group is not being sent, so there is nothing to warn
+  // about sending. The check chip still has the faults for anyone who wants
+  // them.
+  if (state === "sent") return { label: GO_TO_GROUP, notice, awake: true, faults: [] };
+  const faults = complaints.filter((c) => c.trim().length > 0);
+  const n = faults.length;
+  if (n === 0) return { label: SEND_IT, notice, awake: true, faults: [] };
+  return {
+    label: `Send anyway \u00b7 ${n} thing${n === 1 ? "" : "s"} to look at`,
+    notice,
+    awake: true,
+    faults,
+  };
 }
 
 /** Where an edit leaves it. A flat nobody has sent is still a flat nobody has

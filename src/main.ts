@@ -1024,6 +1024,7 @@ const saveResultsEl = document.getElementById("send-results") as HTMLElement;
 const saveGoBtn = document.getElementById("save-go") as HTMLButtonElement;
 const saveGoLabelEl = document.getElementById("save-go-label") as HTMLElement;
 const sendStaleEl = document.getElementById("send-stale") as HTMLElement;
+const sendFaultsEl = document.getElementById("send-faults") as HTMLElement;
 /** How far this flat has got towards the group, in this visit (run 0034, a
  *  third state in run 0035). It is what turns step 02's one red button from
  *  the send button into the way to the group, and what puts the line under it
@@ -1031,10 +1032,12 @@ const sendStaleEl = document.getElementById("send-stale") as HTMLElement;
  *  read it are `sendButtonLabel` and `staleNotice` in src/core/flatState.ts,
  *  and `afterEdit` is the only thing that moves it on an edit. */
 let sendState: SendState = "never";
-/** How many things the layout check has to say about this flat. Counted once
- *  in `refreshFlatFigures`, where the chip already counts them, and read by
- *  the one button rule (run 0036). */
-let complaints = 0;
+/** What the layout check has to say about this flat, in the rules' own words.
+ *  Collected once in `refreshFlatFigures`, from the same violations the chip
+ *  counts and the report lists, and read by the one button rule (run 0036,
+ *  the words themselves in run 0038). The chip shows how many; the button
+ *  shows how many and, under it, which. */
+let complaints: string[] = [];
 
 // ---- "More": folded by default (run 0026), holding the design number,
 // colour and the five checkboxes that used to be the whole dialog. ----
@@ -1278,14 +1281,14 @@ function refreshFlatFigures(): void {
   let cls: string;
   let title: string;
   if (!checksRun(phase)) {
-    complaints = 0;
+    complaints = [];
     // A hint, carrying no fault: it drops the pill outline entirely and
     // reads as the muted sentence FlatEmpty.dc.html shows in its card.
     label = EMPTY_HINT;
     cls = "chip chip-hint";
     title = EMPTY_HINT;
   } else if (!built.ok) {
-    complaints = 1;
+    complaints = [built.reason];
     label = "1 must fix";
     cls = "chip chip-acc";
     title = built.reason;
@@ -1294,9 +1297,10 @@ function refreshFlatFigures(): void {
       computeDwellingGraph(floors.floors),
       floors.orientationPreference
     ).filter((v) => v.severity === "hard");
-    // The same count the chip shows, kept for step 02's button so the two can
-    // never disagree about how many things there are to look at (run 0036).
-    complaints = hard.length;
+    // The same violations the chip counts and the report lists, kept for step
+    // 02's button so the three can never disagree about what there is to look
+    // at (run 0036, run 0038).
+    complaints = hard.map((v) => v.description);
     label = hard.length ? `${hard.length} must fix` : "All checks pass";
     cls = hard.length ? "chip chip-acc" : "chip chip-ok";
     title = hard.length ? `${hard[0].description} — open the layout report` : "Open the layout report";
@@ -1694,6 +1698,16 @@ function syncSaveDialog(): void {
   const button = sendButton(phase, sendState, complaints);
   saveGoLabelEl.textContent = button.label;
   sendStaleEl.textContent = button.notice;
+  // One line per fault, in the rule's own words, from the same list the report
+  // shows (run 0038). `replaceChildren` with nothing is what empties it, and
+  // `:empty` then takes it out of the layout.
+  sendFaultsEl.replaceChildren(
+    ...button.faults.map((f) => {
+      const li = document.createElement("li");
+      li.textContent = f;
+      return li;
+    })
+  );
   saveGoBtn.disabled = sendState === "sent" ? false : !button.awake;
 }
 

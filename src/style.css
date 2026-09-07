@@ -594,6 +594,35 @@ button.primary:hover {
   display: none;
 }
 
+/* The things to look at, under the button (run 0038). Muted ink rather than
+   the accent the stale line takes: these do not stop a send and are not a
+   warning, they are what a resident would read in the report if they opened
+   it. */
+.send-faults {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.send-faults:empty {
+  display: none;
+}
+.send-faults li {
+  position: relative;
+  padding-left: 12px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.send-faults li::before {
+  content: "\2022";
+  position: absolute;
+  left: 0;
+  color: var(--dim);
+}
+
 .hint-text {
   font-size: 11px;
   color: var(--text-dim);
