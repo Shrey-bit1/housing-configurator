@@ -45,3 +45,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0034 | 2026-09-06 | One way forward, and the landing arrives in order | complete | 0034-one-way-forward.report.md |
 | 0035 | 2026-09-06 | Leaving takes the flat, renaming keeps it, and the library counts from one | complete | 0035-leaving-takes-the-flat.report.md |
 | 0036 | 2026-09-06 | Sending is one press, and the store says who left | complete | 0036-sending-is-one-press.report.md |
+| 0037 | 2026-09-07 | One landing for both apps | complete | 0037-one-landing-for-both-apps.report.md |

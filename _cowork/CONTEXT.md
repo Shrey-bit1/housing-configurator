@@ -251,7 +251,22 @@ empty `who` so its own voice is distinguishable from a person's. No new
 directory, no new entry point, no new dependency and no new run step; the store
 contract changed only by that line. PROJECT_STATE new §17.
 
-**Last updated:** 2026-09-06
+Run 0037 made the landing ONE FILE that both repositories render. The two had
+drifted: put side by side on 7 September the doors sat at the far right edge in
+one app and in the middle in the other, the columns were different widths, and
+the flat app had a brand and a red rule the other lacked. There is now a
+`landing/` folder in the Context directory beside the brief, holding
+`landing.html` and `landing.css`, and each app carries a byte-for-byte copy and
+a test that hashes it against a LANDING FINGERPRINT line in the brief. One
+attribute on the root, `data-app="flat"` or `"building"`, picks the doors and
+the six dots' tones, and nothing else about the landing may differ. To change
+the landing you change the Context copy, copy it into each app, and update that
+line. This app now inlines the fragment at build time instead of carrying the
+markup in index.html and 9046 bytes of rules in style.css. That is a new shared
+directory outside either repository, which is the first thing the two apps have
+in common besides docs/store.md. PROJECT_STATE new §18.
+
+**Last updated:** 2026-09-07
 
 ## What this project is
 
