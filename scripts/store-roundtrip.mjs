@@ -9,7 +9,8 @@
  * two resident names, sets each resident's counts, share and ballot, reads the
  * session state back and checks the summaries, reads each flat back and checks
  * it byte for byte against the file that was sent, writes a building run and
- * checks that `changed` cleared, then renames one resident and removes the other
+ * checks that `changed` cleared, then runs a whole round of the vote to its
+ * close, then renames one resident and removes the other
 and checks that a person's flats follow them out. Every response is printed; the two flat bodies
  * are printed as their size and SHA-256 rather than 70 KB of JSON, and the
  * byte comparison is the check. Exit code 1 if any check fails.
@@ -197,7 +198,97 @@ check(opt.status === 204 && opt.headers.get("access-control-allow-origin") === "
 // which is how the building app's run 0059 met `TypeError: Failed to fetch`.
 check((opt.headers.get("access-control-allow-methods") ?? "").includes("DELETE"), "preflight offers DELETE, so a browser can send the leave call");
 
-// 9. A new name keeps the flat, and leaving takes it (run 0035). Ben's flat
+// 9. A whole round of the vote (run 0039), from opening to closing, with the
+// group as it now stands: Ana and Ben, two people, two pairs.
+const candidate = (g) => ({ genome: [g, g + 1], summary: { flats: 2, fitness: 0.5 + g / 10 }, plot });
+const roundBody = (n) => ({
+  n,
+  weights: [1, 1, 1, 1, 1],
+  pairs: [
+    { id: "p1", a: candidate(1), b: candidate(2), dial: "light",
+      sentence: "This one has more light and longer walks to the stair." },
+    { id: "p2", a: candidate(3), b: candidate(4), dial: "cost",
+      sentence: "This one has a tighter facade and is cheaper to heat." },
+  ],
+});
+
+const wrongN = await call("PUT", "/round", JSON.stringify(roundBody(4)));
+check(wrongN.status === 409, `opening round 4 first is refused (${wrongN.status})`);
+console.log(`  the refusal: ${wrongN.status} ${JSON.stringify(wrongN.json)}`);
+
+const opened = await call("PUT", "/round", JSON.stringify(roundBody(1)), { quiet: true });
+check(opened.status === 201 && opened.json?.n === 1, "round 1 opens");
+check(opened.json?.expected === 2, `it expects both people (${opened.json?.expected})`);
+check(
+  Array.isArray(opened.json?.pairs) && opened.json.pairs.length === 2 && opened.json.votes.length === 0,
+  "with two pairs and no votes yet"
+);
+console.log(`  round 1 opened at ${opened.json?.openedAt}, pairs ${opened.json?.pairs.map((p) => p.id).join(", ")}`);
+
+const openedTwice = await call("PUT", "/round", JSON.stringify(roundBody(2)));
+check(openedTwice.status === 409, `a second round while one is open is refused (${openedTwice.status})`);
+
+const stranger = await call("POST", "/rounds/1/votes", JSON.stringify({ who: "Zoe", pair: "p1", pick: "a", reasons: [] }));
+check(stranger.status === 403, `somebody who is not in the group cannot vote (${stranger.status})`);
+
+const badReason = await call("POST", "/rounds/1/votes", JSON.stringify({ who: "Ana", pair: "p1", pick: "a", reasons: ["a nice view"] }));
+check(badReason.status === 400, `a reason outside the five is refused (${badReason.status})`);
+
+// Every person in the group votes on every pair. The name is spelled in the
+// wrong case on the last one, to show that the store counts one voter.
+const votes = [
+  { who: "Ana", pair: "p1", pick: "a", reasons: ["light"] },
+  { who: "Ana", pair: "p1", pick: "b", reasons: ["light", "privacy"] }, // she changes her mind
+  { who: "Ben", pair: "p1", pick: "a", reasons: ["cost"] },
+  { who: "Ana", pair: "p2", pick: "b", reasons: [] },
+  { who: "ben", pair: "p2", pick: "b", reasons: ["shared space", "short walks"] },
+];
+let closedOn = null;
+for (const v of votes) {
+  const r = await call("POST", "/rounds/1/votes", JSON.stringify(v));
+  check(r.status === 201, `${v.who} votes ${v.pick} on ${v.pair} (${r.status})`);
+  if (r.json?.closedTheRound) closedOn = v;
+}
+check(closedOn !== null, "the last vote closed the round");
+console.log(`  the vote that closed it: ${JSON.stringify(closedOn)}`);
+
+const afterVote = await call("GET", "", undefined, { quiet: true });
+check(afterVote.json?.round === null, "no round is open any more");
+check(afterVote.json?.lastRound?.n === 1, "and round 1 is the last closed one");
+check(typeof afterVote.json?.lastRound?.closedAt === "string", "with the time it closed");
+check(
+  afterVote.json?.lastRound?.votes?.length === 4,
+  `four votes, because the second one replaced the first rather than joining it (${afterVote.json?.lastRound?.votes?.length})`
+);
+check(
+  afterVote.json?.lastRound?.pairs?.every((p) => p.voted === 2 && p.expected === 2),
+  "and both pairs read two of two"
+);
+console.log(`  the round that closed: ${JSON.stringify(afterVote.json?.lastRound)}`);
+
+const tooLate = await call("POST", "/rounds/1/votes", JSON.stringify({ who: "Ana", pair: "p1", pick: "a", reasons: [] }));
+check(tooLate.status === 409, `a vote after the close is refused (${tooLate.status})`);
+
+const wrongNext = await call("PUT", "/round", JSON.stringify(roundBody(4)));
+check(wrongNext.status === 409, `opening round 4 after round 1 is refused (${wrongNext.status})`);
+console.log(`  the refusal: ${wrongNext.status} ${JSON.stringify(wrongNext.json)}`);
+
+const two = await call("PUT", "/round", JSON.stringify(roundBody(2)), { quiet: true });
+check(two.status === 201 && two.json?.n === 2, "round 2 opens once round 1 has closed");
+const byHand = await call("POST", "/rounds/2/close", undefined, { quiet: true });
+check(byHand.status === 200 && typeof byHand.json?.closedAt === "string", "and can be closed by hand");
+
+const expRounds = await call("GET", "/export", undefined, { quiet: true });
+check(
+  (expRounds.json?.rounds ?? []).map((r) => r.n).join(",") === "1,2",
+  `the export carries both rounds (${(expRounds.json?.rounds ?? []).map((r) => r.n).join(",")})`
+);
+check(
+  !("rounds" in (afterVote.json ?? {})),
+  "and the polling call does not, because a round holds two whole buildings per pair"
+);
+
+// 10. A new name keeps the flat, and leaving takes it (run 0035). Ben's flat
 // gets a picture first, so the removal has a preview to take with it.
 const shot = Buffer.from("ffd8ffe000104a46494600010100000100010000ffd9", "hex");
 const shotRes = await fetch(`${base}/api/session/${code}/flats/flat-3/preview`, { method: "PUT", body: shot, headers: { "content-type": "image/jpeg" } });
