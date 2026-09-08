@@ -306,6 +306,20 @@ function inRoom(index: SessionIndex, who: string): boolean {
   return roomMembers(index).some((k) => sameResident(k, who));
 }
 
+/**
+ * Whether every expected vote is in: every person at the table has voted on
+ * every pair. This is the ONE close rule, and the store applies it inside the
+ * same write that records a vote, so a round cannot sit open for a moment
+ * after its last vote lands.
+ */
+function everyoneHasVoted(index: SessionIndex, round: Round): boolean {
+  const members = roomMembers(index);
+  if (members.length === 0) return false;
+  return round.pairs.every((p) =>
+    members.every((m) => round.votes.some((v) => v.pair === p.id && sameResident(v.who, m)))
+  );
+}
+
 /** What one pair looks like in the polled state: the pair itself, plus the
  *  counting a client needs to say "8 of 20 so far" without doing arithmetic
  *  over a vote list it would have to fetch anyway. */
@@ -715,6 +729,7 @@ async function route(req: Request, kv: KV): Promise<Response> {
       const reasons = parseReasons(body.reasons);
 
       let vote!: Vote;
+      let closed = false;
       await updateIndex(kv, indexKey, (index) => {
         const open = openRound(index);
         // A vote on anything but the open round is refused, whether that round
@@ -738,8 +753,35 @@ async function route(req: Request, kv: KV): Promise<Response> {
         // have to be told they cannot.
         open.votes = open.votes.filter((v) => !(v.pair === pair && sameResident(v.who, who)));
         open.votes.push(vote);
+        // The round closes in the SAME write that records its last vote. A
+        // close in a second write would leave a moment where every vote is in
+        // and the round still reads open, and a client polling in that moment
+        // would show a room waiting for nobody.
+        if (everyoneHasVoted(index, open)) {
+          open.closedAt = new Date().toISOString();
+          closed = true;
+        }
       });
-      return json(vote, 201);
+      return json({ ...vote, closedTheRound: closed }, 201);
+    }
+
+    if (rest[2] === "close") {
+      // By hand, and only by hand: the store closes a round itself the moment
+      // its last expected vote lands. This stays for the day a rule for an
+      // absent person arrives, since the brief says one is coming and that
+      // "for now an absent person can hold a round open".
+      if (req.method !== "POST") return fail(405, "POST only");
+      let closedRound!: Round;
+      await updateIndex(kv, indexKey, (index) => {
+        const open = openRound(index);
+        if (open === undefined || open.n !== n) {
+          const known = (index.rounds ?? []).some((r) => r.n === n);
+          return fail(409, known ? `round ${n} in session "${code}" is already closed` : `no open round ${n} in session "${code}"`);
+        }
+        open.closedAt = new Date().toISOString();
+        closedRound = open;
+      });
+      return json(roundView(await readIndex(kv, indexKey), closedRound));
     }
 
     return fail(404, "no such route; see docs/store.md");
