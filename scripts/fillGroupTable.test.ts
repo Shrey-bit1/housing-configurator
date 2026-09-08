@@ -1,7 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 // @ts-expect-error plain JS beside a plain JS script; see the module's own header.
-import { RESIDENTS, MESSAGES, SHARED, SHARE_MIN, SHARE_MAX, flatIdFor } from "./fillGroupTable.mjs";
+import {
+  RESIDENTS,
+  MESSAGES,
+  SHARED,
+  SHARE_MIN,
+  SHARE_MAX,
+  REASONS,
+  CHANGES_MIND,
+  voteFor,
+  otherThought,
+  ballotFor,
+  flatIdFor,
+} from "./fillGroupTable.mjs";
 
 /**
  * The twenty `scripts/fill-group.mjs` fills a group with (run 0038).
@@ -157,5 +169,174 @@ describe("the script itself", () => {
   it("does not exit hard, so a closing socket cannot abort it", () => {
     expect(source).not.toContain("process.exit(");
     expect(source).toContain("process.exitCode");
+  });
+});
+
+/**
+ * The vote (run 0041). What `scripts/vote-group.mjs` has the twenty do on an
+ * open round.
+ *
+ * The pick rule is pure and lives in the table's file, so the whole count is a
+ * property of data that can be checked without a store: a round of five pairs
+ * is built here, one per dial, and the rule is driven over it. The runner is
+ * read as text for the same reason `fill-group.mjs` is: importing it would
+ * vote in a group.
+ */
+
+interface Voter extends Resident {
+  cares: string[];
+}
+const voters = RESIDENTS as Voter[];
+const round = (REASONS as string[]).map((dial, i) => ({ id: `p${i + 1}`, dial }));
+
+describe("what the twenty care about", () => {
+  it("is a ranking of all five reasons, for each of them", () => {
+    for (const r of voters) {
+      expect([...r.cares].sort(), `${r.name} ranks all five`).toEqual([...(REASONS as string[])].sort());
+    }
+  });
+
+  it("is twenty different rankings", () => {
+    expect(new Set(voters.map((r) => r.cares.join("|"))).size).toBe(20);
+  });
+
+  it("puts each reason first exactly four times", () => {
+    for (const reason of REASONS as string[]) {
+      expect(voters.filter((r) => r.cares[0] === reason).length, `${reason} is first`).toBe(4);
+    }
+  });
+
+  it("puts each reason in a top two exactly eight times, which is what splits a pair 8 to 12", () => {
+    for (const reason of REASONS as string[]) {
+      expect(voters.filter((r) => r.cares.slice(0, 2).includes(reason)).length, `${reason} is top two`).toBe(8);
+    }
+  });
+});
+
+describe("the pick rule", () => {
+  it("picks the challenger and ticks the dial when the dial is a top-two care", () => {
+    const ana = voters[0];
+    expect(ana.cares.slice(0, 2)).toEqual(["privacy", "shared space"]);
+    expect(voteFor(ana, { id: "p1", dial: "privacy" })).toEqual({ pick: "b", reasons: ["privacy"] });
+    expect(voteFor(ana, { id: "p2", dial: "shared space" })).toEqual({ pick: "b", reasons: ["shared space"] });
+  });
+
+  it("keeps the building they had and ticks their own first care otherwise", () => {
+    const ana = voters[0];
+    expect(voteFor(ana, { id: "p3", dial: "cost" })).toEqual({ pick: "a", reasons: ["privacy"] });
+    expect(voteFor(ana, { id: "p5", dial: "short walks" })).toEqual({ pick: "a", reasons: ["privacy"] });
+  });
+
+  it("ticks exactly one of the five, whichever way it goes", () => {
+    for (const r of voters) {
+      for (const pair of round) {
+        const v = voteFor(r, pair);
+        expect(v.reasons, `${r.name} on ${pair.id}`).toHaveLength(1);
+        expect(REASONS as string[]).toContain(v.reasons[0]);
+        expect(["a", "b"]).toContain(v.pick);
+      }
+    }
+  });
+
+  it("splits every pair of a five-pair round 8 for the challenger and 12 for the building they had", () => {
+    for (const pair of round) {
+      const b = voters.filter((r) => voteFor(r, pair).pick === "b").length;
+      expect(b, `${pair.id} (${pair.dial})`).toBe(8);
+      expect(voters.length - b).toBe(12);
+    }
+  });
+
+  it("does not give one person the same answer on all five pairs", () => {
+    for (const r of voters) {
+      const picks = new Set(round.map((p) => voteFor(r, p).pick));
+      expect(picks.size, `${r.name} does not vote one way five times`).toBe(2);
+    }
+  });
+
+  it("is the same on two runs, because nothing in it is random", () => {
+    const once = voters.map((r) => round.map((p) => voteFor(r, p).pick).join(""));
+    const twice = voters.map((r) => round.map((p) => voteFor(r, p).pick).join(""));
+    expect(once).toEqual(twice);
+  });
+});
+
+describe("the four who change their mind", () => {
+  it("are four, named, and all of them are in the group", () => {
+    expect(CHANGES_MIND).toHaveLength(4);
+    expect(CHANGES_MIND).toEqual(["Bruno", "Elin", "Rosa", "Viktor"]);
+    for (const name of CHANGES_MIND as string[]) {
+      expect(voters.some((r) => r.name === name), `${name} is one of the twenty`).toBe(true);
+    }
+  });
+
+  it("really change their pick, never say the same thing twice", () => {
+    for (const name of CHANGES_MIND as string[]) {
+      const r = voters.find((v) => v.name === name)!;
+      const settled = voteFor(r, round[0]);
+      const first = otherThought(r, round[0]);
+      expect(first.pick, `${name} changes pick`).not.toBe(settled.pick);
+    }
+  });
+
+  it("cast one extra vote each, on the round's first pair only", () => {
+    for (const name of CHANGES_MIND as string[]) {
+      const r = voters.find((v) => v.name === name)!;
+      const ballot = ballotFor(r, round) as { pair: string; replaced: boolean }[];
+      expect(ballot, `${name} casts six votes on five pairs`).toHaveLength(6);
+      const extra = ballot.filter((v) => v.replaced);
+      expect(extra).toHaveLength(1);
+      expect(extra[0].pair).toBe("p1");
+      expect(ballot[0].replaced).toBe(true);
+      expect(ballot[1]).toMatchObject({ pair: "p1", replaced: false });
+    }
+  });
+
+  it("leave everybody else casting one vote per pair", () => {
+    for (const r of voters.filter((v) => !(CHANGES_MIND as string[]).includes(v.name))) {
+      const ballot = ballotFor(r, round) as { replaced: boolean }[];
+      expect(ballot, `${r.name} casts five`).toHaveLength(5);
+      expect(ballot.every((v) => !v.replaced)).toBe(true);
+    }
+  });
+
+  it("make a round of five pairs 104 votes cast, 100 current and 4 replaced", () => {
+    const all = voters.flatMap((r) => ballotFor(r, round) as { replaced: boolean }[]);
+    expect(all).toHaveLength(104);
+    expect(all.filter((v) => v.replaced)).toHaveLength(4);
+    expect(all.filter((v) => !v.replaced)).toHaveLength(100);
+  });
+});
+
+describe("the vote script itself", () => {
+  const source = readFileSync(new URL("./vote-group.mjs", import.meta.url), "utf8");
+
+  it("writes only through the store's public calls", () => {
+    expect(source).toContain('call("GET", "")');
+    expect(source).toContain("`/rounds/${open.n}/votes`");
+    expect(source).not.toContain("writeFileSync");
+    expect(source).not.toContain("index.json");
+  });
+
+  it("exits 2 when it was asked wrongly and nothing was written", () => {
+    expect(source).toContain("process.exitCode = 2;");
+    // Both refusals return before any vote is cast.
+    expect(source).toContain('console.error("usage: node scripts/vote-group.mjs <store-url> <group-code> [--round n]");');
+    expect(source).toContain("no open round in");
+    expect(source).toContain("is the open one.");
+  });
+
+  it("exits 1 when votes did not land, refused or failed", () => {
+    expect(source).toContain("if (failures > 0 || strangers.length > 0) process.exitCode = 1;");
+  });
+
+  it("does not exit hard, so a closing socket cannot abort it", () => {
+    expect(source).not.toContain("process.exit(");
+    expect(source).toContain("process.exitCode");
+  });
+
+  it("names which of the two statuses a refusal arrived as", () => {
+    expect(source).toContain("const notInTheGroup = (status) => status === 403 || status === 404;");
+    expect(source).toContain("the store's own 403");
+    expect(source).toContain("404, which is how `netlify dev` delivers the store's 403");
   });
 });
