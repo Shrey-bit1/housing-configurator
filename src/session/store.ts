@@ -301,6 +301,11 @@ export function roomMembers(index: SessionIndex): string[] {
   return out.sort();
 }
 
+/** Whether this person is at the table, by the same rule. */
+function inRoom(index: SessionIndex, who: string): boolean {
+  return roomMembers(index).some((k) => sameResident(k, who));
+}
+
 /** What one pair looks like in the polled state: the pair itself, plus the
  *  counting a client needs to say "8 of 20 so far" without doing arithmetic
  *  over a vote list it would have to fetch anyway. */
@@ -693,6 +698,53 @@ async function route(req: Request, kv: KV): Promise<Response> {
     return json(roundView(await readIndex(kv, indexKey), stored), 201);
   }
 
+  if (rest[0] === "rounds" && rest.length === 3) {
+    const n = Number(decodeSegment(rest[1]));
+    if (!Number.isInteger(n) || n < 1) return fail(400, "round number must be a whole number \u2265 1");
+
+    if (rest[2] === "votes") {
+      if (req.method !== "POST") return fail(405, "POST only");
+      const body = await req.json().catch(() => fail(400, "body must be JSON"));
+      if (!isRecord(body)) return fail(400, "body must be a JSON object");
+      if (typeof body.who !== "string") return fail(400, "who must be 1-64 printable characters");
+      const who = residentName(body.who);
+      const pick = body.pick;
+      if (pick !== "a" && pick !== "b") return fail(400, 'pick must be "a" or "b"');
+      const pair = typeof body.pair === "string" ? body.pair.trim() : "";
+      if (!pair) return fail(400, "pair must name one of the round's pairs");
+      const reasons = parseReasons(body.reasons);
+
+      let vote!: Vote;
+      await updateIndex(kv, indexKey, (index) => {
+        const open = openRound(index);
+        // A vote on anything but the open round is refused, whether that round
+        // has closed or never existed. The message says which it was, because
+        // the two mean different things to whoever is holding the screen.
+        if (open === undefined || open.n !== n) {
+          const known = (index.rounds ?? []).some((r) => r.n === n);
+          return fail(409, known ? `round ${n} in session "${code}" is closed` : `no open round ${n} in session "${code}"`);
+        }
+        if (!open.pairs.some((p) => p.id === pair)) {
+          return fail(400, `no pair "${pair}" in round ${n}`);
+        }
+        // The room rule, read from the index rather than passed in: a person
+        // who joined or who owns a flat. Anyone else is not at this table.
+        if (!inRoom(index, who)) {
+          return fail(403, `"${who}" is not in session "${code}"`);
+        }
+        vote = { who, pair, pick, reasons, at: new Date().toISOString() };
+        // One vote per person per pair. A second one replaces the first while
+        // the round is open, so a resident who changes their mind does not
+        // have to be told they cannot.
+        open.votes = open.votes.filter((v) => !(v.pair === pair && sameResident(v.who, who)));
+        open.votes.push(vote);
+      });
+      return json(vote, 201);
+    }
+
+    return fail(404, "no such route; see docs/store.md");
+  }
+
   if (rest.length === 1 && rest[0] === "export") {
     // The whole session as one file (run 0023): the state the poll returns
     // plus every flat body, carried as a STRING so its bytes survive the
@@ -945,6 +997,17 @@ function parseResidentPatch(body: unknown): Partial<Resident> {
 
 /** The three, named once so the check, the message and the document agree. */
 const WISH_KEYS = ["corner", "terrace", "quiet"] as const;
+
+/** The reasons off the wire: a list, any length including none, and every
+ *  entry one of the five. Anything else is a 400 naming the five. */
+function parseReasons(raw: unknown): Reason[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) return fail(400, `reasons must be a list of ${REASONS.join(", ")}`);
+  for (const r of raw) {
+    if (!isReason(r)) return fail(400, `"${String(r)}" is not one of ${REASONS.join(", ")}`);
+  }
+  return raw as Reason[];
+}
 
 /** One building of a pair. The store checks that the three keys are there and
  *  reads inside none of them. */
