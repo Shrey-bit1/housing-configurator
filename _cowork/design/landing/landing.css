@@ -228,6 +228,36 @@
   cursor: pointer;
 }
 
+/* The way out of a remembered browser (settled 8 September). One quiet line
+   at the foot of the doors column, in both apps: "Start again with a new
+   flat." in the flat app, "Start again as someone else." in the building app.
+   Each app places its own element with this class INSIDE `.landing-doors`,
+   after the aside, so it sits under the doors and not beside them (the drift
+   run 0064's photograph found when it went into `#landing-extra`). Shown only
+   when the browser remembers something. */
+#landing .landing-again {
+  margin: 14px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--meta);
+}
+#landing .landing-again button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+#landing .landing-again button:hover {
+  color: var(--ink);
+}
+#landing .landing-again[hidden] {
+  display: none;
+}
+
 /* ============================================================
    THE SWITCH, first half: which doors this app has.
 
@@ -480,6 +510,9 @@
 }
 #landing[data-app="flat"] .landing-aside {
   animation-delay: 2900ms;
+}
+#landing .landing-again {
+  animation-delay: 3050ms;
 }
 #landing[data-app="building"] #landing-open-building {
   animation-delay: 2500ms;

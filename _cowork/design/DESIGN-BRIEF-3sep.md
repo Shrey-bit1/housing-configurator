@@ -277,7 +277,7 @@ two landings had drifted: the doors sat at the far right edge in one and
 in the middle in the other, the columns were different widths, and one
 carried a brand and a red rule the other lacked.
 
-LANDING FINGERPRINT sha256 3b6260a290174bf267a9cebef3d7862d37a9fd2f4cbc0430266d42e6fadf7818
+LANDING FINGERPRINT sha256 7a21b057379d50f7cc93dd0c79962e6c98449f27a02206d546a06ca755ae6602
 That is `landing.html` then `landing.css`, concatenated, with every
 CRLF read as LF, hashed as UTF-8. Each app has a test that computes it
 over its own copy and fails when the two disagree, which is how a copy
@@ -313,11 +313,19 @@ Building app: five steps in the bar.
 2. Wishes: the share slider, the ballot as a numbered list, three
    flat wishes as toggles, the radar with the group's average.
 3. The group: people at the table with mini radars at left, the
-   building in the middle with the six numbers under it, Build and
-   the feed at right, a chat line at the bottom. Residents can drag
-   a shared space; flats stay put.
-4. Your flat: the building with the resident's copies in red, the
-   card in sentences at right, then the next button.
+   building in the middle with the six numbers under it, the feed at
+   right, a chat line at the bottom. Residents can drag a shared
+   space; flats stay put. There is no build button (settled
+   8 September): once the wishes are in, the building builds itself,
+   and while it searches the screen shows it trying, lightly, with the
+   step count. Above the building one small switch of five views:
+   Building, Rooms, Backbone, Plan, Section (Benjamin's three views
+   from 3 September plus the two drawings). Building is the default:
+   facade panels, glass, studio light, shadows, ground plane.
+4. Your flat: the building with the resident's own flat in red,
+   everyone else's in one quiet neutral, shared rooms in yellow; the
+   card in sentences at right; the same five-view switch; then the
+   next button.
 5. Vote: as "The vote chooses the building" above. Pairs side by side
    with the six numbers and one sentence naming the difference, five
    reasons to tick, one press per pair, and a line saying how many
@@ -340,6 +348,23 @@ sliders, at any time, group or no group. Residents never reach it. A
 tall building gets two staircases from eight storeys; below that the
 walk to the stair decides.
 
+Storeys are the architect's too, and growing them is a last resort
+(settled 8 September). The building is packed at the storey count set
+in the drawer. When the flats do not fit, every screen says the same
+thing in the same words ("Only 14 of 21 flats fit on this plot at 7
+storeys. Seven people have no flat yet. Your architect has been told."),
+and the drawer offers one press, "Add storeys until everybody fits",
+which walks the heights once, keeps the best, and says what it found.
+Nothing grows unasked.
+
+A shared room is placed only where a person can walk to it from a
+stair landing along the corridor or through another shared room. A
+terrace nobody can reach is not a terrace.
+
+Nothing a resident reads names a field, a parameter or a button that
+is not on their screen. "Shared space 89 m², was 81." Never
+"sharedBuiltM2 80.6, −8.7".
+
 ## What the runs do, in order
 
 Updated 6 September. Done: flat 0026, 0027, 0028, 0029, 0030, 0031, 0032,
@@ -358,7 +383,8 @@ Next, in this order:
    a penalty that makes an unplaced flat a failure, storeys that grow on
    their own until everyone fits (the plot never changes), a progress
    bar instead of a thousand messages, simulated annealing with a plain
-   control, and a search that settles and wakes.
+   control, and a search that settles and wakes. (Storeys growing on
+   their own was withdrawn 8 September; see the plot paragraphs.)
 3. Packer, the vote: two buildings side by side, five checkboxes, the
    round counter, votes weighted into the next batch.
 4. Packer, display: shadows, three lights, ground plane, the three
