@@ -51,6 +51,28 @@ function line(what, status, detail = "") {
   console.log(`  ${ok ? "ok  " : "FAIL"}  ${String(status).padEnd(3)} ${what}${detail ? "  " + detail : ""}`);
 }
 
+/** A refusal line that is the store working, not the script failing. */
+function refused(what, status, detail) {
+  console.log(`  --    ${String(status).padEnd(3)} ${what}  ${detail}`);
+}
+
+/**
+ * Whether this answer means "you are not in this group".
+ *
+ * The store answers `403` (src/session/store.ts:768). Through `netlify dev`
+ * that arrives as `404`: the dev server retries a non-2xx from a function as
+ * `<path>.html`, `.htm`, `/index.html` and `/index.htm`, and the client is
+ * handed the last of those 404s. Run 0039 found the same masking and its
+ * report records it. Nothing else on this route answers either status, so both
+ * mean the same thing, and the script prints which one it actually saw rather
+ * than deciding for the reader.
+ */
+const notInTheGroup = (status) => status === 403 || status === 404;
+const howItArrived = (status) =>
+  status === 403
+    ? "not in the group (the store's own 403)"
+    : "not in the group (404, which is how `netlify dev` delivers the store's 403)";
+
 async function call(method, path, body, headers) {
   const res = await fetch(`${base}/api/session/${code}${path}`, { method, body, headers });
   const text = await res.text();
@@ -85,12 +107,27 @@ async function main() {
       `${open?.votes?.length ?? 0} vote(s), ${open?.replaced?.length ?? 0} replaced, ` +
       `${open?.pairs?.length ?? 0} pair(s), ${open?.expected ?? 0} expected`
   );
+  // Two refusals, both exit 2, the same code the usage line uses: nothing was
+  // written and nothing is half done, so a caller can tell "I asked wrongly"
+  // from "some of the votes did not land", which is exit 1 below.
   if (open === null) {
-    console.error(`\nno open round in "${code}". Open one first, then run this.`);
+    const last = state.json?.lastRound ?? null;
+    console.error(
+      `\nno open round in "${code}".` +
+        (last === null
+          ? " No round has ever been opened here."
+          : ` Round ${last.n} closed at ${last.closedAt}. Open the next one, then run this again.`)
+    );
+    process.exitCode = 2;
     return;
   }
   if (wantRound !== null && open.n !== wantRound) {
-    console.error(`\nround ${wantRound} was asked for and round ${open.n} is the open one.`);
+    console.error(
+      Number.isInteger(wantRound) && wantRound >= 1
+        ? `\nround ${wantRound} was asked for and round ${open.n} is the open one.`
+        : `\n--round wants a whole number 1 or more, and round ${open.n} is the open one.`
+    );
+    process.exitCode = 2;
     return;
   }
   console.log(`  pairs: ${open.pairs.map((p) => `${p.id}/${p.dial}`).join(", ")}`);
@@ -99,6 +136,7 @@ async function main() {
   //    their mind cast twice on the first pair, so the store supersedes the
   //    first and keeps it in `replaced`.
   let closedAt = null;
+  const strangers = [];
   for (const r of RESIDENTS) {
     for (const v of ballotFor(r, open.pairs)) {
       const res = await call(
@@ -107,6 +145,15 @@ async function main() {
         JSON.stringify({ who: r.name, pair: v.pair, pick: v.pick, reasons: v.reasons }),
         JSON_H
       );
+      // Somebody the store does not know is not a failure of this script. It
+      // is the store's membership rule working on a group this table does not
+      // match. Report it, drop the rest of that person's ballot, which would
+      // be refused the same way five more times, and go on to the next.
+      if (notInTheGroup(res.status)) {
+        strangers.push(r.name);
+        refused(`${r.name.padEnd(7)} ${v.pair.padEnd(4)} ${v.pick}`, res.status, howItArrived(res.status));
+        break;
+      }
       const closed = res.json?.closedTheRound === true;
       if (closed) closedAt = res.json?.at ?? "";
       line(
@@ -130,8 +177,19 @@ async function main() {
   }
   console.log(`  closedAt: ${round?.closedAt ?? "still open"}`);
   if (closedAt !== null) console.log(`  the last vote closed it, at ${closedAt}`);
-  console.log(failures === 0 ? `\nvoted.` : `\n${failures} call(s) FAILED`);
-  if (failures > 0) process.exitCode = 1;
+  if (strangers.length > 0) {
+    console.log(`  not in "${code}": ${strangers.join(", ")}`);
+  }
+  // Exit 1 when anybody's votes did not land, whether the store refused them
+  // or a call failed. A refusal is the store being right and the run still
+  // being short of what was asked for, and a caller in a script should hear
+  // about both the same way.
+  console.log(
+    failures === 0 && strangers.length === 0
+      ? `\nvoted.`
+      : `\n${failures} call(s) FAILED, ${strangers.length} resident(s) refused`
+  );
+  if (failures > 0 || strangers.length > 0) process.exitCode = 1;
 }
 
 if (process.exitCode !== 2) await main();
