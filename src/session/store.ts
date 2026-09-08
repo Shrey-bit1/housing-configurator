@@ -174,6 +174,77 @@ export function leftMessage(name: string): Message {
   return { who: "", text: `${name} left the group.`, at: new Date().toISOString() };
 }
 
+/**
+ * The five reasons a resident may tick beside a vote (run 0039).
+ *
+ * Copied word for word from the brief's "The vote chooses the building", which
+ * says both apps read these five from that paragraph. They are the only ones
+ * the store accepts, and they are also the five dials a challenger is built
+ * on, which is why a pair names one of them as its `dial`.
+ *
+ * The wording is the data. "shared space" and "short walks" are two words on
+ * purpose, because they are what a resident reads on the button.
+ */
+export const REASONS = ["privacy", "shared space", "cost", "light", "short walks"] as const;
+export type Reason = (typeof REASONS)[number];
+
+const isReason = (v: unknown): v is Reason => typeof v === "string" && (REASONS as readonly string[]).includes(v);
+
+/** One building in a pair. The store never reads inside any of the three. */
+export interface Candidate {
+  genome: unknown;
+  summary: unknown;
+  /** The plot it was built on, opaque, the same shape `BuildingRun.plot` has. */
+  plot?: Record<string, unknown>;
+}
+
+/**
+ * Two buildings a resident chooses between, and why they differ.
+ *
+ * `dial` is the one reason the challenger was pushed on, and `sentence` is the
+ * line the screen shows: "This one has more light and longer walks to the
+ * stair." The store keeps both and reads neither; the building app writes them
+ * and the flat app never sees them.
+ */
+export interface Pair {
+  id: string;
+  a: Candidate;
+  b: Candidate;
+  dial: Reason;
+  sentence: string;
+}
+
+/** One person's answer on one pair. */
+export interface Vote {
+  who: string;
+  pair: string;
+  pick: "a" | "b";
+  /** Any of the five, in any order, possibly none. */
+  reasons: Reason[];
+  /** When the STORE received it. A replacement carries the later time. */
+  at: string;
+}
+
+/**
+ * One round of the vote.
+ *
+ * A round is stored whole: its pairs with both buildings inside them, the five
+ * weights it was built with, every vote cast on it, and when it opened and
+ * closed. Nothing about a round is recomputed on read, so a round read back
+ * next year is the round that ran.
+ *
+ * At most one round is open at a time. `closedAt` absent is what open means.
+ */
+export interface Round {
+  n: number;
+  pairs: Pair[];
+  /** The five numbers the round was built with, one per reason, in REASONS' order. */
+  weights: number[];
+  openedAt: string;
+  closedAt?: string;
+  votes: Vote[];
+}
+
 interface SessionIndex {
   flats: Record<string, FlatSummary>;
   residents: Record<string, Resident>;
@@ -184,6 +255,88 @@ interface SessionIndex {
   /** When somebody started this group on purpose, or absent if nobody did.
    *  Written once by `POST /api/session/{code}` and never overwritten. */
   startedAt?: string;
+  /**
+   * Every round, open and closed, oldest first (run 0039). ONE list rather
+   * than an open round beside a history: at most one round is ever open, so
+   * "the open round" and "the last closed round" are both views of this, and
+   * two fields that could disagree would be two fields that eventually do.
+   *
+   * Optional in the type for the same reason `messages` is: an index written
+   * before this run has none, and the store reads a record back as it found
+   * it rather than backfilling.
+   */
+  rounds?: Round[];
+}
+
+/** The one open round, or undefined. At most one is open, which `PUT /round`
+ *  is what enforces. */
+function openRound(index: SessionIndex): Round | undefined {
+  return (index.rounds ?? []).find((r) => r.closedAt === undefined);
+}
+
+/** The most recent closed round, or undefined. */
+function lastClosedRound(index: SessionIndex): Round | undefined {
+  const closed = (index.rounds ?? []).filter((r) => r.closedAt !== undefined);
+  return closed[closed.length - 1];
+}
+
+/**
+ * Who is at the table, as the store reads the room (run 0039).
+ *
+ * A person is in the group if they joined, which is a resident row, OR if they
+ * own a flat, which is a flat published under their name. That is the building
+ * app's own rule from its run 0059, and the store can answer it from its index
+ * without being told, so a vote does not have to carry a membership list that
+ * could be stale.
+ *
+ * Names come back as they were STORED, deduped by `sameResident`, so somebody
+ * who typed "ana" once and "Ana" the next time is one person and counts once.
+ * Sorted, so the expected count and the list are the same on every read.
+ */
+export function roomMembers(index: SessionIndex): string[] {
+  const out: string[] = [];
+  for (const name of [...Object.keys(index.residents), ...Object.values(index.flats).map((f) => f.resident)]) {
+    if (!out.some((k) => sameResident(k, name))) out.push(name);
+  }
+  return out.sort();
+}
+
+/** Whether this person is at the table, by the same rule. */
+function inRoom(index: SessionIndex, who: string): boolean {
+  return roomMembers(index).some((k) => sameResident(k, who));
+}
+
+/**
+ * Whether every expected vote is in: every person at the table has voted on
+ * every pair. This is the ONE close rule, and the store applies it inside the
+ * same write that records a vote, so a round cannot sit open for a moment
+ * after its last vote lands.
+ */
+function everyoneHasVoted(index: SessionIndex, round: Round): boolean {
+  const members = roomMembers(index);
+  if (members.length === 0) return false;
+  return round.pairs.every((p) =>
+    members.every((m) => round.votes.some((v) => v.pair === p.id && sameResident(v.who, m)))
+  );
+}
+
+/** What one pair looks like in the polled state: the pair itself, plus the
+ *  counting a client needs to say "8 of 20 so far" without doing arithmetic
+ *  over a vote list it would have to fetch anyway. */
+function pairView(round: Round, expected: number) {
+  return round.pairs.map((p) => ({
+    ...p,
+    voted: round.votes.filter((v) => v.pair === p.id).length,
+    expected,
+  }));
+}
+
+/** A round on the wire. The votes ride along whole, so a client can count them
+ *  its own way as well as read the counts above. */
+function roundView(index: SessionIndex, round: Round | undefined) {
+  if (round === undefined) return null;
+  const expected = roomMembers(index).length;
+  return { ...round, pairs: pairView(round, expected), expected };
 }
 
 /**
@@ -528,6 +681,112 @@ async function route(req: Request, kv: KV): Promise<Response> {
     return json(message, 201);
   }
 
+  // ---- The vote (run 0039) -------------------------------------------------
+  // Rounds of pairs, one vote per person per pair, and a round that closes
+  // itself when the last expected vote lands. The brief's "The vote chooses
+  // the building" is what all of this is shaped by; the store holds it and
+  // counts nothing beyond "has everybody voted".
+
+  if (rest.length === 1 && rest[0] === "round") {
+    if (req.method !== "PUT") return fail(405, "PUT only");
+    const body = await req.json().catch(() => fail(400, "body must be JSON"));
+    const round = parseRound(body);
+    let stored!: Round;
+    await updateIndex(kv, indexKey, (index) => {
+      const rounds = index.rounds ?? [];
+      const open = openRound(index);
+      // Two clients racing to open the same round cannot both win: the check
+      // is INSIDE the mutate, which `updateIndex` re-runs on a lost ETag, so
+      // the loser sees the winner's round and is refused.
+      if (open !== undefined) {
+        return fail(409, `round ${open.n} in session "${code}" is still open`);
+      }
+      const last = rounds[rounds.length - 1];
+      const wanted = last === undefined ? 1 : last.n + 1;
+      if (round.n !== wanted) {
+        return fail(409, `next round in session "${code}" is ${wanted}, not ${round.n}`);
+      }
+      stored = { ...round, openedAt: new Date().toISOString(), votes: [] };
+      index.rounds = [...rounds, stored];
+    });
+    return json(roundView(await readIndex(kv, indexKey), stored), 201);
+  }
+
+  if (rest[0] === "rounds" && rest.length === 3) {
+    const n = Number(decodeSegment(rest[1]));
+    if (!Number.isInteger(n) || n < 1) return fail(400, "round number must be a whole number \u2265 1");
+
+    if (rest[2] === "votes") {
+      if (req.method !== "POST") return fail(405, "POST only");
+      const body = await req.json().catch(() => fail(400, "body must be JSON"));
+      if (!isRecord(body)) return fail(400, "body must be a JSON object");
+      if (typeof body.who !== "string") return fail(400, "who must be 1-64 printable characters");
+      const who = residentName(body.who);
+      const pick = body.pick;
+      if (pick !== "a" && pick !== "b") return fail(400, 'pick must be "a" or "b"');
+      const pair = typeof body.pair === "string" ? body.pair.trim() : "";
+      if (!pair) return fail(400, "pair must name one of the round's pairs");
+      const reasons = parseReasons(body.reasons);
+
+      let vote!: Vote;
+      let closed = false;
+      await updateIndex(kv, indexKey, (index) => {
+        const open = openRound(index);
+        // A vote on anything but the open round is refused, whether that round
+        // has closed or never existed. The message says which it was, because
+        // the two mean different things to whoever is holding the screen.
+        if (open === undefined || open.n !== n) {
+          const known = (index.rounds ?? []).some((r) => r.n === n);
+          return fail(409, known ? `round ${n} in session "${code}" is closed` : `no open round ${n} in session "${code}"`);
+        }
+        if (!open.pairs.some((p) => p.id === pair)) {
+          return fail(400, `no pair "${pair}" in round ${n}`);
+        }
+        // The room rule, read from the index rather than passed in: a person
+        // who joined or who owns a flat. Anyone else is not at this table.
+        if (!inRoom(index, who)) {
+          return fail(403, `"${who}" is not in session "${code}"`);
+        }
+        vote = { who, pair, pick, reasons, at: new Date().toISOString() };
+        // One vote per person per pair. A second one replaces the first while
+        // the round is open, so a resident who changes their mind does not
+        // have to be told they cannot.
+        open.votes = open.votes.filter((v) => !(v.pair === pair && sameResident(v.who, who)));
+        open.votes.push(vote);
+        // The round closes in the SAME write that records its last vote. A
+        // close in a second write would leave a moment where every vote is in
+        // and the round still reads open, and a client polling in that moment
+        // would show a room waiting for nobody.
+        if (everyoneHasVoted(index, open)) {
+          open.closedAt = new Date().toISOString();
+          closed = true;
+        }
+      });
+      return json({ ...vote, closedTheRound: closed }, 201);
+    }
+
+    if (rest[2] === "close") {
+      // By hand, and only by hand: the store closes a round itself the moment
+      // its last expected vote lands. This stays for the day a rule for an
+      // absent person arrives, since the brief says one is coming and that
+      // "for now an absent person can hold a round open".
+      if (req.method !== "POST") return fail(405, "POST only");
+      let closedRound!: Round;
+      await updateIndex(kv, indexKey, (index) => {
+        const open = openRound(index);
+        if (open === undefined || open.n !== n) {
+          const known = (index.rounds ?? []).some((r) => r.n === n);
+          return fail(409, known ? `round ${n} in session "${code}" is already closed` : `no open round ${n} in session "${code}"`);
+        }
+        open.closedAt = new Date().toISOString();
+        closedRound = open;
+      });
+      return json(roundView(await readIndex(kv, indexKey), closedRound));
+    }
+
+    return fail(404, "no such route; see docs/store.md");
+  }
+
   if (rest.length === 1 && rest[0] === "export") {
     // The whole session as one file (run 0023): the state the poll returns
     // plus every flat body, carried as a STRING so its bytes survive the
@@ -537,7 +796,17 @@ async function route(req: Request, kv: KV): Promise<Response> {
     const index = await readIndex(kv, indexKey);
     const bodies: Record<string, string | null> = {};
     for (const id of Object.keys(index.flats)) bodies[id] = await kv.get(`${code}/flats/${id}`);
-    return json({ ...sessionView(code, index), bodies, exportedAt: new Date().toISOString() });
+    // Every round, open and closed, oldest first (run 0039). This is the only
+    // call that carries them, for the same reason it is the only one that
+    // carries the flat bodies: it is the thesis record of a room at the end of
+    // a test, and a poll should not drag a building through the wire every few
+    // seconds.
+    return json({
+      ...sessionView(code, index),
+      rounds: (index.rounds ?? []).map((r) => roundView(index, r)),
+      bodies,
+      exportedAt: new Date().toISOString(),
+    });
   }
 
   if (rest.length !== 1 || rest[0] !== "building") return fail(404, "no such route; see docs/store.md");
@@ -660,6 +929,14 @@ function sessionView(code: string, index: SessionIndex) {
     // it defaults to an empty list rather than being absent, so a group with
     // nothing said reads as having said nothing.
     messages: index.messages ?? [],
+    // The vote, as two views of one list (run 0039). `round` is the open one
+    // with its per-pair counts, `lastRound` the one that closed most
+    // recently. Both are null rather than absent, so a client can tell "no
+    // round" from "a field this store does not have". The whole history is in
+    // `/export` only: a poll runs every few seconds and every round carries
+    // two whole buildings.
+    round: roundView(index, openRound(index)),
+    lastRound: roundView(index, lastClosedRound(index)),
   };
 }
 
@@ -762,3 +1039,73 @@ function parseResidentPatch(body: unknown): Partial<Resident> {
 
 /** The three, named once so the check, the message and the document agree. */
 const WISH_KEYS = ["corner", "terrace", "quiet"] as const;
+
+/** The reasons off the wire: a list, any length including none, and every
+ *  entry one of the five. Anything else is a 400 naming the five. */
+function parseReasons(raw: unknown): Reason[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) return fail(400, `reasons must be a list of ${REASONS.join(", ")}`);
+  for (const r of raw) {
+    if (!isReason(r)) return fail(400, `"${String(r)}" is not one of ${REASONS.join(", ")}`);
+  }
+  return raw as Reason[];
+}
+
+/** One building of a pair. The store checks that the three keys are there and
+ *  reads inside none of them. */
+function parseCandidate(raw: unknown, where: string): Candidate {
+  if (!isRecord(raw)) return fail(400, `${where} must be a JSON object`);
+  if (!("genome" in raw)) return fail(400, `${where} must carry a genome`);
+  if (!("summary" in raw)) return fail(400, `${where} must carry a summary`);
+  const c: Candidate = { genome: raw.genome, summary: raw.summary };
+  if ("plot" in raw) {
+    if (!isRecord(raw.plot)) return fail(400, `${where}.plot must be a JSON object`);
+    c.plot = raw.plot;
+  }
+  return c;
+}
+
+/**
+ * A round off the wire, checked whole before anything is written. `openedAt`
+ * and `votes` are the store's to set, so a body carrying them is ignored
+ * rather than refused: they are not a caller's to send and a 400 would be
+ * pedantry.
+ */
+function parseRound(raw: unknown): Omit<Round, "openedAt" | "votes"> {
+  if (!isRecord(raw)) return fail(400, "body must be a JSON object");
+  const n = raw.n;
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 1) {
+    return fail(400, "n must be a whole number \u2265 1");
+  }
+  if (!Array.isArray(raw.pairs) || raw.pairs.length === 0) {
+    return fail(400, "pairs must be a list with at least one pair in it");
+  }
+  const ids = new Set<string>();
+  const pairs: Pair[] = raw.pairs.map((p, i) => {
+    if (!isRecord(p)) return fail(400, `pairs[${i}] must be a JSON object`);
+    const id = typeof p.id === "string" ? p.id.trim() : "";
+    if (!id) return fail(400, `pairs[${i}].id must be a non-empty string`);
+    if (ids.has(id)) return fail(400, `two pairs share the id "${id}"`);
+    ids.add(id);
+    if (!isReason(p.dial)) return fail(400, `pairs[${i}].dial must be one of ${REASONS.join(", ")}`);
+    if (typeof p.sentence !== "string" || p.sentence.trim() === "") {
+      return fail(400, `pairs[${i}].sentence must say what is different between the two`);
+    }
+    return {
+      id,
+      a: parseCandidate(p.a, `pairs[${i}].a`),
+      b: parseCandidate(p.b, `pairs[${i}].b`),
+      dial: p.dial,
+      sentence: p.sentence,
+    };
+  });
+  const weights = raw.weights;
+  if (
+    !Array.isArray(weights) ||
+    weights.length !== REASONS.length ||
+    !weights.every((w) => typeof w === "number" && Number.isFinite(w))
+  ) {
+    return fail(400, `weights must be ${REASONS.length} numbers, one per reason, in the order ${REASONS.join(", ")}`);
+  }
+  return { n, pairs, weights: weights as number[] };
+}

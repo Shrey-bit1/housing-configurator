@@ -44,6 +44,13 @@ A `GET` on a code nobody has started still answers `200` with an empty group and
 polls a code continuously, including before anybody has published anything, and
 a `404` there would be a poll that fails for a group that is merely young.
 
+**Who is in the group.** A person is in the group if they joined, which is a
+resident row, or if they own a flat, which is a flat published under their
+name. The store reads that off its own index, so nothing has to tell it who is
+at the table and no membership list can go stale. Two names that match after
+trimming and folding case are one person and count once. This is the rule the
+vote uses to decide who may vote and how many votes a round is waiting for.
+
 **A person's flats leave with them.** One person is one profile is one flat, so
 `DELETE /api/session/{code}/residents/{name}` removes that person's row and
 every flat they own in the same call, and nothing is left behind for the
@@ -88,6 +95,9 @@ There are four things in a session: **flats**, **residents**, the last
 | `DELETE` | `/api/session/{code}/residents/{name}` | none | `{ resident, flats }`, naming what was removed; `404` if that name has neither a row nor a flat |
 | `POST` | `/api/session/{code}/residents/{name}/rename` | `to` | `{ from, to, flats }`; `409` if the new name is already at the table |
 | `POST` | `/api/session/{code}/messages` | `who`, `text` | the stored message with the store's `at`; `201` |
+| `PUT` | `/api/session/{code}/round` | `n`, `pairs`, `weights` | the round as stored; `409` if `n` is not the next one or a round is still open |
+| `POST` | `/api/session/{code}/rounds/{n}/votes` | `who`, `pair`, `pick`, `reasons` | the vote with `closedTheRound`; `403` from outside the group, `409` on a round that is not open |
+| `POST` | `/api/session/{code}/rounds/{n}/close` | none | the round, closed by hand; `409` if it is not the open one |
 | `GET` | `/api/session/{code}/building` | none | the last run, or `null` |
 | `PUT` | `/api/session/{code}/building` | `genome`, `summary`, `by` | the stored run with its `at` timestamp |
 | `GET` | `/api/session/{code}/export` | none | the session state plus every flat body, as strings |
@@ -415,6 +425,144 @@ session cannot grow the index without bound. It comes back under `messages` in
 `GET /api/session/{code}` and in `/export`, oldest first, and a group that has
 said nothing reads as `[]` rather than as a missing key. There is no edit and no
 delete: the point is a record of what a group said while it decided something.
+
+### `PUT /api/session/{code}/round` — open a round of pairs
+
+The vote runs as rounds of pairs. A round offers several pairs at once, each a
+current building beside a challenger built by pushing one dial, and a resident
+votes on each pair. The design is in the brief under "The vote chooses the
+building"; the store holds the rounds and the votes and counts nothing beyond
+"has everybody voted".
+
+The body is the whole round:
+
+- `n` is the round number, a whole number 1 or more. It must be exactly one
+  more than the last round's number, or 1 when there has been none.
+- `pairs` is a list, at least one, each `{ id, a, b, dial, sentence }`. `id` is
+  yours and must be unique within the round. `a` and `b` are the two buildings,
+  each `{ genome, summary }` and optionally `plot`; all three are opaque and
+  stored exactly as sent. `dial` is the one reason the challenger was pushed
+  on, one of the five below. `sentence` is the line the screen shows, naming
+  what is different: "This one has more light and longer walks to the stair."
+- `weights` is five numbers, one per reason, in the order the five are listed
+  below. These are the weights the round was built with, kept so a round read
+  back later is the round that ran.
+
+The store adds `openedAt` and an empty `votes` list. A body carrying either is
+ignored rather than refused, because they are not a caller's to send.
+
+```
+PUT /api/session/room-42/round
+content-type: application/json
+
+{ "n": 1,
+  "weights": [1, 1, 1, 1, 1],
+  "pairs": [
+    { "id": "p1",
+      "a": { "genome": [3, 1, 4], "summary": { "flats": 20 }, "plot": { "modulesX": 11 } },
+      "b": { "genome": [3, 2, 4], "summary": { "flats": 20 }, "plot": { "modulesX": 11 } },
+      "dial": "light",
+      "sentence": "This one has more light and longer walks to the stair." }
+  ] }
+```
+
+```json
+201 Created
+{ "n": 1, "pairs": [ … ], "weights": [1, 1, 1, 1, 1],
+  "openedAt": "2026-09-07T09:00:00.000Z", "votes": [], "expected": 20 }
+```
+
+**Two refusals, both `409`.** A round while another is open is refused, naming
+the open one, because the polled state's `round` can only mean one of them. An
+`n` that is not the next one is refused, naming the number that was expected.
+Both checks run inside the same write that would store the round, so two
+clients racing to open the same round cannot both win: the loser reads the
+winner's round and is refused.
+
+### The five reasons
+
+The reasons a resident may tick, and the dials a challenger is built on, are
+five and are copied word for word from the brief:
+
+```
+privacy, shared space, cost, light, short walks
+```
+
+Both apps read them from that paragraph. Anything else, in a `dial` or in a
+vote's `reasons`, is a `400` naming all five.
+
+### `POST /api/session/{code}/rounds/{n}/votes` — one vote
+
+The body is `{ who, pair, pick, reasons }`. `pick` is `"a"` or `"b"`.
+`reasons` is a list of any of the five, in any order, and may be empty:
+somebody may prefer a building without being able to say why.
+
+One vote per person per pair. A second vote on the same pair replaces the
+first while the round is open, so a resident who changes their mind is not
+told they cannot. Who cast a vote is matched the way ownership is matched
+everywhere in this store, after trimming and folding case, so a name typed two
+ways is one voter.
+
+`who` must be in the group by the rule above. Anybody else gets `403`. A vote
+on a round that is not the open one gets `409`, and the message says whether
+that round is closed or never existed.
+
+```
+POST /api/session/room-42/rounds/1/votes
+content-type: application/json
+
+{ "who": "Ana", "pair": "p1", "pick": "b", "reasons": ["light", "privacy"] }
+```
+
+```json
+201 Created
+{ "who": "Ana", "pair": "p1", "pick": "b", "reasons": ["light", "privacy"],
+  "at": "2026-09-07T09:04:00.000Z", "closedTheRound": false }
+```
+
+`closedTheRound` is true on the vote that was the last one expected. The
+client that cast it therefore knows at once, without polling.
+
+### `POST /api/session/{code}/rounds/{n}/close` — close one by hand
+
+**You should not normally need this.** The store closes a round itself, in the
+same write that records its last expected vote, so a round is never open for a
+moment after everybody has voted.
+
+This exists for the day a rule for an absent person arrives. The brief says one
+is coming and that "for now an absent person can hold a round open", and when
+that rule is written this is where it will land. Until then it is a way to
+close a round a group has given up waiting on.
+
+It answers the closed round. `409` if that round is not the open one, saying
+whether it was already closed or never existed.
+
+### The vote in the polled state
+
+`GET /api/session/{code}` carries two fields for the vote, both `null` when
+there is nothing to carry, so a client can tell "no round" from "a store that
+does not have this".
+
+`round` is the open round, with two things added for counting. Each pair
+carries `voted`, how many people have voted on it, and `expected`, how many are
+at the table; the round itself carries `expected` as well. Every vote so far
+rides along whole under `votes`, so a client that wants to count its own way
+can. `lastRound` is the round that closed most recently, in the same shape.
+
+```json
+{ "code": "room-42",
+  "round": { "n": 2, "expected": 20, "openedAt": "…",
+             "weights": [1.2, 0.9, 1, 1.1, 0.8],
+             "pairs": [ { "id": "p1", "a": {…}, "b": {…}, "dial": "light",
+                          "sentence": "…", "voted": 8, "expected": 20 } ],
+             "votes": [ { "who": "Ana", "pair": "p1", "pick": "b",
+                          "reasons": ["light"], "at": "…" } ] },
+  "lastRound": { "n": 1, "closedAt": "…", … } }
+```
+
+Only `/export` carries every round, under `rounds`, oldest first. A poll runs
+every few seconds and every round holds two whole buildings per pair, so the
+history stays out of it.
 
 ### `PUT` and `GET /api/session/{code}/building` — the last run
 

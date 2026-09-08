@@ -75,7 +75,7 @@
 }
 #landing .landing-disc-b {
   right: -90px;
-  bottom: -120px;
+  bottom: 150px; /* clear of the journey strip at 1440 by 900 (run 0062 found it covering the last dot) */
   width: 340px;
   height: 340px;
   background: var(--blue);

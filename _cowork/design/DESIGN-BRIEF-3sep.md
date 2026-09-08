@@ -159,6 +159,65 @@ The names for the written part: opinion pooling for the average, and
 iterative proportional fitting for the floor-by-floor fit, both after
 Nourian et al., EquiCity, Scientific Reports 2024.
 
+## The vote chooses the building
+
+Settled 7 September. The vote is how the group arrives at one building
+it agrees on. It runs as a sequence of rounds, and it runs over days if
+it has to, because twenty people are rarely at their laptops at once.
+
+What a resident sees. Two buildings side by side, the six numbers
+under each, and one sentence saying what is different between them:
+"This one has more light and longer walks to the stair." The resident
+presses the one they would rather live in and ticks one or two reasons
+from five: privacy, shared space, cost, light, short walks. Then the
+screen says "You have voted. 8 of 20 so far." and they are done until
+the round closes. Nobody waits at a screen.
+
+Where the second building comes from. A second building that differs
+only by chance is not worth a vote. So a challenger is the current
+building searched again with one dial pushed: more windows in light, or
+shorter walks to the stair, or a tighter facade that is cheaper to heat
+and cool, or more shared space, or fewer shafts. The two then differ in
+a way a person can see and the six numbers can show.
+
+Rounds. Because every round is a wait for the whole group, a round
+offers several pairs at once rather than one, five pairs maybe, each
+built from the current building pushed on a different dial. A resident
+votes on each pair. A round closes when everyone at the table has
+voted; until then it stays open, and the screen says how many have.
+When it closes, the app counts, keeps the building that won most, and
+prepares the next round. Two or three rounds is the expectation.
+
+The bump. The reasons people tick are counted, everyone equal, and
+become five numbers, one per dial. They do two things. They decide
+which dials the next round pushes hardest: what people ticked for a
+building that lost is what they wanted and did not get. And round by
+round they become the weights the search itself builds by, so that
+after the vote the scoring rule the building is built by has been set
+by the residents' choices rather than by a guess in the Architect
+drawer. One person ticking the same reason every time moves a weight
+by one twentieth.
+
+When it ends. At the close of any round, if three quarters or more of
+the people who voted chose the same building, that building is the one,
+and the screen says "17 of 20 chose this building. This is the one."
+Otherwise the next round goes up. For now an absent person can hold a
+round open; a rule for that comes later.
+
+The pause before it. After the wishes, the screen says "Your wishes are
+recorded. The building will be ready when everyone has answered." While
+the group finishes, the app uses that time to run the search properly
+and to build the first round's pairs, so when the last person answers
+the vote is ready. The same happens between rounds. This is an idea
+for the thesis after the master, and the first version (run 0063)
+builds the vote without the pause.
+
+What the store carries for this: the current building and the
+challengers of the open round, each with its genome and the plot it
+was built on; the round number; and one vote per person per pair with
+the reasons ticked. Both apps read the same five reasons, copied from
+this paragraph: privacy, shared space, cost, light, short walks.
+
 ## The six numbers
 
 On every screen that shows a building, the same six, in this order:
@@ -208,7 +267,7 @@ two landings had drifted: the doors sat at the far right edge in one and
 in the middle in the other, the columns were different widths, and one
 carried a brand and a red rule the other lacked.
 
-LANDING FINGERPRINT sha256 908c7f9e20e8e89f3a36a766056c2659803e38dd266207dd9377ef19553ba419
+LANDING FINGERPRINT sha256 3b6260a290174bf267a9cebef3d7862d37a9fd2f4cbc0430266d42e6fadf7818
 That is `landing.html` then `landing.css`, concatenated, with every
 CRLF read as LF, hashed as UTF-8. Each app has a test that computes it
 over its own copy and fails when the two disagree, which is how a copy
@@ -249,8 +308,10 @@ Building app: five steps in the bar.
    a shared space; flats stay put.
 4. Your flat: the building with the resident's copies in red, the
    card in sentences at right, then the next button.
-5. Vote: two buildings side by side with the six numbers, the two
-   extremes small at the top, five checkboxes for why, one button.
+5. Vote: as "The vote chooses the building" above. Pairs side by side
+   with the six numbers and one sentence naming the difference, five
+   reasons to tick, one press per pair, and a line saying how many
+   have voted.
 
 Architect: a drawer from the right with every operator control,
 closed unless opened. The building shows as backbone behind it.

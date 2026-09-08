@@ -281,7 +281,21 @@ lines were behind the check chip in another corner. That is a new run step and
 a new script; nothing else about the repo's shape changed. PROJECT_STATE new
 §19.
 
-**Last updated:** 2026-09-07
+Run 0039 gave the store the vote. It held one building, no rounds and no votes;
+it now holds rounds of pairs and one vote per person per pair. `PUT
+/api/session/{code}/round` opens a round, whose number must be one more than
+the last and which is refused while another is open, both checks inside the
+same write so two clients racing cannot both win. `POST
+.../rounds/{n}/votes` casts a vote, refusing anyone the store does not read as
+being in the group, which it works out from its own index: somebody who joined
+or who owns a flat. The store closes a round itself in the same write that
+records its last expected vote. Five reasons, copied word for word from the
+brief, are the only ones it accepts. The polled state gains `round` and
+`lastRound`; only `/export` carries the history. The store contract changed by
+those three calls and nothing else, and `building` keeps its shape. The
+building app's run 0063 builds the screens on top. PROJECT_STATE new §20.
+
+**Last updated:** 2026-09-08
 
 ## What this project is
 
