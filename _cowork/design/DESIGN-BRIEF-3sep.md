@@ -202,7 +202,9 @@ When it ends. At the close of any round, if three quarters or more of
 the people who voted chose the same building, that building is the one,
 and the screen says "17 of 20 chose this building. This is the one."
 Otherwise the next round goes up. For now an absent person can hold a
-round open; a rule for that comes later.
+round open; a rule for that comes later. A vote that a person changes
+is replaced for the count, and the earlier one is kept in the record,
+so that how many changed their minds can be read afterwards.
 
 The pause before it. After the wishes, the screen says "Your wishes are
 recorded. The building will be ready when everyone has answered." While
@@ -239,6 +241,14 @@ same three lines under it, same two discs, same journey strip. Only the
 doors differ: the flat app's are Start a flat, Start a group, Join a
 group, Open a file; the building app's are Join a group, Open a
 building, Look at the example.
+
+When the flat app remembers you (settled 8 September), the first door
+reads "Back to your flat" and the fields hold your code and name. Under
+the doors there is then one written line, "Start again with a new
+flat." It asks once, in plain words, and then forgets the flat and the
+name on this browser, so the landing is a first visit again. The flat
+you already sent stays in the group; taking it out is done from the
+group screen, never by starting again.
 
 The six dots are always all six. The dots that belong to the app you
 are in are ink; the dots that belong to the other app are dim. The dot
@@ -321,6 +331,14 @@ Every size in that drawer reads in metres on its face. The plot says
 other way round. Nobody outside the code knows what a module is. A
 module is 4 cells of 0.6 m, so 2.4 m; a cell is the 0.6 m grid both
 apps draw on; a bay is 8 cells, 4.8 m.
+
+The plot is the architect's (settled 8 September). Nothing in the app
+changes it on its own: not a rebuild, not a file opening, not the
+storeys growing. The architect sets it with the two sliders or with one
+press, "Size the plot for these flats", which measures once and sets the
+sliders, at any time, group or no group. Residents never reach it. A
+tall building gets two staircases from eight storeys; below that the
+walk to the stair decides.
 
 ## What the runs do, in order
 

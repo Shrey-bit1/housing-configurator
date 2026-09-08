@@ -72,7 +72,7 @@ work-in-progress research artifact, not a production app.
 | **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`/`delete`, the last added in run 0035) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. `sameResident(a, b)` (run 0026: trimmed, case-insensitive) is the ownership check's rule, and run 0035's leave and rename calls reach it through `residentKey`, `flatsOwnedBy` and `storedName` rather than answering the same question a second time; run 0039 adds the vote, `REASONS`, `roomMembers` and the round and vote routes; a building run's optional `plot` (run 0026, opaque) rides alongside `genome`/`summary`. See §12. |
 | **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
 | **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by `refreshFlatFigures` (`main.ts`), which writes the bar's strip in step 01 and the read-out under the drawing in step 02. See §11, §14. |
-| **The flat is kept as you draw** (run 0036) | `src/core/draft.ts` | `saveDraft(store, snapshot)`, `readDraft(store, search)` and `draftHasRooms(text)`, over a two-method `DraftStore` that `localStorage` satisfies. The draft is the SAME string the undo history takes as a snapshot, so the app serializes once per action. `readDraft` is the one rule with three reasons to say no: no store, a URL naming a project, or a draft with no rooms. `draft.test.ts` drives it with a Map. See §17. |
+| **The flat is kept as you draw** (run 0036) | `src/core/draft.ts` | `saveDraft(store, snapshot)`, `readDraft(store, search)` and `draftHasRooms(text)`, over a two-method `DraftStore` that `localStorage` satisfies. Run 0040 adds the other way out: `BROWSER_MEMORY`, the two keys this browser holds, with `forgetThisBrowser`, `remembersAnything`, `asksToForget` and `withoutFresh`. The draft is the SAME string the undo history takes as a snapshot, so the app serializes once per action. `readDraft` is the one rule with three reasons to say no: no store, a URL naming a project, or a draft with no rooms. `draft.test.ts` drives it with a Map. See §17. |
 | **The rules the chrome runs on** (run 0027) | `src/core/flatState.ts` | `flatPhase(placedRooms, unitBuilds)` → `empty` / `unready` / `ready`, plus `canSend`, `showsDropHint`, `checksRun`, the empty screen's own words, `showsLanding(search)`, and (run 0036) `sendButton(phase, state, complaints)`, the whole rule for step 02's one button, answering a label, a notice, whether it is awake and (run 0038) the fault lines to list under it. It takes the lines rather than a count, so the number on the button is derived from the list it prints. Pure, no DOM: one production rule over one state value, read by the numbers, the check chip, the drop hint, the Send button and step 02's tab, so none of them can disagree. `flatState.test.ts` drives both rules directly. See §14. |
 | **The landing, shared by both apps** (run 0037) | `_cowork/design/landing/landing.html`, `landing.css` | The whole landing as one fragment both repositories render, byte for byte, with `data-app="flat"` or `"building"` on the root picking the doors and the dot tones. Self-contained: every selector scoped under `#landing`, every colour and font declared on `#landing` itself. Inlined by `src/main.ts` with `?raw` at build time. The Context folder holds the source; `src/landingShared.test.ts` fingerprints this copy against the hash in the brief. See §18. |
 | **The journey, as data** (run 0027) | `src/core/journey.ts` | `JOURNEY`, six ordered steps across the two apps, with `journeyIndex(id)` and (run 0034) `journeyTones(currentId, thisApp)` → `now` / `here` / `elsewhere`, which replaced run 0027's `journeyMarks` and its `done` / `now` / `ahead`. Since run 0037 the landing does NOT render it: the six dots are markup in the shared fragment and their tones come from `data-app` in CSS. `JOURNEY` stays the record of what the six steps are, and `landingShared.test.ts` checks the fragment's dots against it in order and wording, so the two cannot part company. Pure, no DOM; `journey.test.ts` pins the order and the tones. See §14, §18. |
@@ -4888,3 +4888,78 @@ the last. A 400 is not retried and arrives as itself. The round trip checks
 that the stranger's vote did not land rather than checking for a bare 403, with
 the reason beside it; `store.test.ts` pins the 403 where no dev server is in
 the way.
+---
+
+## 21. Starting again, and the vote a person changed (run 0040)
+
+**The landing had no written way out.** When this browser remembers a flat and
+a name, the first door reads "Back to your flat" and the fields are filled,
+which runs 0027 and 0031 built. A person who wanted to draw a new flat from
+nothing on the same laptop could only draw over the old one.
+
+**One written line, under the doors.** "Start again with a new flat.", text
+with a link's cursor in the fragment's meta grey, quieter than a door because
+it undoes rather than does. It is shown only when this browser remembers
+something worth starting again from.
+
+**It is this app's element, not the shared fragment's.** It is declared in
+`index.html` and moved into the fragment's own `#landing-doors` column by
+`src/main.ts` at startup. The shared files are untouched and their fingerprint
+still passes: putting this app's own element inside a container the fragment
+provides, and styling that element, is not restyling anything of the
+fragment's. Its arrival delay is written `#landing #landing-start-again`, by
+id, because the fragment gives every child of `.landing-doors` the `animation`
+shorthand, which resets the delay, and the two selectors are otherwise the same
+specificity with the fragment's stylesheet later. Measured live it read `0s`
+until this was by id. 3050 ms puts it after the aside at 2900 and before the
+journey strip at 3200.
+
+**`BROWSER_MEMORY` is the one list, and `forgetThisBrowser` the one place.**
+Two keys, `reconfigure.draft` and `reconfigure.session`. The written line, the
+`?fresh` address and the tests all clear exactly those, because all three call
+the same function, and it returns the keys it cleared so a caller can say what
+happened.
+
+**What counts as remembering something.** A draft holding an empty grid does
+not, for the same reason `readDraft` refuses to restore one, and that case is
+not hypothetical: emptying the editor writes an empty draft like any other
+edit, so the key is back the moment after somebody starts again. Found live,
+where the line stayed on screen after forgetting. A session holding two empty
+strings does not count either.
+
+**One question, then it happens.** "This forgets the flat and the name on this
+browser. The flat you sent stays in your group. Start again?" A no wins
+nothing. A yes clears both keys, empties the editor to one floor with nothing
+on it through the same `restoreState` an import and an undo use, and shows the
+landing as a first visit. Nothing is sent anywhere: a flat already published
+stays in its group, which is what the question says and what the brief settled.
+
+**`?fresh` is the same forgetting with no question**, for the operator, who
+restarts often. The address is cleaned afterwards with
+`window.history.replaceState`, so a reload does not forget again.
+`window.history` rather than `history`, because `history` in `src/main.ts` is
+the undo stack.
+
+**A changed vote is now kept.** `Round.replaced` holds every superseded vote,
+oldest first, exactly as it was cast with its own `at`. `votes` is unchanged in
+meaning and shape, one current vote per person per pair, so anything counting
+from it sees nothing new. Run 0039 threw the earlier vote away and its own
+report said what that costs: "eight people changed their minds after seeing the
+count" is a finding the thesis would want, and it was unrecoverable the moment
+the second vote landed. `replaced` is an empty list on the wire rather than
+absent, so a round nobody changed their mind on and a round from before this
+field existed read the same.
+
+**Verified live (run 0040)** against `netlify dev` on 8888 at 1440 by 900. A
+first visit showing no line, with `localStorage` empty. A remembered browser
+showing it at y 629, under the aside at y 583, in `rgb(107, 102, 92)` with a
+pointer cursor and a 3.05 s delay. The confirm's exact wording captured by
+replacing `window.confirm`, a no clearing nothing, a yes leaving only an empty
+draft behind with the line gone, both fields empty, no recall sentence, the
+first door reading "Start a flat" and the area reading a dash. `?fresh` on a
+browser holding both keys clearing both and leaving the address at
+`http://localhost:8888/`. Two pictures at
+`_cowork/outbox/0040-remembered.png` and `0040-first-visit.png`, both 1440 by
+900. The round trip (`scripts/store-roundtrip.mjs`, 97 checks, all passing)
+printing Ana's current vote and her replaced one with the earlier timestamp on
+the kept one.

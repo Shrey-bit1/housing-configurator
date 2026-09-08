@@ -523,6 +523,16 @@ content-type: application/json
 `closedTheRound` is true on the vote that was the last one expected. The
 client that cast it therefore knows at once, without polling.
 
+**A replaced vote is kept.** The round carries `replaced`, a list oldest first,
+holding every vote that was superseded exactly as it was cast with its own
+`at`. `votes` is unchanged in meaning and shape, one current vote per person
+per pair, so anything counting from it sees nothing new. `replaced` is there so
+that how many people changed their minds after seeing the count can be read
+afterwards, which is a thing worth knowing about a group and which cannot be
+recovered once the earlier vote is gone. A screen may say "3 people changed
+their minds" from it, or ignore it entirely. It is an empty list on a round
+nobody changed their mind on.
+
 ### `POST /api/session/{code}/rounds/{n}/close` — close one by hand
 
 **You should not normally need this.** The store closes a round itself, in the
@@ -545,9 +555,10 @@ does not have this".
 
 `round` is the open round, with two things added for counting. Each pair
 carries `voted`, how many people have voted on it, and `expected`, how many are
-at the table; the round itself carries `expected` as well. Every vote so far
+at the table; the round itself carries `expected` as well. Every current vote
 rides along whole under `votes`, so a client that wants to count its own way
-can. `lastRound` is the round that closed most recently, in the same shape.
+can, and every superseded one under `replaced`. `lastRound` is the round that
+closed most recently, in the same shape.
 
 ```json
 { "code": "room-42",
@@ -556,7 +567,9 @@ can. `lastRound` is the round that closed most recently, in the same shape.
              "pairs": [ { "id": "p1", "a": {…}, "b": {…}, "dial": "light",
                           "sentence": "…", "voted": 8, "expected": 20 } ],
              "votes": [ { "who": "Ana", "pair": "p1", "pick": "b",
-                          "reasons": ["light"], "at": "…" } ] },
+                          "reasons": ["light"], "at": "09:04:00" } ],
+             "replaced": [ { "who": "Ana", "pair": "p1", "pick": "a",
+                             "reasons": ["cost"], "at": "09:01:00" } ] },
   "lastRound": { "n": 1, "closedAt": "…", … } }
 ```
 

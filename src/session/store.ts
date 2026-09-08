@@ -242,7 +242,24 @@ export interface Round {
   weights: number[];
   openedAt: string;
   closedAt?: string;
+  /** One current vote per person per pair. This is what a client counts from,
+   *  and run 0040 did not change its meaning or its shape. */
   votes: Vote[];
+  /**
+   * The votes that were replaced, oldest first, each exactly as it was cast
+   * with its own `at` (run 0040).
+   *
+   * A person who changes their mind replaces their vote, which is right for
+   * the count. Run 0039 then threw the earlier one away, and its own report
+   * pointed out what that costs: "eight people changed their minds after
+   * seeing the count" is a finding the thesis would want, and it was
+   * unrecoverable the moment the second vote landed. Keeping them costs one
+   * list and changes no count.
+   *
+   * Optional in the type because a round opened before run 0040 has none, and
+   * the store reads a record back as it found it rather than backfilling.
+   */
+  replaced?: Vote[];
 }
 
 interface SessionIndex {
@@ -336,7 +353,11 @@ function pairView(round: Round, expected: number) {
 function roundView(index: SessionIndex, round: Round | undefined) {
   if (round === undefined) return null;
   const expected = roomMembers(index).length;
-  return { ...round, pairs: pairView(round, expected), expected };
+  // `replaced` is named rather than left to the spread, so it is an empty list
+  // on the wire rather than absent (run 0040). A round nobody changed their
+  // mind on and a round from before this field existed then read the same, and
+  // a client can count `replaced.length` without checking for undefined first.
+  return { ...round, replaced: round.replaced ?? [], pairs: pairView(round, expected), expected };
 }
 
 /**
@@ -750,7 +771,12 @@ async function route(req: Request, kv: KV): Promise<Response> {
         vote = { who, pair, pick, reasons, at: new Date().toISOString() };
         // One vote per person per pair. A second one replaces the first while
         // the round is open, so a resident who changes their mind does not
-        // have to be told they cannot.
+        // have to be told they cannot. The one it replaces is kept (run 0040),
+        // oldest first, so how many people changed their minds is still
+        // readable afterwards. `votes` keeps its meaning: one current vote per
+        // person per pair, which is what anything counting reads.
+        const superseded = open.votes.filter((v) => v.pair === pair && sameResident(v.who, who));
+        if (superseded.length > 0) open.replaced = [...(open.replaced ?? []), ...superseded];
         open.votes = open.votes.filter((v) => !(v.pair === pair && sameResident(v.who, who)));
         open.votes.push(vote);
         // The round closes in the SAME write that records its last vote. A

@@ -554,6 +554,44 @@ button.primary:hover {
   color: var(--bg);
 }
 
+/* The landing's written way out (run 0040), under the doors and inside the
+   shared fragment's own column. It is THIS app's element, which is why it is
+   styled here; the fragment's own rules are not touched. Text with a link's
+   cursor, in the fragment's meta grey, quieter than a door because it undoes
+   rather than does.
+
+   The delay is set here too. The fragment gives every child of `.landing-doors`
+   the arrival animation and gives each of its OWN children a delay by id; an
+   element it does not know about would otherwise arrive at zero while
+   everything else staggered. 3050 ms puts it after the aside at 2900 and
+   before the journey strip at 3200. */
+#landing #landing-start-again {
+  margin: 14px 0 0;
+  /* By id, so it outweighs the fragment's `.landing-doors > *`, which sets the
+     `animation` shorthand and would otherwise reset this to zero: the two
+     selectors are the same specificity and the fragment's stylesheet comes
+     later. Measured live, where it read 0s until this was by id. */
+  animation-delay: 3050ms;
+}
+#landing #landing-start-again button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--meta);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+#landing #landing-start-again button:hover {
+  color: var(--ink);
+}
+#landing #landing-start-again[hidden] {
+  display: none;
+}
+
 /* Who is sending and where to (run 0036). One quiet sentence where two open
    fields used to be, with a small "change" that unfolds them. */
 .save-who {

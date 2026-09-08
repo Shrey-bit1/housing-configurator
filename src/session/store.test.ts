@@ -844,7 +844,13 @@ async function twoAtTheTable(): Promise<MemoryKV> {
 const vote = (kv: KV, n: number, body: unknown) =>
   call(kv, "POST", `/api/session/g/rounds/${n}/votes`, JSON.stringify(body));
 const poll = async (kv: KV) => (await (await call(kv, "GET", "/api/session/g")).json()) as {
-  round: { n: number; expected: number; votes: unknown[]; pairs: { id: string; voted: number; expected: number }[] } | null;
+  round: {
+    n: number;
+    expected: number;
+    votes: unknown[];
+    replaced: unknown[];
+    pairs: { id: string; voted: number; expected: number }[];
+  } | null;
   lastRound: { n: number; closedAt?: string; votes: unknown[] } | null;
 };
 
@@ -983,6 +989,97 @@ describe("voting", () => {
     const res = await vote(kv, 7, { who: "Ana", pair: "p1", pick: "a", reasons: [] });
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatch(/no open round 7/);
+  });
+});
+
+describe("a vote that was changed", () => {
+  it("keeps the one it replaced, with its own time", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons: ["light"] });
+    const first = ((await poll(kv)).round!.votes as { at: string }[])[0].at;
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "b", reasons: ["cost"] });
+
+    const r = (await poll(kv)).round as unknown as {
+      votes: { pick: string; at: string }[];
+      replaced: { pick: string; reasons: string[]; at: string }[];
+    };
+    expect(r.votes).toHaveLength(1);
+    expect(r.votes[0].pick).toBe("b");
+    expect(r.replaced).toHaveLength(1);
+    expect(r.replaced[0].pick).toBe("a");
+    expect(r.replaced[0].reasons).toEqual(["light"]);
+    expect(r.replaced[0].at).toBe(first);
+  });
+
+  it("keeps `replaced` empty until somebody changes their mind", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons: [] });
+    await vote(kv, 1, { who: "Ben", pair: "p1", pick: "b", reasons: [] });
+    expect((await poll(kv)).round!.replaced).toEqual([]);
+  });
+
+  it("keeps both when somebody changes their mind twice, oldest first", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    for (const reasons of [["light"], ["cost"], ["privacy"]]) {
+      await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons });
+    }
+    const r = (await poll(kv)).round as unknown as {
+      votes: { reasons: string[] }[];
+      replaced: { reasons: string[]; at: string }[];
+    };
+    expect(r.votes).toHaveLength(1);
+    expect(r.votes[0].reasons).toEqual(["privacy"]);
+    expect(r.replaced.map((v) => v.reasons)).toEqual([["light"], ["cost"]]);
+    expect(r.replaced[0].at <= r.replaced[1].at).toBe(true);
+  });
+
+  it("keeps them per pair, not muddled together", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons: [] });
+    await vote(kv, 1, { who: "Ana", pair: "p2", pick: "a", reasons: [] });
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "b", reasons: [] });
+    const r = (await poll(kv)).round as unknown as {
+      votes: unknown[];
+      replaced: { pair: string }[];
+    };
+    expect(r.votes).toHaveLength(2);
+    expect(r.replaced.map((v) => v.pair)).toEqual(["p1"]);
+  });
+
+  it("leaves `votes` counting one per person per pair, which is what a client reads", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    for (const pick of ["a", "b", "a"] as const) {
+      await vote(kv, 1, { who: "Ana", pair: "p1", pick, reasons: [] });
+    }
+    const state = await poll(kv);
+    expect(state.round!.votes).toHaveLength(1);
+    expect(state.round!.pairs.find((p) => p.id === "p1")!.voted).toBe(1);
+  });
+
+  it("does not close the round early, however many times a mind changes", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1, [PAIRS[0]]));
+    for (const pick of ["a", "b", "a", "b"] as const) {
+      const r = await vote(kv, 1, { who: "Ana", pair: "p1", pick, reasons: [] });
+      expect((await r.json()).closedTheRound, `Ana picking ${pick} again`).toBe(false);
+    }
+    const last = await vote(kv, 1, { who: "Ben", pair: "p1", pick: "a", reasons: [] });
+    expect((await last.json()).closedTheRound).toBe(true);
+  });
+
+  it("rides into the export with the round", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons: [] });
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "b", reasons: [] });
+    const exported = await (await call(kv, "GET", "/api/session/g/export")).json();
+    expect(exported.rounds[0].replaced).toHaveLength(1);
+    expect(exported.rounds[0].replaced[0].pick).toBe("a");
   });
 });
 

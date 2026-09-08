@@ -295,6 +295,20 @@ brief, are the only ones it accepts. The polled state gains `round` and
 those three calls and nothing else, and `building` keeps its shape. The
 building app's run 0063 builds the screens on top. PROJECT_STATE new §20.
 
+Run 0040 added two small things. The landing gained a written way out: one
+line under the doors, "Start again with a new flat.", shown only when this
+browser remembers something worth starting again from, asking once and then
+clearing the flat and the name it holds while the flat already sent stays in
+the group. `?fresh` in the address does the same with no question, for the
+operator. One function in src/core/draft.ts decides what "forget this browser"
+clears, and the line, the address and the tests all call it. The line is this
+app's own element placed inside the shared landing fragment's doors column, so
+the shared files and their fingerprint are untouched. And the store now keeps a
+vote somebody changed: `replaced` on the round holds every superseded vote with
+its own time, while `votes` keeps its meaning and shape so anything counting
+from it sees no change. Nothing about the repo's shape moved: no new directory,
+entry point, dependency or run step. PROJECT_STATE new §21.
+
 **Last updated:** 2026-09-08
 
 ## What this project is

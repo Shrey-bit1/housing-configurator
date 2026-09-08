@@ -257,10 +257,26 @@ const votes = [
   { who: "ben", pair: "p2", pick: "b", reasons: ["shared space", "short walks"] },
 ];
 let closedOn = null;
-for (const v of votes) {
+for (const [i, v] of votes.entries()) {
   const r = await call("POST", "/rounds/1/votes", JSON.stringify(v));
   check(r.status === 201, `${v.who} votes ${v.pick} on ${v.pair} (${r.status})`);
   if (r.json?.closedTheRound) closedOn = v;
+
+  // Right after the vote that replaces one (run 0040): her first vote is in
+  // `replaced` and her second is the only one in `votes` for that pair.
+  if (i === 1) {
+    const mid = await call("GET", "", undefined, { quiet: true });
+    const hers = (mid.json?.round?.votes ?? []).filter((x) => x.who === "Ana" && x.pair === "p1");
+    const gone = mid.json?.round?.replaced ?? [];
+    console.log(`  Ana on p1, current: ${JSON.stringify(hers)}`);
+    console.log(`  Ana on p1, replaced: ${JSON.stringify(gone)}`);
+    check(hers.length === 1 && hers[0].pick === "b", "one current vote for Ana on p1, her second");
+    check(gone.length === 1 && gone[0].pick === "a", "and her first is kept in `replaced`");
+    check(
+      gone[0].at < hers[0].at,
+      `the kept one carries the earlier time (${gone[0]?.at} before ${hers[0]?.at})`
+    );
+  }
 }
 check(closedOn !== null, "the last vote closed the round");
 console.log(`  the vote that closed it: ${JSON.stringify(closedOn)}`);
