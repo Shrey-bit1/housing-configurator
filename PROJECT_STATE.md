@@ -69,7 +69,7 @@ work-in-progress research artifact, not a production app.
 | Interaction | `src/interaction/picker.ts`, `dragDrop.ts`, `selection.ts` | Raycast picking (`cellAt`/`groupAt`/`groundPoint`, scoped to the ACTIVE floor's store — this is also why floor visibility needs no picker-side filtering, see §5), palette→canvas placement, select/**multi-select**/move/**group-move**/rotate/**mirror**/delete/**group-delete**/**Shift+D-duplicate** (any count) of modules, plus entrance AND door select/delete (two `MarkerSelectionAdapter`s — mutually exclusive singletons, excluded from multi-select). `R`/`M` work on the palette ghost, the move ghost, the duplicate ghost, and a SINGLE selected instance — no-op on 2+ (§2h). `dragDrop.cancelPlacement()`/`selection.cancelDuplicate()`/`entranceController.cancel()` are public, no-argument, and NOT wired to their own Escape listeners — Escape is arbitrated centrally by main.ts (§2h). `dragDrop`/`selection` take an `onAfterAction` callback (fires after a committed mutation → undo snapshot, see §2f); `selection` also takes `onSelectionChange`/`onNoopHint` callbacks and an `EntranceSelectionAdapter`. |
 | **Group-move ghost** | `src/scene/groupGhostPreview.ts` | `GroupGhostPreview`: one translucent ghost mesh per selected member, positioned by its cell offset from the grabbed member's target origin, tinted green/red as ONE unit (mirrors `GhostPreview`'s shape/API). See §2h. |
 | Wiring / render loop / view-mode orchestration, **dev-only `?project=` loader + `window.__app` capture handle** | `src/main.ts` | Constructs everything; `animate()` renders 3D or drives the graph view; owns Reset View, plan-mode, diagram-mode toggle logic (mutually exclusive, see §5), the undo/redo history wiring (§2f), the central Escape-priority handler, and the selection-readout/shortcuts-legend wiring (§2h). Default grid 16×16. |
-| **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`/`delete`, the last added in run 0035) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. `sameResident(a, b)` (run 0026: trimmed, case-insensitive) is the ownership check's rule, and run 0035's leave and rename calls reach it through `residentKey`, `flatsOwnedBy` and `storedName` rather than answering the same question a second time; a building run's optional `plot` (run 0026, opaque) rides alongside `genome`/`summary`. See §12. |
+| **The session store** (shared HTTP store for many residents, run 0022) | `src/session/store.ts`, `netlify/functions/session.mts` | `handleSession(req, kv)`: one Netlify function under `/api/session/{code}` routed by path regex + method; `KV` interface (`get`/`getWithMetadata`/`set`/`delete`, the last added in run 0035) that `@netlify/blobs`' `Store` satisfies structurally, so `store.test.ts` drives it through a `Map`. Never imports the app. `sameResident(a, b)` (run 0026: trimmed, case-insensitive) is the ownership check's rule, and run 0035's leave and rename calls reach it through `residentKey`, `flatsOwnedBy` and `storedName` rather than answering the same question a second time; run 0039 adds the vote, `REASONS`, `roomMembers` and the round and vote routes; a building run's optional `plot` (run 0026, opaque) rides alongside `genome`/`summary`. See §12. |
 | **The preview** (one axonometric for every flat, run 0024) | `src/core/previewFrame.ts` | `axoFrame(box, aspect)`: pure box-corner-projection math (no THREE, no DOM) for the app's own isometric pose, pinned in `previewFrame.test.ts` against a known box. Applied to the live camera by `captureFlatPreview` in `main.ts`. See §10, §11. |
 | **The flat's three live numbers** (run 0026) | `src/core/unitStats.ts` | `unitStats(storeys)`: area (cells × 0.36 m²), storey count, glazing length (glazed edges × 0.6 m) off an already-built unit's storeys. Its own file, not a function in `unitExport.ts`, specifically so a fast test importing it never pays that module's runtime import graph (`./adjacencyGraph`, `./door`, `./windows`) — see `unitExport.test.ts`'s own header and `unitStats.ts`'s. Read by `refreshFlatFigures` (`main.ts`), which writes the bar's strip in step 01 and the read-out under the drawing in step 02. See §11, §14. |
 | **The flat is kept as you draw** (run 0036) | `src/core/draft.ts` | `saveDraft(store, snapshot)`, `readDraft(store, search)` and `draftHasRooms(text)`, over a two-method `DraftStore` that `localStorage` satisfies. The draft is the SAME string the undo history takes as a snapshot, so the app serializes once per action. `readDraft` is the one rule with three reasons to say no: no store, a URL naming a project, or a draft with no rooms. `draft.test.ts` drives it with a Map. See §17. |
@@ -4810,3 +4810,81 @@ square-metre figures reading 7, 4, 11, 6, 9, 3, 12, 5, 8, 10, 6, 4, 12, 7, 9, 3,
 exited 1. On a flat with two faults the button read "Send anyway · 2 things to
 look at", the chip read "2 must fix", and under the button stood "A dwelling
 needs a bathroom." and "A dwelling needs a kitchen." in `rgb(107, 102, 92)`.
+---
+
+## 20. The store holds a vote (run 0039)
+
+**What the vote is.** The brief settles it under "The vote chooses the
+building": rounds of pairs, a resident picks one building of each pair and
+ticks reasons, a round closes when everyone has voted, three quarters agreeing
+ends it, and the reasons become the weights the search builds by. None of that
+had anywhere to live. This run gave the store the room; the building app's run
+0063 builds the screens and the counting on top of it.
+
+**A round.** `PUT /api/session/{code}/round` opens one: `n`, `pairs` and
+`weights`. Each pair is `{ id, a, b, dial, sentence }`, where `a` and `b` are
+buildings carrying `genome`, `summary` and optionally `plot`, `dial` is the one
+reason the challenger was pushed on, and `sentence` is the line the screen
+shows. The store keeps all of it and reads inside none of it. It adds
+`openedAt` and an empty `votes`.
+
+**Two refusals, both 409.** An `n` that is not one more than the last round's,
+or 1, is refused naming the number expected. A round while another is open is
+refused naming the open one. Both checks run INSIDE the mutate that
+`updateIndex` re-runs on a lost ETag, so two clients racing to open the same
+round cannot both win: the loser reads the winner's round and is refused.
+
+**One list, two views.** The index holds `rounds`, every round oldest first. At
+most one is ever open, so `round` and `lastRound` in the polled state are two
+views of that one list rather than two fields that could disagree. Both are
+`null` rather than absent when there is nothing, so a client can tell "no
+round" from "a store that does not have this". `/export` is the only call that
+carries the history, under `rounds`, because a poll runs every few seconds and
+every round holds two whole buildings per pair.
+
+**A vote.** `POST /api/session/{code}/rounds/{n}/votes` with `who`, `pair`,
+`pick` and `reasons`. One vote per person per pair; a second replaces the first
+while the round is open, matched by `sameResident` so a name typed two ways is
+one voter. A vote on anything but the open round is a 409 saying whether that
+round is closed or never existed. The answer carries `closedTheRound`, so the
+client that cast the last one knows without polling.
+
+**Who is at the table.** `roomMembers` reads it off the index: somebody who
+joined, which is a resident row, or who owns a flat. That is the building app's
+own rule from its run 0059, and the store answering it itself means no
+membership list can arrive stale. Anyone else voting is a 403. The room is read
+LIVE, not frozen when the round opened, so somebody who joins mid-round is
+waited for.
+
+**The close.** The store closes a round itself, in the same write that records
+its last expected vote. A close in a second write would leave a moment where
+every vote is in and the round still reads open, and a client polling then
+would show a room waiting for nobody. The rule is one function: every person at
+the table has voted on every pair. `POST .../rounds/{n}/close` closes one by
+hand and exists only for the day a rule for an absent person arrives, which the
+brief says is coming.
+
+**The five reasons.** `REASONS` in `src/session/store.ts`, copied word for word
+from the brief: privacy, shared space, cost, light, short walks. They are the
+reasons a resident ticks and the dials a challenger is built on. Anything else,
+in a `dial` or in a vote, is a 400 naming all five.
+
+**Verified live (run 0039)** against `netlify dev` on 8888. The round trip
+(`scripts/store-roundtrip.mjs`, 94 checks, all passing) opens round 4 first and
+is refused, opens round 1 for two people and two pairs, is refused a second
+round while it is open, is refused a stranger's vote and a reason outside the
+five, votes as both people on both pairs with one changing her mind and one
+spelling her name in the wrong case, sees the last vote answer
+`closedTheRound: true`, reads the closed round back with four votes rather than
+five and both pairs at two of two, is refused a vote after the close and round
+4 again, opens round 2, closes it by hand, and finds both rounds in `/export`
+and neither in the poll.
+
+**A dev-server trap, again.** Run 0035 recorded that `netlify dev` retries a
+function's 404 as `<path>.html`. It does the same to a 403: the log for this
+run shows `POST .../votes` answering 403 and then the same path retried as
+`.html`, `.htm`, `/index.html` and `/index.htm`, all 404, and the client seeing
+the last. A 400 is not retried and arrives as itself. The round trip checks
+that the stranger's vote did not land rather than checking for a bare 403, with
+the reason beside it; `store.test.ts` pins the 403 where no dev server is in
+the way.
