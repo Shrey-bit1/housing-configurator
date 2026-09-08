@@ -720,3 +720,40 @@ create-only write for the same reason.
 
 The store is global to the site rather than per deploy, so a branch deploy
 and production share the same sessions.
+
+## Filling a group, and voting in it
+
+Two commands drive the store from outside the apps, so the whole journey can
+be walked against a room that looks like a room. Both write only through the
+calls above, and neither touches the store's files or its index, so what they
+leave behind cannot be told from what twenty real residents would have left.
+
+`node scripts/fill-group.mjs http://localhost:8888 hall-14` starts the group
+if nobody has, publishes the library's twenty designed flats under twenty
+different resident names with their pictures, writes each resident's answers,
+and says three things in the chat. It refuses a group that already holds flats
+unless `--replace` is given. The twenty are a fixed table,
+`scripts/fillGroupTable.mjs`, so two runs give the same room.
+
+`node scripts/vote-group.mjs http://localhost:8888 hall-14` has those same
+twenty vote on whatever round is open. It reads the round from
+`GET /api/session/{code}` and casts one vote per person per pair with
+`POST /api/session/{code}/rounds/{n}/votes`, printing the store's status for
+each. The pick and the reasons come from the person's own row by one rule. A
+pair names one dial. If that dial is one of the two reasons the person cares
+about most they pick the challenger and tick the dial, otherwise they keep the
+building they had and tick their own first care. Over the twenty that splits
+every pair 8 to 12, and which eight it is changes with the dial. Four named
+people change their mind once on the round's first pair, so a round of five
+pairs ends with 100 votes and 4 in `replaced`, and a round of three pairs with
+60 and 4. Pass `--round n` to say which round is expected and be refused if the
+open one is not it.
+
+The vote script exits 2 when it was asked wrongly and nothing was written, so
+either no round is open or `--round` named a different one. It exits 1 when
+votes did not land: a call failed, or the store refused somebody who is not in
+the group. A refusal is reported and the run goes on to the next person. The
+store answers `403` for somebody who is not at the table. Through `netlify dev`
+that arrives as `404`, because the dev server retries a non-2xx from a function
+as `<path>.html` and hands back the last of those. The script prints which of
+the two statuses it saw.
