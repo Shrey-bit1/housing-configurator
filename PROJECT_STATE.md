@@ -5031,3 +5031,69 @@ a closed round the script exits 2 naming round 1 and its `closedAt`; on a group
 that never had one it exits 2 saying so; `--round 5` against open round 2 exits
 2 naming both. On a group holding none of the twenty, all twenty are refused
 with `404` and named in one line, and the script exits 1.
+---
+
+## 23. Every word on screen, rewritten against the guide (run 0042)
+
+**One pass over every string a person can read**, and nothing else. No layout,
+no logic, no thresholds, no numbers. Shrey read both apps on 8 September and
+rejected their words. The strings here were written run by run over three months
+by different sessions and did not sound like one app.
+
+**The measure is two documents.** `_cowork/design/DESIGN-BRIEF-3sep.md`, section
+"How the app talks", and `_cowork/design/WRITING-GUIDE.md`, which arrived in
+this repository with run 0041 and is the actual file from
+`Context -start\`. Short natural sentences that explain rather than announce.
+Plain words. No slogans, no punchlines, no metaphors, nothing that sells, no
+contrast constructions of the "x, not y" shape, no em dashes gluing clauses
+together. Every number in something a person can picture.
+
+**`src/core/words.ts` is where the words live now**, 470 lines of named
+constants and small pure functions. `index.html`, `src/main.ts`,
+`src/core/rules.ts`, `src/core/flatState.ts`, `src/core/savePlan.ts`,
+`src/core/projectIO.ts`, `src/session/session.ts`, `src/ui/palette.ts` and
+`src/ui/validationPanel.ts` take their words from it. The next rewrite is one
+file.
+
+**`docs/words.md` is the inventory**, every string with where it lives, what it
+said and what it says, grouped by the screen a person is looking at, with a note
+per group saying what changed and why in the guide's own terms.
+
+**The 42 rules keep their thresholds.** Only their advisory lines moved.
+`RULE_WORDS` in words.ts holds them and `RULES` reads from it, so the rules stay
+a table of checks. DP1 and F1 build their lines from
+`DEEP_ROOM_THRESHOLD_HOPS` and `ESCAPE_DEPTH_MAX`, so the number on screen is the
+number the rule uses. `docs/rules-reference.html` and `docs/rules-list.html`
+name the rules in their own words and quote none of these lines, so neither
+needed regenerating.
+
+**The finishing pass found four families the inventory missed**, by opening the
+app at 1440 by 900 and reading it. The import parser's four messages, which
+named JSON and a format identifier. Nine lines a rule builds about one room
+rather than showing its own, which the layout report still displayed with their
+em dashes. The report's strip of numbers, which read as a list of measures. And
+the twenty room names in `src/core/modules.ts`, sixteen of which carry an em
+dash on the palette. The first three are rewritten. The room names stay, because
+`src/core/unitExport.ts:238` writes `def.name` into the unit file, and that is
+one of the three downloads this run had to leave byte-identical.
+
+**`src/core/words.test.ts` reads all of it**, 18 cases in the fast suite over
+every constant, every rule line, every template run across a table of one and
+many and empty, and the eleven shortcut rows. Seven of the guide's tells fail a
+test on the way in: an em dash, an exclamation mark, fourteen named words, a
+contrast construction, "rather than" trailing off, a plural in brackets, and a
+field name a resident has no screen for. `DASH` is the one em dash allowed, and
+the test names it, because it stands in a number's place rather than gluing two
+clauses.
+
+**Verified live (run 0042)** against `netlify dev` on 8888, at 1440 by 900,
+through headless Chrome driven over its debugging protocol so a state a click
+reaches could be captured. The landing on a remembered browser reading "You were
+here before, as Ana in walk-0041. Change either one if that is not you." The
+check chip reading "1 thing to fix" and its tooltip carrying the fault's own
+sentence. The layout report showing ST3 as "Floor 1 is not reachable by stairs
+from the floor the entrance is on." and A1 as "This circulation is narrower than
+1.2 m across 2 cells. A wheelchair needs 1.2 m." Step 02 reading "Send anyway ·
+1 thing to look at" with the fault named under it, and after the press
+"Sent to walk-0041. Your group sees it as Unit 33." Five pictures at
+`_cowork/outbox/0042-*.png`, all 1440 by 900.
