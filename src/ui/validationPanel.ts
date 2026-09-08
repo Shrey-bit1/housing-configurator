@@ -1,4 +1,4 @@
-import type { DwellingGraph } from "../core/adjacencyGraph";
+import type { DwellingGraph } from "../core/adjacencyGraph";
 import * as W from "../core/words";
 import {
   computeCirculationFraction,
