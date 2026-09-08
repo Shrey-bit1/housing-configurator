@@ -66,7 +66,7 @@ describe("routing", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
     expect(await res.json()).toEqual({
-      code: "fresh-1", exists: false, flats: [], residents: [], building: null, messages: [],
+      code: "fresh-1", exists: false, flats: [], residents: [], building: null, messages: [], round: null, lastRound: null,
     });
   });
 
@@ -290,7 +290,7 @@ describe("starting a group (run 0032)", () => {
     const res = await start(kv, "willow-42");
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({
-      code: "willow-42", exists: true, flats: [], residents: [], building: null, messages: [],
+      code: "willow-42", exists: true, flats: [], residents: [], building: null, messages: [], round: null, lastRound: null,
     });
   });
 
@@ -354,11 +354,13 @@ describe("exists (run 0032)", () => {
 
   it("adds itself BESIDE everything the poll already returned", async () => {
     // The building app polls this call. Every field it read before run 0032 is
-    // still here and still means the same thing; exists is the only addition.
+    // still here and still means the same thing; `exists` was that run's
+    // addition and `round` and `lastRound` are run 0039's, all three beside
+    // what was there rather than instead of it.
     const kv = new MemoryKV();
     await call(kv, "POST", "/api/session/willow-42");
     expect(Object.keys(await get(kv, "willow-42")).sort()).toEqual(
-      ["building", "code", "exists", "flats", "messages", "residents"]
+      ["building", "code", "exists", "flats", "lastRound", "messages", "residents", "round"]
     );
   });
 });
