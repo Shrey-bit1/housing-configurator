@@ -4775,9 +4775,10 @@ show the same room. Square metres run 3 to 12 with no two neighbours alike, the
 ballots are different orderings of the five shared spaces, and the wishes are
 set every way round; twenty identical answers would be one person twenty times
 and would tell the building app nothing.
-`scripts/fillGroupTable.test.ts` pins all of that in the FAST suite at 18
-cases, including that every ballot is a permutation of the five and that each
-wish is set both ways across the twenty.
+`scripts/fillGroupTable.test.ts` pins all of that in the FAST suite, at 18
+cases after this run and 38 after run 0041 added the vote, including that
+every ballot is a permutation of the five and that each wish is set both ways
+across the twenty.
 
 **It refuses a group that already holds flats** unless `--replace` is given, so
 it cannot trample a live room by accident.
@@ -4963,3 +4964,70 @@ browser holding both keys clearing both and leaving the address at
 900. The round trip (`scripts/store-roundtrip.mjs`, 97 checks, all passing)
 printing Ana's current vote and her replaced one with the earlier timestamp on
 the kept one.
+---
+
+## 22. The group votes in one command (run 0041)
+
+**One command has the twenty vote.**
+`node scripts/vote-group.mjs <store> <code>` reads whichever round is open from
+`GET /api/session/{code}` and casts one vote per person per pair with
+`POST /api/session/{code}/rounds/{n}/votes`. Run 0038's fill script put twenty
+people in a group so the journey could be walked as the twenty-first; the walk
+then reached the vote and the twenty never voted, because nothing made them. A
+round waits for everyone, so it could only be closed by hand and the count read
+"1 of 1". This is the second half of that command.
+
+**It writes through the store's public calls only**, the two named above, both
+in `docs/store.md`. It never touches the store's files or its index, so a count
+it produced cannot be told from twenty real residents voting.
+
+**The pick rule is one pure function**, `voteFor` in
+`scripts/fillGroupTable.mjs:128`. A pair names one dial, which is the reason
+its challenger was pushed on. If that dial is one of the two things a person
+cares about most they pick the challenger and tick the dial. Otherwise they
+keep the building they had and tick their own first care. Two in five is what
+makes the room look like a room: over the twenty, every pair splits 8 for the
+challenger and 12 against, and which eight it is changes with the dial. A rule
+of "top one" would split 4 to 16 and "top three" 12 to 8.
+
+**The table gained a `cares` column** for it,
+`scripts/fillGroupTable.mjs:50-100`, twenty different orderings of the five
+reasons. The ballot could not answer the rule's question: `ballot` orders the
+five kinds of SHARED SPACE, `hall` to `social`, and a pair's `dial` is one of
+the five REASONS, `privacy` to `short walks`. Nothing in a ballot says how much
+somebody cares about light. The orderings are built so each reason is a first
+care exactly four times and a top-two care exactly eight times, which is where
+the 8-to-12 split comes from.
+
+**Four named people change their mind once**, `CHANGES_MIND` at
+`scripts/fillGroupTable.mjs:109`: Bruno, Elin, Rosa and Viktor. They vote the
+other way on the round's first pair, then vote again with the rule's answer, so
+run 0040's `replaced` has something in it. A round of five pairs is therefore
+104 votes cast, 100 current and 4 replaced. The first vote is the answer the
+rule gives somebody who cares the other way round, so a change of mind is a
+real change of pick rather than the same pick with a different reason.
+
+**Two refusals exit 2, one exits 1.** No open round exits 2 and says whether a
+round closed or none was ever opened. A `--round n` that is not the open one
+exits 2 and names the open one. Both refuse before anything is written, so exit
+2 means nothing landed. A person the store does not know is reported, the rest
+of that person's ballot is dropped, the run goes on, and the script exits 1,
+because the store was right and the run is still short of what was asked for.
+
+**The store answers 403 for somebody who is not at the table**
+(`src/session/store.ts:768`), and through `netlify dev` that arrives as 404,
+which run 0039 found and recorded: the dev server retries a non-2xx from a
+function as `<path>.html`, `.htm`, `/index.html` and `/index.htm`, and the
+client is handed the last of those 404s. The script treats both as the same
+refusal and prints which one it saw rather than deciding for the reader.
+
+**Verified live (run 0041)** against `netlify dev` on 8888. A group `walk-0041`
+filled with the twenty, a round of five pairs opened one per dial, and one run
+of the script: 104 posts all 201, every pair 20 of 20 voted with 8 for the
+challenger, 100 votes and 4 replaced read back from the polled call, and
+`closedAt` set by Viktor's last vote at `2026-09-08T13:11:10.558Z`. The four
+change-of-mind lines land at Bruno, Elin, Rosa and Viktor and nowhere else. On
+a closed round the script exits 2 naming round 1 and its `closedAt`; on a group
+that never had one it exits 2 saying so; `--round 5` against open round 2 exits
+2 naming both. On a group holding none of the twenty, all twenty are refused
+with `404` and named in one line, and the script exits 1.
