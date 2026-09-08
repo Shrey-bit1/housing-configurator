@@ -36,11 +36,12 @@ When the walk reaches the vote, the same twenty can cast their votes:
 node scripts/vote-group.mjs http://localhost:8888 hall-14
 ```
 
-That reads whichever round is open and votes once per person per pair, so
-the count on the screen is a real count rather than "1 of 1". Every pair
-splits 8 for the challenger and 12 for the building the group had, four
-people change their mind once, and the last vote closes the round. Pass
-`--round n` to say which round you expect.
+That reads whichever round is open and votes once per person per pair. A
+round waits for everyone, so before this the count on the screen stayed at
+"1 of 1" and the round had to be closed by hand. Every pair splits 8 for
+the challenger and 12 for the building the group had. Four people change
+their mind once, so the round keeps four earlier votes. The twentieth vote
+closes the round. Pass `--round n` to say which round you expect.
 
 ## Current features
 
