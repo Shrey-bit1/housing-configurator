@@ -325,6 +325,21 @@ change their mind once on the first pair, so a round of five pairs ends with
 step and one new script; nothing else about the repo's shape changed.
 PROJECT_STATE new §22.
 
+Run 0042 rewrote every word a person reads in this app. They were spread over
+nine files and written run by run over three months, and they did not sound
+like one app. They are now in one file, `src/core/words.ts`, as named constants
+and small pure functions, measured against the brief's "How the app talks" and
+`_cowork/design/WRITING-GUIDE.md`, which is in this repository at that path.
+`docs/words.md` lists every string with what it said and what it says, grouped
+by screen. `src/core/words.test.ts` reads all of them and fails on seven of the
+guide's tells, so a string added later by a session that has not read the guide
+fails on the way in. No layout, no logic, no thresholds. The 42 rules keep their
+checks and take their advisory lines from the same file. One thing is left and
+named: the twenty room names carry em dashes and cannot change while
+`src/core/unitExport.ts` writes them into the unit file. That is one new module
+and one new document; nothing else about the repo's shape changed.
+PROJECT_STATE new §23.
+
 **Last updated:** 2026-09-08
 
 ## What this project is
