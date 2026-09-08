@@ -228,8 +228,21 @@ console.log(`  round 1 opened at ${opened.json?.openedAt}, pairs ${opened.json?.
 const openedTwice = await call("PUT", "/round", JSON.stringify(roundBody(2)));
 check(openedTwice.status === 409, `a second round while one is open is refused (${openedTwice.status})`);
 
+// The store answers 403 here. Under `netlify dev` that is not the last word:
+// the dev server treats 403 the way it treats 404 and retries the same path
+// four more ways, `.html`, `.htm`, `/index.html` and `/index.htm`, and the
+// client sees the last of those, a 404 from this store's own router. Measured
+// in the dev server's log during this run. The 400 refusals below are NOT
+// retried, so they arrive as themselves. What matters is that the vote did not
+// land, and that is what is checked; `src/session/store.test.ts` pins the 403
+// itself, where no dev server is in the way.
 const stranger = await call("POST", "/rounds/1/votes", JSON.stringify({ who: "Zoe", pair: "p1", pick: "a", reasons: [] }));
-check(stranger.status === 403, `somebody who is not in the group cannot vote (${stranger.status})`);
+check(stranger.status >= 400, `somebody who is not in the group cannot vote (${stranger.status})`);
+const afterStranger = await call("GET", "", undefined, { quiet: true });
+check(
+  (afterStranger.json?.round?.votes ?? []).length === 0,
+  "and nothing of theirs is in the round"
+);
 
 const badReason = await call("POST", "/rounds/1/votes", JSON.stringify({ who: "Ana", pair: "p1", pick: "a", reasons: ["a nice view"] }));
 check(badReason.status === 400, `a reason outside the five is refused (${badReason.status})`);

@@ -817,6 +817,265 @@ describe("rename a resident", () => {
   });
 });
 
+/**
+ * The vote (run 0039). Rounds of pairs, one vote per person per pair, and a
+ * round that closes itself when the last expected vote lands.
+ *
+ * Every case here turns on the store reading the room off its own index: who
+ * may vote, and how many votes a round is waiting for, are both answered from
+ * the flats and the resident rows rather than from anything a caller sends.
+ */
+
+const cand = (g: number) => ({ genome: [g], summary: { flats: 2 }, plot: { modulesX: 9 } });
+const PAIRS = [
+  { id: "p1", a: cand(1), b: cand(2), dial: "light", sentence: "This one has more light." },
+  { id: "p2", a: cand(3), b: cand(4), dial: "cost", sentence: "This one is cheaper to heat." },
+];
+const round = (n: number, pairs = PAIRS) => ({ n, weights: [1, 1, 1, 1, 1], pairs });
+
+/** A group with Ana, who owns a flat, and Ben, who only joined. Two people at
+ *  the table by the two halves of the room rule. */
+async function twoAtTheTable(): Promise<MemoryKV> {
+  const kv = new MemoryKV();
+  await put(kv, "/api/session/g/flats/f-ana?resident=Ana", UNIT_TEXT);
+  await put(kv, "/api/session/g/residents/Ben", { share: 0.3 });
+  return kv;
+}
+const vote = (kv: KV, n: number, body: unknown) =>
+  call(kv, "POST", `/api/session/g/rounds/${n}/votes`, JSON.stringify(body));
+const poll = async (kv: KV) => (await (await call(kv, "GET", "/api/session/g")).json()) as {
+  round: { n: number; expected: number; votes: unknown[]; pairs: { id: string; voted: number; expected: number }[] } | null;
+  lastRound: { n: number; closedAt?: string; votes: unknown[] } | null;
+};
+
+describe("opening a round", () => {
+  it("stores it whole and answers it back", async () => {
+    const kv = await twoAtTheTable();
+    const res = await put(kv, "/api/session/g/round", round(1));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.n).toBe(1);
+    expect(body.pairs).toHaveLength(2);
+    expect(body.pairs[0].a).toEqual(cand(1));
+    expect(body.weights).toEqual([1, 1, 1, 1, 1]);
+    expect(typeof body.openedAt).toBe("string");
+    expect(body.votes).toEqual([]);
+  });
+
+  it("refuses any number but the next one", async () => {
+    const kv = await twoAtTheTable();
+    for (const n of [2, 4, 99]) {
+      const res = await put(kv, "/api/session/g/round", round(n));
+      expect(res.status, `round ${n} first`).toBe(409);
+      expect((await res.json()).error).toMatch(/is 1, not/);
+    }
+    expect((await put(kv, "/api/session/g/round", round(1))).status).toBe(201);
+  });
+
+  it("refuses a second round while one is open", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    const res = await put(kv, "/api/session/g/round", round(2));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/round 1 .* is still open/);
+  });
+
+  it("refuses opening the same round twice", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    expect((await put(kv, "/api/session/g/round", round(1))).status).toBe(409);
+  });
+
+  it("opens the next one once the last has closed", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    await call(kv, "POST", "/api/session/g/rounds/1/close");
+    expect((await put(kv, "/api/session/g/round", round(2))).status).toBe(201);
+    expect((await put(kv, "/api/session/g/round", round(4))).status).toBe(409);
+  });
+
+  it("refuses a dial or a weight list the vote cannot use", async () => {
+    const kv = await twoAtTheTable();
+    const badDial = await put(kv, "/api/session/g/round", round(1, [{ ...PAIRS[0], dial: "a nice view" }]));
+    expect(badDial.status).toBe(400);
+    expect((await badDial.json()).error).toMatch(/privacy, shared space, cost, light, short walks/);
+    const badWeights = await put(kv, "/api/session/g/round", { n: 1, weights: [1, 2], pairs: PAIRS });
+    expect(badWeights.status).toBe(400);
+    const twoIds = await put(kv, "/api/session/g/round", round(1, [PAIRS[0], { ...PAIRS[1], id: "p1" }]));
+    expect(twoIds.status).toBe(400);
+  });
+});
+
+describe("voting", () => {
+  it("takes one vote and counts it against the room", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    const res = await vote(kv, 1, { who: "Ana", pair: "p1", pick: "b", reasons: ["light"] });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ who: "Ana", pair: "p1", pick: "b", closedTheRound: false });
+
+    const state = await poll(kv);
+    expect(state.round!.expected).toBe(2);
+    expect(state.round!.pairs.find((p) => p.id === "p1")).toMatchObject({ voted: 1, expected: 2 });
+    expect(state.round!.pairs.find((p) => p.id === "p2")).toMatchObject({ voted: 0, expected: 2 });
+  });
+
+  it("refuses somebody who is not in the group", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    const res = await vote(kv, 1, { who: "Zoe", pair: "p1", pick: "a", reasons: [] });
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toMatch(/"Zoe" is not in session/);
+  });
+
+  it("lets in both halves of the room rule, a flat owner and a joiner", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    expect((await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons: [] })).status).toBe(201);
+    expect((await vote(kv, 1, { who: "Ben", pair: "p1", pick: "a", reasons: [] })).status).toBe(201);
+  });
+
+  it("replaces a vote rather than adding a second, and folds case doing it", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons: ["light"] });
+    await vote(kv, 1, { who: " ana ", pair: "p1", pick: "b", reasons: ["cost"] });
+    const state = await poll(kv);
+    expect(state.round!.votes).toHaveLength(1);
+    expect(state.round!.votes[0]).toMatchObject({ pick: "b", reasons: ["cost"] });
+    expect(state.round!.pairs.find((p) => p.id === "p1")!.voted).toBe(1);
+  });
+
+  it("keeps one vote per pair, not one per person", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons: [] });
+    await vote(kv, 1, { who: "Ana", pair: "p2", pick: "b", reasons: [] });
+    expect((await poll(kv)).round!.votes).toHaveLength(2);
+  });
+
+  it("takes any of the five, and none at all", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    for (const reasons of [[], ["privacy"], ["shared space", "cost", "light", "short walks"]]) {
+      const res = await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons });
+      expect(res.status, JSON.stringify(reasons)).toBe(201);
+    }
+  });
+
+  it("refuses a reason outside the five, naming all five", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    const res = await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons: ["a nice view"] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('"a nice view" is not one of privacy, shared space, cost, light, short walks');
+  });
+
+  it("refuses a pick that is not a or b, and a pair the round does not have", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    expect((await vote(kv, 1, { who: "Ana", pair: "p1", pick: "c", reasons: [] })).status).toBe(400);
+    expect((await vote(kv, 1, { who: "Ana", pair: "p9", pick: "a", reasons: [] })).status).toBe(400);
+  });
+
+  it("refuses a round that never existed", async () => {
+    const kv = await twoAtTheTable();
+    const res = await vote(kv, 7, { who: "Ana", pair: "p1", pick: "a", reasons: [] });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/no open round 7/);
+  });
+});
+
+describe("the round closing", () => {
+  it("does not close before the last expected vote", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    // Three of the four votes two people owe on two pairs.
+    for (const [who, pair] of [["Ana", "p1"], ["Ben", "p1"], ["Ana", "p2"]] as const) {
+      const res = await vote(kv, 1, { who, pair, pick: "a", reasons: [] });
+      expect((await res.json()).closedTheRound, `${who} on ${pair}`).toBe(false);
+    }
+    const state = await poll(kv);
+    expect(state.round!.n).toBe(1);
+    expect(state.lastRound).toBe(null);
+  });
+
+  it("closes on the last one, in the same answer", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    for (const [who, pair] of [["Ana", "p1"], ["Ben", "p1"], ["Ana", "p2"]] as const) {
+      await vote(kv, 1, { who, pair, pick: "a", reasons: [] });
+    }
+    const last = await vote(kv, 1, { who: "Ben", pair: "p2", pick: "b", reasons: ["cost"] });
+    expect((await last.json()).closedTheRound).toBe(true);
+
+    const state = await poll(kv);
+    expect(state.round).toBe(null);
+    expect(state.lastRound!.n).toBe(1);
+    expect(typeof state.lastRound!.closedAt).toBe("string");
+    expect(state.lastRound!.votes).toHaveLength(4);
+  });
+
+  it("refuses a vote once it has closed", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    for (const [who, pair] of [["Ana", "p1"], ["Ben", "p1"], ["Ana", "p2"], ["Ben", "p2"]] as const) {
+      await vote(kv, 1, { who, pair, pick: "a", reasons: [] });
+    }
+    const res = await vote(kv, 1, { who: "Ana", pair: "p1", pick: "b", reasons: [] });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/round 1 .* is closed/);
+  });
+
+  it("waits for a person who joins mid-round, because the room is read live", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1, [PAIRS[0]]));
+    await vote(kv, 1, { who: "Ana", pair: "p1", pick: "a", reasons: [] });
+    await put(kv, "/api/session/g/residents/Cara", { share: 0.1 });
+    const res = await vote(kv, 1, { who: "Ben", pair: "p1", pick: "a", reasons: [] });
+    expect((await res.json()).closedTheRound, "Cara has not voted yet").toBe(false);
+    const last = await vote(kv, 1, { who: "Cara", pair: "p1", pick: "b", reasons: [] });
+    expect((await last.json()).closedTheRound).toBe(true);
+  });
+
+  it("closes by hand, and refuses to close one that is not open", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    const res = await call(kv, "POST", "/api/session/g/rounds/1/close");
+    expect(res.status).toBe(200);
+    expect(typeof (await res.json()).closedAt).toBe("string");
+    const again = await call(kv, "POST", "/api/session/g/rounds/1/close");
+    expect(again.status).toBe(409);
+    expect((await again.json()).error).toMatch(/already closed/);
+    expect((await call(kv, "POST", "/api/session/g/rounds/9/close")).status).toBe(409);
+  });
+});
+
+describe("the vote in the polled state and the export", () => {
+  it("reads null for both before any round", async () => {
+    const state = await poll(await twoAtTheTable());
+    expect(state.round).toBe(null);
+    expect(state.lastRound).toBe(null);
+  });
+
+  it("keeps the history out of the poll and in the export", async () => {
+    const kv = await twoAtTheTable();
+    await put(kv, "/api/session/g/round", round(1));
+    await call(kv, "POST", "/api/session/g/rounds/1/close");
+    await put(kv, "/api/session/g/round", round(2));
+
+    const polled = await (await call(kv, "GET", "/api/session/g")).json();
+    expect("rounds" in polled).toBe(false);
+    expect(polled.round.n).toBe(2);
+    expect(polled.lastRound.n).toBe(1);
+
+    const exported = await (await call(kv, "GET", "/api/session/g/export")).json();
+    expect(exported.rounds.map((r: { n: number }) => r.n)).toEqual([1, 2]);
+    expect(exported.rounds[0].closedAt).toBeTruthy();
+    expect(exported.rounds[1].closedAt).toBeUndefined();
+  });
+});
+
 describe("two writers", () => {
   it("retries a write that lost the ETag race instead of overwriting", async () => {
     class RacingKV extends MemoryKV {
