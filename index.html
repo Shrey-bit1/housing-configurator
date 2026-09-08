@@ -355,6 +355,20 @@
          routes leave identical state. "Start a group" invents a code, starts
          it in the store and shows it back, a plain screen for the same
          reason. -->
+    <!-- The way out of a remembered browser (run 0040). It belongs to THIS
+         app, not to the shared landing fragment, so it is declared here and
+         src/main.ts moves it into the fragment's own doors column at startup.
+         The shared files and their fingerprint are untouched; this app is only
+         placing its own element inside a container the fragment provides, and
+         styling its own element, which is not the same as restyling anything
+         of the fragment's.
+
+         Shown only when this browser remembers something: a flat, a code, a
+         name, or any of them. On a true first visit there is nothing to start
+         again from and the line is not there. -->
+    <p id="landing-start-again" class="landing-start-again" hidden>
+      <button type="button" id="landing-forget"></button>
+    </p>
     <div id="landing-forms" hidden>
       <form class="landing-join" id="landing-join-form" hidden>
         <label>Your group

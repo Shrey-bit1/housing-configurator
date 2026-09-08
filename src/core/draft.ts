@@ -21,13 +21,109 @@
  * conditions at the call site.
  */
 
+import { SESSION_STORAGE_KEY } from "../session/session";
+
 /** Where the draft lives. Its own key, never mixed with the session's. */
 export const DRAFT_KEY = "reconfigure.draft";
+
+/**
+ * Everything this browser remembers about the person using it (run 0040).
+ *
+ * ONE list, and the one place that decides what "forget this browser" means.
+ * The landing's written line, the `?fresh` address and any test all clear
+ * exactly this and nothing else, so there is no way for the three to drift
+ * apart and no way for a key to be forgotten by one route and kept by
+ * another.
+ *
+ * The draft is the flat as it was being drawn; the session is the group code
+ * and the name. Nothing else is stored per browser, and nothing here reaches
+ * the store: a flat already sent stays in its group, and taking it out is done
+ * from the group screen.
+ */
+export const BROWSER_MEMORY = [DRAFT_KEY, SESSION_STORAGE_KEY] as const;
+
+/**
+ * Forget this browser. Returns the keys it cleared, so a caller can say what
+ * happened and a test can pin it exactly.
+ *
+ * A storage that refuses is not worth interrupting anybody for, the same as
+ * everywhere else in this file, so a key that cannot be removed is simply not
+ * in the answer.
+ */
+export function forgetThisBrowser(store: ForgetfulStore | null): string[] {
+  const cleared: string[] = [];
+  for (const key of BROWSER_MEMORY) {
+    try {
+      store?.removeItem(key);
+      cleared.push(key);
+    } catch {
+      // Nothing to say about a key a browser will not let go of.
+    }
+  }
+  return cleared;
+}
+
+/**
+ * Whether this browser remembers anything worth starting again from, which is
+ * what decides whether the landing offers to. A flat with something in it, a
+ * group code, a name, or any of them.
+ *
+ * A draft holding an empty grid does NOT count, for the same reason
+ * {@link readDraft} refuses to restore one: there is nothing there to start
+ * again from, and offering to forget it would be offering to forget nothing.
+ * That case is not hypothetical. Emptying the editor writes an empty draft
+ * like any other edit, so the moment after somebody starts again the key is
+ * back with an empty project inside it (found live).
+ *
+ * A session holding two empty strings does not count either, for the same
+ * reason: it is what a browser is left with after somebody typed into a field
+ * and cleared it again.
+ */
+export function remembersAnything(store: ForgetfulStore | null): boolean {
+  if (store === null) return false;
+  try {
+    if (draftHasRooms(store.getItem(DRAFT_KEY))) return true;
+    const raw = store.getItem(SESSION_STORAGE_KEY);
+    if (raw === null) return false;
+    const s = JSON.parse(raw) as { resident?: unknown; code?: unknown };
+    const said = (v: unknown) => typeof v === "string" && v.trim() !== "";
+    return said(s.resident) || said(s.code);
+  } catch {
+    return false;
+  }
+}
+
+/** Whether an address is asking to be forgotten before anything is shown. */
+export function asksToForget(search: string): boolean {
+  return new URLSearchParams(search).has("fresh");
+}
+
+/** The same address with `?fresh` taken out, so a reload does not forget
+ *  again. Everything else about the address is left alone. */
+export function withoutFresh(url: string): string {
+  const u = new URL(url, "http://x");
+  u.searchParams.delete("fresh");
+  const q = u.searchParams.toString();
+  return `${u.pathname}${q ? `?${q}` : ""}${u.hash}`;
+}
 
 /** What a resident is told when their flat comes back by itself. Said once,
  *  quietly, because it is information rather than a warning: they did not ask
  *  for this and should know it happened. */
 export const DRAFT_RESTORED = "Your flat is as you left it.";
+
+/** The landing's own written way out, under the doors (run 0040). Quieter than
+ *  a door, because it undoes rather than does. */
+export const START_AGAIN = "Start again with a new flat.";
+
+/**
+ * The one question it asks, before anything is cleared. It names both halves
+ * of what goes and, because a person who has sent a flat will wonder, says
+ * plainly that the sent one is not among them.
+ */
+export const FORGET_CONFIRM =
+  "This forgets the flat and the name on this browser. " +
+  "The flat you sent stays in your group. Start again?";
 
 /** The little of `Storage` this needs. `window.localStorage` has it, and so
  *  does a `Map` with three lines around it. */
@@ -36,11 +132,19 @@ export interface DraftStore {
   setItem(key: string, value: string): void;
 }
 
-// There is no `clearDraft`, on purpose. A resident who empties their grid
-// writes an empty draft like any other edit, and `readDraft` refuses to restore
-// one with no rooms in it, so the draft clears itself. Nothing in the app
-// deliberately throws a flat away: "Start over" goes back to the landing and
-// leaves the drawing exactly where it was.
+/** The little more that forgetting needs. `window.localStorage` has it. */
+export interface ForgetfulStore extends DraftStore {
+  removeItem(key: string): void;
+}
+
+// There is no `clearDraft`. A resident who empties their grid writes an empty
+// draft like any other edit, and `readDraft` refuses to restore one with no
+// rooms in it, so the draft clears itself. "Start over" in the menu goes back
+// to the landing and leaves the drawing exactly where it was.
+//
+// `forgetThisBrowser` above is the one deliberate throwing-away, added in run
+// 0040, and it is deliberate in the strong sense: a person asks for it in
+// words and is asked once to confirm.
 
 /**
  * Whether a serialized project has anything in it worth keeping. An empty grid
