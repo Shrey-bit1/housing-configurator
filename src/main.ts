@@ -90,6 +90,7 @@ import {
   unitFileName,
 } from "./core/saveFiles";
 import { createUnitBrowser } from "./library/unitBrowser";
+import * as W from "./core/words";
 import {
   readSession,
   writeSession,
@@ -337,7 +338,7 @@ const doorController = new DoorController(
   // (isDoorValid is deliberately unchanged); only NEW authoring is blocked.
   (door) =>
     floors.isSemiExteriorDoor(floors.active, door)
-      ? { ok: false, hint: "That boundary is already a french window onto the balcony." }
+      ? { ok: false, hint: W.ALREADY_A_FRENCH_WINDOW }
       : { ok: true },
   (msg) => showToast("info", msg)
 );
@@ -375,7 +376,7 @@ function renderSidebar(): void {
         const culled = f.store.reconcileAfterResize();
         if (culled.length > 0) {
           console.info(
-            `Floor resized to ${cols}x${rows}; removed ${culled.length} item(s) that no longer fit.`
+            W.floorResized(cols, rows, culled.length)
           );
         }
         floors.syncStairsAndHoles(); // resize may change which cells have plate above
@@ -399,9 +400,7 @@ function renderSidebar(): void {
       },
       onDeleteFloor() {
         if (floors.floors.length <= 1) return;
-        const ok = window.confirm(
-          "Delete this floor and everything on it?"
-        );
+        const ok = window.confirm(W.DELETE_FLOOR_CONFIRM);
         if (!ok) return;
         if (planMode) exitPlanMode();
         floors.deleteFloor();
@@ -496,9 +495,9 @@ function updateSelectionReadout(): void {
   } else if (insts.length > 1) {
     text = `${insts.length} selected`;
   } else if (entId) {
-    text = "Entrance · Floor 0";
+    text = W.selectionEntrance();
   } else if (doorSelected) {
-    text = `Door · Floor ${floors.activeIndexValue}`;
+    text = W.selectionDoor(floors.activeIndexValue);
   }
   selectionText.textContent = text;
   selectionReadout.classList.toggle("visible", !!text);
@@ -524,7 +523,7 @@ function toggleDoubleHeight(instanceId: string): { ok: boolean; blockedBy?: Cell
               .slice(0, 4)
               .map((c) => `${c.cx},${c.cz}`)
               .join(" · ")}${cells.length > 4 ? " …" : ""}). Clear those cells first.`
-        : "This room cannot be made double height."
+        : W.NOT_DOUBLE_HEIGHT
     );
     return res;
   }
@@ -620,7 +619,7 @@ function syncDisplaySummary(): void {
   if (seedsToggle.classList.contains("active")) on.push("Seeds");
   if (floors.structureViewOn) on.push("Structure");
   if (floors.interfaceViewOn) on.push("Interface");
-  displaySummary.textContent = on.length ? on.join(" · ") : "all off";
+  displaySummary.textContent = on.length ? on.join(" \u00b7 ") : W.DISPLAY_NOTHING_ON;
 }
 
 function syncViewSegments(): void {
@@ -758,7 +757,7 @@ document.getElementById("compass-row")!.prepend(compassDial.el);
 function syncNorthUI(): void {
   displayNorthAngle = floors.northAngle;
   compassDial.setAngle(floors.northAngle);
-  compassValue.textContent = `North ${Math.round(floors.northAngle)}°`;
+  compassValue.textContent = W.compassValue(Math.round(floors.northAngle));
 }
 
 /** Rotate the north badge to point at TRUE north on screen: project the world
@@ -1318,9 +1317,9 @@ function refreshFlatFigures(): void {
     // 02's button so the three can never disagree about what there is to look
     // at (run 0036, run 0038).
     complaints = hard.map((v) => v.description);
-    label = hard.length ? `${hard.length} must fix` : "All checks pass";
+    label = hard.length ? W.mustFixLabel(hard.length) : W.ALL_CHECKS_PASS;
     cls = hard.length ? "chip chip-acc" : "chip chip-ok";
-    title = hard.length ? `${hard[0].description} — open the layout report` : "Open the layout report";
+    title = W.checkChipTooltip(hard.length ? hard[0].description : "");
   }
   for (const chip of [figCheckEl, frCheckEl]) {
     chip.className = cls;
@@ -1461,7 +1460,7 @@ function showLanding(): void {
   // Nothing is destroyed on the way here, so the primary door says what it
   // will really do: open an empty grid the first time, and hand back an
   // afternoon's work every time after that.
-  landingStartLabel.textContent = isEmptyProject() ? "Start a flat" : "Back to your flat";
+  landingStartLabel.textContent = isEmptyProject() ? W.START_A_FLAT : W.BACK_TO_YOUR_FLAT;
   // The written way out, only when there is something to start again FROM
   // (run 0040). A true first visit has nothing to forget and says nothing.
   landingStartAgain.hidden = !remembersAnything(draftStore);
@@ -1552,7 +1551,7 @@ document.getElementById("landing-new")!.addEventListener("click", async () => {
   }
   if (code === null) {
     landingNewCode.textContent = "—";
-    landingNewWhy.textContent = "Could not reach the store to start a group. Try again in a moment.";
+    landingNewWhy.textContent = W.COULD_NOT_START_GROUP;
     return;
   }
   landingNewCode.textContent = code;
@@ -1609,7 +1608,7 @@ landingJoinForm.addEventListener("submit", async (e) => {
     landingWhy.textContent =
       checked.failure === "absent"
         ? storeAbsentText()
-        : `The store could not answer for ${next.code}. Try again in a moment.`;
+        : W.couldNotAnswer(next.code);
     return;
   }
   if (!checked.started) {
@@ -1748,7 +1747,7 @@ function syncSaveDialog(): void {
   // What the flat will be called in the group. One name now rather than a
   // list built from four checkboxes (run 0036).
   saveNamesLine.textContent =
-    `It becomes ${unitNameFor(n)}` +
+    W.itBecomes(unitNameFor(n)) +
     (numberCountsSession ? `, the next free number in the library and in ${session.code}` : "");
   if (!saveColorTouched) saveColorInput.value = defaultUnitColor(unitNameFor(n));
   // ONE rule for the button and the line under it (run 0036), over three
@@ -1900,7 +1899,7 @@ async function runSend(): Promise<void> {
     // Words, run 0026: "Sent to <code> as <label>", the brief's exact phrasing.
     // The version shows only when it moved, since "version 1" says nothing a
     // first send does not already imply.
-    let line = `Sent to ${session.code} as ${r.label}`;
+    let line = W.sentTo(session.code, r.label);
     if (r.version > 1) line += `, version ${r.version}`;
     // The axonometric follows to the SAME id. A failed preview is noted on the
     // same line and never undoes the flat itself.
@@ -1988,8 +1987,7 @@ async function saveLibraryEntry(
   let replace = false;
   if (existing) {
     replace = window.confirm(
-      `The library already holds "${existing.name}" (${existing.id}, saved ${existing.savedAt.slice(0, 10)}).\n\n` +
-        `OK replaces that entry. Cancel keeps it and adds a second one under a new id.`
+      W.libraryReplaceConfirm(existing.name, existing.id, existing.savedAt.slice(0, 10))
     );
   }
 
@@ -2111,8 +2109,8 @@ function importProjectText(text: string): boolean {
     const msg =
       err instanceof ProjectParseError
         ? err.message
-        : "Could not read this file.";
-    showToast("error", `Import failed: ${msg}`);
+        : W.COULD_NOT_READ_FILE;
+    showToast("error", W.couldNotOpen(msg));
     return false;
   }
 
@@ -2126,11 +2124,11 @@ function importProjectText(text: string): boolean {
   const replacing = !isEmptyProject();
   if (replacing || parsed.status === "newer") {
     let confirmMsg = replacing
-      ? "This will replace your current layout. Continue?"
-      : "Load this project?";
+      ? W.REPLACE_LAYOUT_CONFIRM
+      : W.LOAD_PROJECT_CONFIRM;
     if (parsed.status === "newer")
       confirmMsg =
-        `This file was created with a newer version (v${parsed.fileVersion}) of the app ` +
+        W.newerFileConfirm(parsed.fileVersion) +
         `than you're running (v${APP_PROJECT_VERSION}). Some elements may not load correctly.` +
         (replacing ? " This will also replace your current layout." : "") +
         " Continue?";
@@ -2147,25 +2145,25 @@ function importProjectText(text: string): boolean {
     commitHistory(); // importing a project is an undoable action
   } catch (err) {
     console.error(err);
-    showToast("error", "Import failed while loading — the file may be corrupt.");
+    showToast("error", W.couldNotOpen(W.FILE_MAY_BE_DAMAGED));
     return false;
   }
   // Tolerant drop, never silent — cause-neutral (collision under current
   // preset footprints, out-of-bounds, whatever made the normal path refuse).
   if (skippedRooms > 0)
-    showToast("warn", `${skippedRooms} room(s) could not be placed.`);
+    showToast("warn", W.roomsNotPlaced(skippedRooms));
 
   if (parsed.status === "older")
     showToast(
       "info",
-      `This file was made with an older version (v${parsed.fileVersion}) and has been loaded successfully.`
+      W.olderFileOpened(parsed.fileVersion)
     );
   else if (parsed.status === "newer")
     showToast(
       "warn",
-      `Loaded a newer-version (v${parsed.fileVersion}) file on an older app (v${APP_PROJECT_VERSION}). Some elements may be missing.`
+      W.newerFileOpened(parsed.fileVersion, APP_PROJECT_VERSION)
     );
-  else showToast("info", "Project imported.");
+  else showToast("info", W.PROJECT_OPENED);
   return true;
 }
 
@@ -2178,7 +2176,7 @@ function readAndImport(file: File): void {
     // than dropping them into an editor they did not ask for (run 0027).
     if (importProjectText(String(reader.result ?? ""))) hideLanding();
   };
-  reader.onerror = () => showToast("error", "Could not read that file.");
+  reader.onerror = () => showToast("error", W.COULD_NOT_READ_FILE);
   reader.readAsText(file);
 }
 
@@ -2224,7 +2222,7 @@ const unitBrowser = createUnitBrowser({
         });
         const r = (await res.json()) as { ok: boolean; error?: string };
         if (!r.ok) throw new Error(r.error ?? "unknown error");
-        showToast("info", `Renamed ${entry.id} to "${newName}".`);
+        showToast("info", W.renamed(entry.id, newName));
       }
     : undefined,
   // Delete is DEV-ONLY beside Rename and saving, and for the same reason: the
@@ -2239,7 +2237,7 @@ const unitBrowser = createUnitBrowser({
         });
         const r = (await res.json()) as { ok: boolean; error?: string; removed?: string[] };
         if (!r.ok) throw new Error(r.error ?? "unknown error");
-        showToast("info", `Deleted "${entry.name}" and ${r.removed?.length ?? 0} of its files.`);
+        showToast("info", W.deleted(entry.name, r.removed?.length ?? 0));
       }
     : undefined,
   storeAbsentText,
@@ -2255,7 +2253,7 @@ const unitBrowser = createUnitBrowser({
           src = undefined;
         }
         if (!src || typeof src !== "object") {
-          showToast("error", `${file.name} carries no sourceProject — cannot open a copy.`);
+          showToast("error", W.noSourceProject(file.name));
           return;
         }
         // A copy, not the library file: the import names nothing, so saving
@@ -2269,7 +2267,7 @@ const unitBrowser = createUnitBrowser({
           unitBrowser.close();
         }
       })
-      .catch((err: Error) => showToast("error", `Could not read ${file.name}: ${err.message}`));
+      .catch((err: Error) => showToast("error", W.couldNotReadNamed(file.name, err.message)));
   },
 });
 document.getElementById("units-btn")!.addEventListener("click", () => unitBrowser.toggle());

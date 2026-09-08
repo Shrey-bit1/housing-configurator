@@ -266,7 +266,7 @@ describe("decideTakeover — what runSave does after a 409, without a DOM", () =
   it("declines with a line naming the owner, sends nothing further", () => {
     expect(decideTakeover(conflict, true, false)).toEqual({
       action: "declined",
-      detail: "not published — you chose not to take over Ana's flat",
+      detail: "not sent, because you chose to leave Ana's flat alone",
     });
   });
 
@@ -299,16 +299,16 @@ describe("landingRecall — what the landing fills in and what it says about it"
     expect(landingRecall(settings("room-42", "Ana"))).toEqual({
       code: "room-42",
       name: "Ana",
-      line: "Picking up where you left off, as Ana in room-42. Change either if that is not you.",
+      line: "You were here before, as Ana in room-42. Change either one if that is not you.",
     });
   });
 
-  it("says 'it' rather than 'either' when it only recognised one thing", () => {
+  it("says 'it' rather than 'either one' when it only recognised one thing", () => {
     expect(landingRecall(settings("room-42", "")).line).toBe(
-      "Picking up where you left off, in room-42. Change it if that is not you."
+      "You were here before, in room-42. Change it if that is not you."
     );
     expect(landingRecall(settings("", "Ana")).line).toBe(
-      "Picking up where you left off, as Ana. Change it if that is not you."
+      "You were here before, as Ana. Change it if that is not you."
     );
   });
 
@@ -399,7 +399,7 @@ describe("classifyStoreFailure — the store is not there, or it said no", () =>
 describe("storeAbsentText — what a resident reads instead of an exception", () => {
   it("names the command and the address, and quotes no exception", () => {
     expect(storeAbsentText()).toBe(
-      "The group needs the store, which is not running. " +
+      "The app cannot reach the place your group is kept. " +
         "Start it with npm run dev and open http://localhost:8888."
     );
   });
