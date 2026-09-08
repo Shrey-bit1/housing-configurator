@@ -1,7 +1,8 @@
 import type { Floor } from "./floor";
 import { SIDES, type Side } from "./exteriorEdges";
 import type { DoorSwing } from "./door";
-import { isCompassSector, type OrientationPreference } from "./orientation";
+import { isCompassSector, type OrientationPreference } from "./orientation";
+import { FILE_NOT_READABLE, FILE_NOT_OURS, FILE_IS_A_PROP, FILE_WRONG_FORMAT } from "./words";
 
 /**
  * Project save/load — serialize the whole design to a JSON file and back.
@@ -145,20 +146,20 @@ export function parseProject(text: string): ParsedProject {
   try {
     raw = JSON.parse(text);
   } catch {
-    throw new ProjectParseError("This file isn't valid JSON.");
+    throw new ProjectParseError(FILE_NOT_READABLE);
   }
 
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
-    throw new ProjectParseError("This file isn't a recognised project file.");
+    throw new ProjectParseError(FILE_NOT_OURS);
 
   const obj = raw as Record<string, unknown>;
   if (obj.format !== PROJECT_FORMAT) {
     if (obj.format === "voxel-prop")
       throw new ProjectParseError(
-        "That's a voxel-prop file (a single furniture prop), not a project file."
+        FILE_IS_A_PROP
       );
     throw new ProjectParseError(
-      "This file isn't a flat-configurator project file (wrong or missing format identifier)."
+      FILE_WRONG_FORMAT
     );
   }
 

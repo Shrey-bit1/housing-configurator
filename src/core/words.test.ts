@@ -80,6 +80,20 @@ const BUILT: [string, string][] = [
   ["floorHasNoBathroom", W.floorHasNoBathroom(1)],
   ["roomIsDeep", W.roomIsDeep(5)],
   ["roomIsFarFromAWayOut", W.roomIsFarFromAWayOut(4)],
+  // The nine lines a rule builds about one room, one floor or one count. The
+  // finishing pass found these on screen still saying what they used to.
+  ["narrowCirculation(1)", W.narrowCirculation(1)],
+  ["narrowCirculation(2)", W.narrowCirculation(2)],
+  ["stairReachesNothing", W.stairReachesNothing("top and the bottom")],
+  ["floorsNotReachable(one)", W.floorsNotReachable("Floor 1", false)],
+  ["floorsNotReachable(many)", W.floorsNotReachable("Floors 1 and 2", true)],
+  ["glazingFaces", W.glazingFaces("north + east")],
+  ["roomIsThisDeep", W.roomIsThisDeep(6)],
+  ["roomIsThisFar", W.roomIsThisFar(7)],
+  ["circulationHeavy", W.circulationHeavy(41)],
+  ["floorCirculationHeavy", W.floorCirculationHeavy(1, 52)],
+  ["wetRoomsSplit", W.wetRoomsSplit(0, 2, "F0 and F1")],
+  ["roomHasNoFacade", W.roomHasNoFacade("Living Room")],
 ];
 
 /** The shortcut panel's rows, which are a table of their own. */

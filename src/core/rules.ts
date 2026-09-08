@@ -2,7 +2,23 @@ import type { DwellingGraph, GraphNode } from "./adjacencyGraph";
 import { BATHROOM_TYPES, WET_TYPES } from "./modules";
 import { connectedComponents } from "./cluster";
 import type { OrientationPreference } from "./orientation";
-import { RULE_WORDS, bedroomDoors, floorHasNoBathroom, roomIsDeep, roomIsFarFromAWayOut } from "./words";
+import {
+  RULE_WORDS,
+  bedroomDoors,
+  floorHasNoBathroom,
+  roomIsDeep,
+  roomIsFarFromAWayOut,
+  narrowCirculation,
+  stairReachesNothing,
+  floorsNotReachable,
+  glazingFaces,
+  roomIsThisDeep,
+  roomIsThisFar,
+  circulationHeavy,
+  floorCirculationHeavy,
+  wetRoomsSplit,
+  roomHasNoFacade,
+} from "./words";
 
 /**
  * Layout-rules validation — ADVISORY ONLY.
@@ -786,7 +802,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "A1",
             severity: "soft",
-            description: `Circulation narrower than 1.2 m (below accessible width) — ${narrow.length} narrow cell${narrow.length === 1 ? "" : "s"}.`,
+            description: narrowCirculation(narrow.length),
             nodeIds: [n.id],
           });
       }
@@ -854,9 +870,7 @@ export const RULES: Rule[] = [
         {
           ruleId: "ST3",
           severity: "hard" as const,
-          description:
-            `${list} ${floors.length === 1 ? "is" : "are"} not reachable by stairs from the ` +
-            `entrance floor. Every space there is cut off for this one reason.`,
+          description: floorsNotReachable(list, floors.length !== 1),
           nodeIds: graph.nodes.filter((n) => ctx.disconnectedFloors.has(n.floor)).map((n) => n.id),
           layout: true,
         },
@@ -880,7 +894,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "ST1",
             severity: "soft",
-            description: `Stair connects to nothing at the ${missing.join(" and ")}.`,
+            description: stairReachesNothing(missing.join(" and ")),
             nodeIds: [n.id],
           });
       }
@@ -989,7 +1003,7 @@ export const RULES: Rule[] = [
         out.push({
           ruleId: "OR2",
           severity: "soft" as const,
-          description: `Room's glazing faces ${sectors.join(" + ")}, which this project asks to avoid.`,
+          description: glazingFaces(sectors.join(" + ")),
           nodeIds: [n.id],
         });
       }
@@ -1146,7 +1160,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "DP1",
             severity: "soft",
-            description: `Room is unusually deep in the layout (${d} hops from the entrance).`,
+            description: roomIsThisDeep(d),
             nodeIds: [n.id],
           });
       }
@@ -1176,7 +1190,7 @@ export const RULES: Rule[] = [
         out.push({
           ruleId: "N1",
           severity: "soft",
-          description: `Circulation-heavy layout (${Math.round(f * 100)}% of interior area).`,
+          description: circulationHeavy(Math.round(f * 100)),
           nodeIds: [],
           layout: true,
         });
@@ -1193,7 +1207,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "N1",
             severity: "soft",
-            description: `Floor ${floor} is circulation-heavy (${Math.round(frac * 100)}% of interior area).`,
+            description: floorCirculationHeavy(floor, Math.round(frac * 100)),
             nodeIds: offenders.map((n) => n.id),
           });
         }
@@ -1252,7 +1266,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "F1",
             severity: "soft",
-            description: `Room is far from any exit (${d} hops from the nearest entrance or stair).`,
+            description: roomIsThisFar(d),
             nodeIds: [n.id],
           });
       }
@@ -1300,9 +1314,7 @@ export const RULES: Rule[] = [
         out.push({
           ruleId: "WET1",
           severity: "soft",
-          description:
-            `Floor ${floor}: wet rooms form ${groups.length} separate groups, at ${where}. ` +
-            `Split wet areas mean long installation runs and shafts that cannot bundle to the next storey.`,
+          description: wetRoomsSplit(floor, groups.length, where),
           nodeIds: nodes.map((n) => n.id),
         });
       }
@@ -1319,9 +1331,7 @@ export const RULES: Rule[] = [
         .map((n) => ({
           ruleId: "FAC1",
           severity: "hard" as const,
-          description:
-            `${n.label} has no facade — it touches neither open sky nor a balcony. ` +
-            `(PBG LS 700.1 § 302: every habitable room needs a facade window)`,
+          description: roomHasNoFacade(n.label),
           nodeIds: [n.id],
         }));
     },

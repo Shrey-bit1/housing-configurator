@@ -1,4 +1,5 @@
-import type { DwellingGraph } from "../core/adjacencyGraph";
+import type { DwellingGraph } from "../core/adjacencyGraph";
+import * as W from "../core/words";
 import {
   computeCirculationFraction,
   computeCirculationFractionByFloor,
@@ -177,7 +178,7 @@ function buildHeader(
   // (`floors.onLayoutChange` in main.ts), so a visible sheet is never stale, and
   // a ticking "3 min ago" would be motion after arrival for no information.
   const when = el("span", "vs-when");
-  when.textContent = "checked just now";
+  when.textContent = W.CHECKED_JUST_NOW;
   counts.appendChild(when);
   block.appendChild(counts);
   head.appendChild(block);
@@ -221,14 +222,12 @@ function metricsLine(graph: DwellingGraph, depths: Map<string, number>): string 
 
   const frac = computeCirculationFraction(graph);
   if (frac !== null) {
-    let s = `Circulation ${Math.round(frac * 100)}% of interior`;
+    let perFloor = "";
     if (graph.floorCount > 1) {
-      const perFloor = [...computeCirculationFractionByFloor(graph)].sort((a, b) => a[0] - b[0]);
-      if (perFloor.length) {
-        s += ` (${perFloor.map(([f, v]) => `F${f} ${Math.round(v * 100)}%`).join(" · ")})`;
-      }
+      const byFloor = [...computeCirculationFractionByFloor(graph)].sort((a, b) => a[0] - b[0]);
+      perFloor = byFloor.map(([f, v]) => W.floorShare(f, Math.round(v * 100))).join(", ");
     }
-    parts.push(s);
+    parts.push(W.circulationShare(Math.round(frac * 100), perFloor));
   }
 
   const reached = graph.nodes.filter((n) => n.kind === "room" && depths.has(n.id));
@@ -236,9 +235,9 @@ function metricsLine(graph: DwellingGraph, depths: Map<string, number>): string 
     const ds = reached.map((n) => depths.get(n.id)!);
     const max = Math.max(...ds);
     const mean = ds.reduce((a, b) => a + b, 0) / ds.length;
-    parts.push(`depth max ${max}, mean ${mean.toFixed(1)}`);
+    parts.push(W.depthSummary(max, mean.toFixed(1)));
     const pg = publicVsBedroomDepth(graph, depths);
-    if (pg) parts.push(`public ${pg.publicMean.toFixed(1)} vs beds ${pg.bedroomMean.toFixed(1)}`);
+    if (pg) parts.push(W.privacyGradient(pg.publicMean.toFixed(1), pg.bedroomMean.toFixed(1)));
   }
 
   return parts.join(" · ");
@@ -450,7 +449,7 @@ function makeLabeller(graph: DwellingGraph): (n: DwellingGraph["nodes"][number])
 }
 
 function involvedText(v: Violation, labelById: Map<string, string>): string {
-  if (v.layout) return "Whole dwelling";
+  if (v.layout) return W.WHOLE_FLAT;
   const names = v.nodeIds.map((id) => labelById.get(id) ?? id);
   if (names.length === 0) return "";
   return names.join(v.edge ? " ↔ " : ", ");

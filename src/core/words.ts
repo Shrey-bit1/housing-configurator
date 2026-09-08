@@ -431,3 +431,100 @@ export function roomIsDeep(hops: number): string {
 export function roomIsFarFromAWayOut(hops: number): string {
   return `This room is far from a way out. Getting to the nearest entrance or stair passes through more than ${hops} rooms.`;
 }
+
+// ---- Opening a file that will not open --------------------------------------
+//
+// Found by the finishing pass, on screen: these four are what a person reads
+// under `Could not open that project.`, and the inventory had missed them. They
+// named JSON, a format identifier and a voxel prop, and one of them was a
+// contrast construction of exactly the shape the guide strikes out.
+
+export const FILE_NOT_READABLE = "This file cannot be read. It may be damaged.";
+export const FILE_NOT_OURS = "This file is not one this app wrote.";
+export const FILE_IS_A_PROP = "That is a single piece of furniture. A project file holds a whole flat.";
+export const FILE_WRONG_FORMAT =
+  "This file is not one this app wrote. It may have come from another program.";
+
+// ---- The lines a rule builds about one room ---------------------------------
+//
+// Found by the finishing pass, in the layout report on screen: nine rules do
+// not show their own line but build one naming the room, the floor or the
+// count. The inventory had listed two of them and missed seven, so seven em
+// dashes and four bracketed asides survived the first pass.
+
+/** A1: how many cells of this circulation are too narrow. */
+export function narrowCirculation(cells: number): string {
+  return `This circulation is narrower than 1.2 m across ${cells} cell${cells === 1 ? "" : "s"}. A wheelchair needs 1.2 m.`;
+}
+
+/** ST1: which of the stair's two ends reaches nothing. */
+export function stairReachesNothing(where: string): string {
+  return `This stair reaches nothing at the ${where}.`;
+}
+
+/** ST3: which floors are cut off. */
+export function floorsNotReachable(list: string, many: boolean): string {
+  return `${list} ${many ? "are" : "is"} not reachable by stairs from the floor the entrance is on. Every space there is cut off for this one reason.`;
+}
+
+/** OR2: which way this room's glazing faces. */
+export function glazingFaces(sectors: string): string {
+  return `All of this room's glazing faces ${sectors}, which this project asks to avoid.`;
+}
+
+/** DP1 and F1, once they know the room's own depth. */
+export function roomIsThisDeep(hops: number): string {
+  return `This room is deep in the flat. Getting to it from the entrance passes through ${hops} rooms.`;
+}
+export function roomIsThisFar(hops: number): string {
+  return `This room is far from a way out. Getting to the nearest entrance or stair passes through ${hops} rooms.`;
+}
+
+/** N1, for the whole flat and for one floor. */
+export function circulationHeavy(percent: number): string {
+  return `${percent}% of the floor area is circulation, so less of it is left to live in.`;
+}
+export function floorCirculationHeavy(floor: number, percent: number): string {
+  return `On floor ${floor}, ${percent}% of the area is circulation, so less of it is left to live in.`;
+}
+
+/** WET1, once it knows the floor and where the groups are. */
+export function wetRoomsSplit(floor: number, groups: number, where: string): string {
+  return `On floor ${floor} the wet rooms form ${groups} separate groups, at ${where}. Pipes then run a long way and cannot bundle into one shaft to the storey above.`;
+}
+
+/** FAC1, naming the room. */
+export function roomHasNoFacade(room: string): string {
+  return `${room} has no facade. It touches neither open sky nor a balcony, and PBG LS 700.1 § 302 asks every habitable room for a facade window.`;
+}
+
+// ---- The layout report's own furniture ---------------------------------------
+//
+// Also found by the finishing pass. The 33 fix hints beside each fault were
+// already short imperative sentences in plain words and are left alone. Two
+// things were not: the strip of numbers under the heading read as a list of
+// measures with no plain reading, and one chip said dwelling where the rest of
+// the app says flat.
+
+export const WHOLE_FLAT = "The whole flat";
+export const CHECKED_JUST_NOW = "checked just now";
+
+/** The circulation share, with the per-floor rider on a flat of more than one
+ *  floor. A percentage never stands on its own; it says what it is a share of. */
+export function circulationShare(percent: number, perFloor: string): string {
+  const head = `Circulation is ${percent}% of the inside`;
+  return perFloor ? `${head} (${perFloor})` : head;
+}
+export function floorShare(floor: number, percent: number): string {
+  return `${percent}% on floor ${floor}`;
+}
+
+/** How far into the flat the rooms sit, in rooms rather than in hops. */
+export function depthSummary(max: number, mean: string): string {
+  return `The deepest room is ${max} rooms from the entrance, ${mean} on average`;
+}
+
+/** Where the living spaces sit against the bedrooms. */
+export function privacyGradient(publicMean: string, bedroomMean: string): string {
+  return `Living spaces sit ${publicMean} rooms in, bedrooms ${bedroomMean}`;
+}
