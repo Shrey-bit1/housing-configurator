@@ -56,7 +56,18 @@ import {
   NO_WAY_IN,
   type FlatPhase,
 } from "./core/flatState";
-import { saveDraft, readDraft, DRAFT_RESTORED, type DraftStore } from "./core/draft";
+import {
+  saveDraft,
+  readDraft,
+  forgetThisBrowser,
+  remembersAnything,
+  asksToForget,
+  withoutFresh,
+  DRAFT_RESTORED,
+  START_AGAIN,
+  FORGET_CONFIRM,
+  type ForgetfulStore,
+} from "./core/draft";
 // The landing, from the ONE shared fragment both apps render (run 0037).
 // `?raw` inlines the markup at build time and the stylesheet is bundled by
 // Vite, so neither is fetched and neither can be half-there when the app
@@ -110,9 +121,15 @@ document.body.insertAdjacentHTML("beforeend", landingMarkup);
   const forms = document.getElementById("landing-forms") as HTMLElement;
   const slot = document.getElementById("landing-extra") as HTMLElement;
   // The fragment lets an app put markup in exactly one place. These two forms
-  // are the only thing this app adds.
+  // are the only thing this app adds there.
   while (forms.firstElementChild) slot.append(forms.firstElementChild);
   forms.remove();
+  // The written way out goes UNDER the doors, so it goes into the doors
+  // column itself rather than the slot beside it (run 0040). It is this app's
+  // own element either way, and the shared file is not edited to hold it.
+  document
+    .getElementById("landing-doors")!
+    .append(document.getElementById("landing-start-again")!);
 }
 
 const canvas = document.getElementById("scene") as HTMLCanvasElement;
@@ -1432,6 +1449,9 @@ const landingNewCode = document.getElementById("landing-new-code") as HTMLElemen
 const landingNewName = document.getElementById("landing-new-name") as HTMLInputElement;
 const landingNewWhy = document.getElementById("landing-new-why") as HTMLElement;
 const landingGroupLink = document.getElementById("landing-group") as HTMLAnchorElement;
+const landingStartAgain = document.getElementById("landing-start-again") as HTMLElement;
+const landingForgetBtn = document.getElementById("landing-forget") as HTMLButtonElement;
+landingForgetBtn.textContent = START_AGAIN;
 
 function showLanding(): void {
   landingEl.hidden = false;
@@ -1442,6 +1462,9 @@ function showLanding(): void {
   // will really do: open an empty grid the first time, and hand back an
   // afternoon's work every time after that.
   landingStartLabel.textContent = isEmptyProject() ? "Start a flat" : "Back to your flat";
+  // The written way out, only when there is something to start again FROM
+  // (run 0040). A true first visit has nothing to forget and says nothing.
+  landingStartAgain.hidden = !remembersAnything(draftStore);
   // One rule, one place (src/session/session.ts): a first visit shows two empty
   // fields and says nothing, and a return visit says plainly that it is picking
   // up rather than guessing at the person in front of it.
@@ -1458,11 +1481,47 @@ function hideLanding(): void {
   landingEl.hidden = true;
 }
 
+/**
+ * Forget this browser and start over (run 0040).
+ *
+ * `forgetThisBrowser` in src/core/draft.ts is the ONE place that decides what
+ * is cleared, so the button, the `?fresh` address and the tests can never
+ * disagree about it. Everything here is what the SCREEN then does: an empty
+ * grid through the same rebuild an import and an undo use, and a landing that
+ * reads as a first visit because the two keys it reads are gone.
+ *
+ * Nothing is sent anywhere. A flat already published stays in its group, which
+ * is what the question says and what the brief settled: taking it out is done
+ * from the group screen.
+ */
+function forgetAndStartAgain(): void {
+  forgetThisBrowser(draftStore);
+  session = readSession(sessionStorageArea, "");
+  saveResidentInput.value = session.resident;
+  saveCodeInput.value = session.code;
+  sendState = "never";
+  // One floor, nothing on it, through `restoreState` rather than a second
+  // rebuild path of its own.
+  restoreState(
+    JSON.stringify(serializeProject(new FloorManager(new THREE.Scene(), DEFAULT_COLS, DEFAULT_ROWS).floors))
+  );
+  syncSessionUI();
+  void openSaveDialog();
+  setStep("draw");
+  showLanding();
+}
+
 // The journey strip is markup in the shared fragment now (run 0037), with the
 // six dots' tones decided by `data-app` in CSS rather than by a render pass
 // here. `renderJourney` is gone with it. `src/core/journey.ts` is still the
 // record of what the six steps ARE, and `landingShared.test.ts` checks the
 // fragment's dots against it, so the two cannot drift apart either.
+
+landingForgetBtn.addEventListener("click", () => {
+  // One plain question, the app's usual confirm. A no wins nothing.
+  if (!window.confirm(FORGET_CONFIRM)) return;
+  forgetAndStartAgain();
+});
 
 document.getElementById("landing-start")!.addEventListener("click", () => {
   hideLanding();
@@ -1614,7 +1673,7 @@ const tbCode = document.getElementById("tb-code") as HTMLElement;
 /** localStorage, or null where the browser refuses it (a sandboxed frame). */
 /** The draft's own storage, separate from the session's only so that a
  *  failure to read one cannot cost the other. Same `localStorage`. */
-const draftStore: DraftStore | null = (() => {
+const draftStore: ForgetfulStore | null = (() => {
   try {
     return window.localStorage;
   } catch {
@@ -2436,6 +2495,19 @@ window.addEventListener("resize", () => ctx.handleResize());
 // The send panel's own state needs one startup read rather than waiting for
 // a first "open", and the figures, the drop hint and the step gate all come
 // from the same first pass.
+// `?fresh` forgets this browser before anything is read, with no question
+// asked (run 0040). It is for the operator, who restarts often and should not
+// have to answer a dialog every time. The address is cleaned afterwards, so a
+// reload does not forget again, and `replaceState` rather than a navigation so
+// nothing reloads here either. It clears exactly what the written line clears,
+// because it calls the same one function.
+if (asksToForget(location.search)) {
+  forgetThisBrowser(draftStore);
+  session = readSession(sessionStorageArea, "");
+  // `window.history`, because `history` in this module is the undo stack.
+  window.history.replaceState(null, "", withoutFresh(location.href));
+}
+
 // The flat is kept as you draw (run 0036), so a refresh, a closed tab or a
 // crash no longer costs an afternoon. `readDraft` is the one rule that says
 // whether to bring it back: a URL naming a project wins over it, and a draft
