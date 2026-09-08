@@ -10,7 +10,20 @@
  *
  * Pure over a two-method storage and a `fetch`, so `session.test.ts` drives
  * the whole thing with a Map and a stub.
+ *
+ * Every sentence this module returns comes from `src/core/words.ts` (run
+ * 0042). The rules for who is at the table stay here; the words they are said
+ * in live with every other word a resident reads.
  */
+import {
+  whoLineText,
+  sessionLineText,
+  recallLine,
+  takeoverConfirm,
+  storeNotRunning,
+  noSuchGroup,
+  declinedTakeover,
+} from "../core/words";
 
 export const SESSION_STORAGE_KEY = "reconfigure.session";
 
@@ -124,7 +137,7 @@ export function classifyStoreFailure(
 /** The one sentence a resident reads when the store is not running. It names
  *  the command and the address, so it can be acted on without asking. */
 export function storeAbsentText(): string {
-  return `The group needs the store, which is not running. Start it with ${STORE_COMMAND} and open ${STORE_ADDRESS}.`;
+  return storeNotRunning(STORE_COMMAND, STORE_ADDRESS);
 }
 
 /**
@@ -169,7 +182,7 @@ export async function startGroup(code: string, f: typeof fetch = fetch): Promise
 /** What a resident is told when they join a code nobody has started. Pure, for
  *  the same reason every other sentence in this file is. */
 export function noSuchGroupText(code: string): string {
-  return `No group called ${code}. Check the code for a typo, or ask whoever started the group for it.`;
+  return noSuchGroup(code);
 }
 
 /**
@@ -232,17 +245,13 @@ export function whyPublishDisabled(s: SessionSettings): string | null {
  */
 export function whoLine(s: SessionSettings): { line: string; ready: boolean } {
   const resident = s.resident.trim();
-  if (resident && s.code) return { line: `As ${resident}, to ${s.code}.`, ready: true };
-  if (!resident && !s.code) return { line: "You have not said who you are or which group.", ready: false };
-  if (!resident) return { line: `To ${s.code}, but you have not said who you are.`, ready: false };
-  return { line: `As ${resident}, but you have not joined a group.`, ready: false };
+  return { line: whoLineText(resident, s.code), ready: Boolean(resident && s.code) };
 }
 
 /** The top-bar line: which group, and who (words only, run 0026). */
 export function sessionLine(s: SessionSettings): string {
   const resident = s.resident.trim();
-  if (!s.code) return resident ? `No group · ${resident}` : "No group";
-  return resident ? `Group ${s.code} · ${resident}` : `Group ${s.code}`;
+  return sessionLineText(resident, s.code);
 }
 
 /**
@@ -271,16 +280,11 @@ export function landingRecall(s: SessionSettings): { code: string; name: string;
   const code = s.code.trim();
   const name = s.resident.trim();
   if (!code && !name) return { code: "", name: "", line: "" };
-  const who = name ? `as ${name}` : "";
-  const where = code ? `in ${code}` : "";
-  const both = [who, where].filter(Boolean).join(" ");
-  // "either" only when there are two things to change.
-  const which = who && where ? "either" : "it";
-  return { code, name, line: `Picking up where you left off, ${both}. Change ${which} if that is not you.` };
+  return { code, name, line: recallLine(name, code) };
 }
 
 export function takeoverConfirmText(owner: string): string {
-  return `This flat belongs to ${owner}. Take it over?`;
+  return takeoverConfirm(owner);
 }
 
 export type PublishResult =
@@ -371,7 +375,7 @@ export type TakeoverDecision =
 export function decideTakeover(r: PublishResult, replaceTicked: boolean, confirmed: boolean): TakeoverDecision {
   if (r.ok || r.status !== 409 || r.ownerResident === undefined || !replaceTicked) return { action: "proceed" };
   if (confirmed) return { action: "retry" };
-  return { action: "declined", detail: `not published — you chose not to take over ${r.ownerResident}'s flat` };
+  return { action: "declined", detail: declinedTakeover(r.ownerResident ?? "") };
 }
 
 export type PreviewPublishResult = { ok: true } | { ok: false; reason: string };

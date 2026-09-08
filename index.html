@@ -62,7 +62,7 @@
         </div>
         <div class="num">
           <span class="v" id="fig-storeys">—</span>
-          <span class="l">storey(s)</span>
+          <span class="l">storeys</span>
         </div>
         <div class="num">
           <span class="v"><span id="fig-glazing">—</span><small> m</small></span>
@@ -120,7 +120,7 @@
         <div id="flat-readout">
           <span class="fr-name" id="fr-name">Untitled</span>
           <div class="num"><span class="v"><span id="fr-area">—</span><small> m²</small></span><span class="l">area</span></div>
-          <div class="num"><span class="v" id="fr-storeys">—</span><span class="l">storey(s)</span></div>
+          <div class="num"><span class="v" id="fr-storeys">—</span><span class="l">storeys</span></div>
           <div class="num"><span class="v"><span id="fr-glazing">—</span><small> m</small></span><span class="l">glazing</span></div>
           <div class="num"><span class="v" id="fr-rooms">—</span><span class="l">rooms</span></div>
           <button id="fr-check" class="chip" type="button" title="Open the layout report"></button>
@@ -130,14 +130,14 @@
         </div>
         <div id="graph-floor-label"></div>
         <div id="graph-legend">
-          <div class="gl-row"><span class="gl-swatch gl-access"></span>Door — connected</div>
-          <div class="gl-row"><span class="gl-swatch gl-touch"></span>Touching — no door</div>
+          <div class="gl-row"><span class="gl-swatch gl-access"></span>A door between them</div>
+          <div class="gl-row"><span class="gl-swatch gl-touch"></span>Touching, with no door</div>
           <div class="gl-row gl-tiers">
             <span class="gl-dot gl-hard"></span>Must fix
             <span class="gl-dot gl-soft"></span>Worth a look
             <span class="gl-dot gl-note"></span>Note
           </div>
-          <div class="gl-row"><span class="gl-entry-mark">▶</span>ENTRY — entrance</div>
+          <div class="gl-row"><span class="gl-entry-mark">▶</span>ENTRY, the entrance</div>
           <div class="gl-toggles">
             <label class="gl-toggle"><input type="checkbox" id="graph-toggle-touch" />Show touching</label>
             <label class="gl-toggle"><input type="checkbox" id="graph-toggle-depth" />Show depth</label>
@@ -150,18 +150,18 @@
             <button id="shortcuts-close" class="vp-close" type="button" aria-label="Close">✕</button>
           </div>
           <ul class="shortcut-list">
-            <li><kbd>Click</kbd><span>Select a placed module</span></li>
-            <li><kbd>Drag</kbd><span>Move the selection</span></li>
-            <li><kbd>R</kbd><span>Rotate selection</span></li>
-            <li><kbd>M</kbd><span>Mirror selection</span></li>
-            <li><kbd>S</kbd><span>Cycle door swing (with a door selected)</span></li>
-            <li><kbd>Del</kbd><span>Delete selection</span></li>
-            <li><kbd>Shift</kbd><span>+ Click — add/remove from selection</span></li>
-            <li><kbd>Ctrl/Cmd D</kbd><span>Duplicate selection (or <kbd>Shift D</kbd>)</span></li>
+            <li><kbd>Click</kbd><span>Select a placed room</span></li>
+            <li><kbd>Drag</kbd><span>Move what is selected</span></li>
+            <li><kbd>R</kbd><span>Rotate what is selected</span></li>
+            <li><kbd>M</kbd><span>Mirror what is selected</span></li>
+            <li><kbd>S</kbd><span>Change the way a selected door swings</span></li>
+            <li><kbd>Del</kbd><span>Delete what is selected</span></li>
+            <li><kbd>Shift</kbd><span>Hold and click to add to or remove from the selection</span></li>
+            <li><kbd>Ctrl/Cmd D</kbd><span>Duplicate what is selected, or <kbd>Shift D</kbd></span></li>
             <li><kbd>Ctrl/Cmd Z</kbd><span>Undo</span></li>
-            <li><kbd>Ctrl/Cmd Shift Z</kbd><span>Redo (or <kbd>Ctrl/Cmd Y</kbd>)</span></li>
-            <li><kbd>Esc</kbd><span>Cancel gesture / clear selection / exit plan view</span></li>
-            <li class="shortcut-note">Reset View &amp; Top View are buttons only — no shortcut.</li>
+            <li><kbd>Ctrl/Cmd Shift Z</kbd><span>Redo, or <kbd>Ctrl/Cmd Y</kbd></span></li>
+            <li><kbd>Esc</kbd><span>Cancel what you are doing, clear the selection, or leave plan view</span></li>
+            <li class="shortcut-note">Frame and Plan are buttons only. Neither has a shortcut.</li>
           </ul>
         </div>
         <!-- Bottom-left cluster: undo and redo. The hint line that used to run
@@ -170,8 +170,8 @@
              width, so it now lives in those two places instead. -->
         <div id="bottom-left">
           <div id="history-controls">
-            <button id="undo-btn" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
-            <button id="redo-btn" type="button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">↷</button>
+            <button id="undo-btn" type="button" title="Undo, Ctrl+Z" aria-label="Undo">↶</button>
+            <button id="redo-btn" type="button" title="Redo, Ctrl+Shift+Z or Ctrl+Y" aria-label="Redo">↷</button>
           </div>
         </div>
         <!-- The one way out of step 01 (run 0034). A resident who has just
@@ -207,15 +207,15 @@
             <span class="dh-caret" aria-hidden="true">▾</span>
           </button>
           <div id="display-body">
-            <button id="cutaway-toggle" type="button" class="active" title="Dollhouse cutaway: hide the walls facing the camera">Cutaway</button>
-            <button id="seeds-toggle" type="button" title="Outline each elastic room's authored seed rectangle">Seeds</button>
-            <button id="structure-toggle" type="button" title="The fixed layer: wet rooms and stairs as built, everything else a bare plate">Structure</button>
-            <button id="interface-toggle" type="button" title="The binding level: perimeter, wet cells, stair, balconies, entrance — the rest as one open plate">Interface</button>
+            <button id="cutaway-toggle" type="button" class="active" title="Hide the walls facing you so you can see in.">Cutaway</button>
+            <button id="seeds-toggle" type="button" title="Outline the rectangle each stretching room was drawn from.">Seeds</button>
+            <button id="structure-toggle" type="button" title="Show the wet rooms and the stairs as they are built. Everything else becomes a bare floor.">Structure</button>
+            <button id="interface-toggle" type="button" title="Show what the building needs from this flat: the outside wall, the wet cells, the stair, the balconies and the entrance. The rest becomes one open floor.">Interface</button>
             <!-- Frame View left the top bar in run 0027 and joined this
                  cluster, so cutaway, the layers, framing and the compass are
                  one group in one corner. It is an action rather than a
                  toggle, so it never carries `.active`. -->
-            <button id="reset-view" type="button" title="Frame the whole flat in the view">Frame</button>
+            <button id="reset-view" type="button" title="Fit the whole flat in the view.">Frame</button>
           </div>
           <div id="compass-row">
             <div id="north-badge" title="North" aria-hidden="true">
@@ -230,14 +230,14 @@
             </div>
             <div class="cr-text">
               <span class="cr-value" id="compass-value">North 0°</span>
-              <span class="cr-hint">drag to set · moves glazing</span>
+              <span class="cr-hint">Drag to set. It moves the glazing.</span>
             </div>
           </div>
         </div>
         <!-- Text lives in a span so the container's own class toggle stays
              independent of its content. -->
         <div id="selection-readout"><span id="selection-text"></span></div>
-        <div id="drop-overlay"><span>Drop project file to import</span></div>
+        <div id="drop-overlay"><span>Drop a project file here to open it.</span></div>
         <div id="toast"></div>
         <!-- The send panel, step 02 only (run 0027, FlatSend.dc.html). It was
              run 0026's always-visible save column; the flat's own numbers
@@ -279,7 +279,7 @@
                 <input id="save-session" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
               </label>
               <label>Your name
-                <input id="save-resident" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
+                <input id="save-resident" type="text" autocomplete="off" spellcheck="false" placeholder="Ana" />
               </label>
             </div>
             <button id="save-go" class="btn-send" type="button">
@@ -375,7 +375,7 @@
           <input id="landing-code" type="text" autocomplete="off" spellcheck="false" placeholder="room-42" />
         </label>
         <label>Your name
-          <input id="landing-name" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
+          <input id="landing-name" type="text" autocomplete="off" spellcheck="false" placeholder="Ana" />
         </label>
         <p class="landing-join-recall" id="landing-join-recall" hidden></p>
         <p class="landing-join-why" id="landing-join-why"></p>
@@ -391,7 +391,7 @@
           Pass this to the others so they can join.
         </p>
         <label>Your name
-          <input id="landing-new-name" type="text" autocomplete="off" spellcheck="false" placeholder="who is sending" />
+          <input id="landing-new-name" type="text" autocomplete="off" spellcheck="false" placeholder="Ana" />
         </label>
         <p class="landing-join-why" id="landing-new-why"></p>
         <button id="landing-new-go" class="landing-door landing-primary" type="submit">

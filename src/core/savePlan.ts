@@ -1,3 +1,5 @@
+import { OUTPUT_PROJECT, OUTPUT_UNIT, OUTPUT_LIBRARY, OUTPUT_GROUP } from "./words";
+
 /**
  * What one Save writes — the pure decision layer behind the save dialog.
  *
@@ -90,10 +92,10 @@ export function unitGateResults(sel: SaveSelection, reason: string): OutputResul
  *  keeps its name (`SaveSelection.publish`, `planOutputs`, …). */
 export function outputLabel(kind: OutputKind): string {
   return kind === "project"
-    ? "Project file"
+    ? OUTPUT_PROJECT
     : kind === "unit"
-      ? "Unit file"
+      ? OUTPUT_UNIT
       : kind === "library"
-        ? "Library entry"
-        : "Group";
+        ? OUTPUT_LIBRARY
+        : OUTPUT_GROUP;
 }

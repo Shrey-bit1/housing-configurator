@@ -2,6 +2,23 @@ import type { DwellingGraph, GraphNode } from "./adjacencyGraph";
 import { BATHROOM_TYPES, WET_TYPES } from "./modules";
 import { connectedComponents } from "./cluster";
 import type { OrientationPreference } from "./orientation";
+import {
+  RULE_WORDS,
+  bedroomDoors,
+  floorHasNoBathroom,
+  roomIsDeep,
+  roomIsFarFromAWayOut,
+  narrowCirculation,
+  stairReachesNothing,
+  floorsNotReachable,
+  glazingFaces,
+  roomIsThisDeep,
+  roomIsThisFar,
+  circulationHeavy,
+  floorCirculationHeavy,
+  wetRoomsSplit,
+  roomHasNoFacade,
+} from "./words";
 
 /**
  * Layout-rules validation — ADVISORY ONLY.
@@ -491,14 +508,14 @@ export const RULES: Rule[] = [
     // evaluate when Check Layout is pressed, so a hard severity here costs
     // nothing during authoring.
     severity: "hard",
-    description: "No entrance defined — the entrance is the unit's interface to the building.",
+    description: RULE_WORDS.E1,
     check(graph, ctx) {
       if (ctx.hasEntrance) return [];
       // Distinguish "never placed one" from "placed one but it's now blocked" —
       // the latter is a more actionable message (E2 already explains why).
       const description =
         graph.entrances.length > 0
-          ? "All entrances are blocked — none currently open to the outside. Reachability can't be validated."
+          ? RULE_WORDS.E1_BLOCKED
           : RULES_BY_ID.E1.description;
       return [{ ruleId: "E1", severity: "hard", description, nodeIds: [], layout: true }];
     },
@@ -506,7 +523,7 @@ export const RULES: Rule[] = [
   {
     id: "E2",
     severity: "hard",
-    description: "Entrance is blocked — its edge no longer faces outside.",
+    description: RULE_WORDS.E2,
     check(graph) {
       return graph.entrances
         .filter((e) => e.blocked)
@@ -529,7 +546,7 @@ export const RULES: Rule[] = [
     // real flags (not instead of them). Once any door exists it disappears.
     id: "DR1",
     severity: "note",
-    description: "No doors placed — reachability requires doors.",
+    description: RULE_WORDS.DR1,
     check(graph, ctx) {
       if (graph.doorCount > 0) return [];
       if (!graph.nodes.some((n) => ctx.is.room(n))) return []; // nothing to reach yet
@@ -542,14 +559,14 @@ export const RULES: Rule[] = [
     // access degree. (Id DR2 — DR1 is the shipped no-doors summary note.)
     id: "DR2",
     severity: "note",
-    description: "Bedroom has an unusual number of doors for a private room.",
+    description: RULE_WORDS.DR2,
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => ctx.is.bedroom(n) && ctx.degree(n.id) >= 3)
         .map((n) => ({
           ruleId: "DR2",
           severity: "note" as const,
-          description: `Bedroom has ${ctx.degree(n.id)} doors — unusual for a private room.`,
+          description: bedroomDoors(ctx.degree(n.id)),
           nodeIds: [n.id],
         }));
     },
@@ -559,7 +576,7 @@ export const RULES: Rule[] = [
   {
     id: "P1",
     severity: "hard",
-    description: "A dwelling needs a bathroom.",
+    description: RULE_WORDS.P1,
     check(graph, ctx) {
       if (graph.nodes.some(ctx.is.bathroom)) return [];
       return [{ ruleId: "P1", severity: "hard", description: RULES_BY_ID.P1.description, nodeIds: [], layout: true }];
@@ -568,7 +585,7 @@ export const RULES: Rule[] = [
   {
     id: "P2",
     severity: "hard",
-    description: "A dwelling needs a kitchen.",
+    description: RULE_WORDS.P2,
     check(graph, ctx) {
       if (graph.nodes.some(ctx.is.kitchen)) return [];
       return [{ ruleId: "P2", severity: "hard", description: RULES_BY_ID.P2.description, nodeIds: [], layout: true }];
@@ -577,7 +594,7 @@ export const RULES: Rule[] = [
   {
     id: "P3",
     severity: "note",
-    description: "More than one kitchen — atypical, but not a problem.",
+    description: RULE_WORDS.P3,
     check(graph, ctx) {
       if (graph.nodes.filter(ctx.is.kitchen).length <= 1) return [];
       return [{ ruleId: "P3", severity: "note", description: RULES_BY_ID.P3.description, nodeIds: [], layout: true }];
@@ -592,7 +609,7 @@ export const RULES: Rule[] = [
     // with nowhere to sleep is not one.
     id: "P4",
     severity: "hard",
-    description: "A dwelling needs a bedroom — place one so the flat has somewhere to sleep.",
+    description: RULE_WORDS.P4,
     check(graph, ctx) {
       if (graph.nodes.some(ctx.is.bedroom)) return [];
       return [{ ruleId: "P4", severity: "hard", description: RULES_BY_ID.P4.description, nodeIds: [], layout: true }];
@@ -605,7 +622,7 @@ export const RULES: Rule[] = [
     // flat is already P1 (hard), and MB1 must not double-fire on that same absence.
     id: "MB1",
     severity: "soft",
-    description: "A floor has bedrooms but no bathroom.",
+    description: RULE_WORDS.MB1,
     check(graph, ctx) {
       if (!graph.nodes.some(ctx.is.bathroom)) return []; // P1 owns "no bathroom at all"
       const out: Violation[] = [];
@@ -616,7 +633,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "MB1",
             severity: "soft",
-            description: `Floor ${f} has bedrooms but no bathroom.`,
+            description: floorHasNoBathroom(f),
             nodeIds: beds.map((n) => n.id),
           });
       }
@@ -628,7 +645,7 @@ export const RULES: Rule[] = [
   {
     id: "H1",
     severity: "hard",
-    description: "Orphaned room — no path of adjacencies (including stairs) reaches an entrance.",
+    description: RULE_WORDS.H1,
     check(graph, ctx) {
       if (!ctx.hasEntrance) return []; // E1 covers the no-entrance case
       const reach = ctx.reachableFrom(ctx.entryIds);
@@ -642,7 +659,7 @@ export const RULES: Rule[] = [
   {
     id: "H2",
     severity: "hard",
-    description: "A room or stair reachable from an entrance only by passing through a bathroom.",
+    description: RULE_WORDS.H2,
     check(graph, ctx) {
       if (!ctx.hasEntrance) return [];
       const full = ctx.reachableFrom(ctx.entryIds);
@@ -661,7 +678,7 @@ export const RULES: Rule[] = [
   {
     id: "H3",
     severity: "hard",
-    description: "A room or stair reachable from an entrance only by passing through a bedroom.",
+    description: RULE_WORDS.H3,
     check(graph, ctx) {
       if (!ctx.hasEntrance) return [];
       const full = ctx.reachableFrom(ctx.entryIds);
@@ -694,7 +711,7 @@ export const RULES: Rule[] = [
     // touch-based H4.)
     id: "H4",
     severity: "hard",
-    description: "Direct door between a bathroom and a kitchen — food prep opening onto a toilet.",
+    description: RULE_WORDS.H4,
     check(graph, ctx) {
       return edgeViolations(graph, ctx, "H4", "hard", (a, b) =>
         pair(ctx.is.bathroom, ctx.is.kitchen, a, b), true
@@ -709,7 +726,7 @@ export const RULES: Rule[] = [
     // economy / stacked-services practice.
     id: "S6",
     severity: "note",
-    description: "Shared wet wall between kitchen and bathroom — efficient services.",
+    description: RULE_WORDS.S6,
     check(graph, ctx) {
       return edgeViolations(graph, ctx, "S6", "note", (a, b) =>
         pair(ctx.is.bathroom, ctx.is.kitchen, a, b), false, true
@@ -719,7 +736,7 @@ export const RULES: Rule[] = [
   {
     id: "H6",
     severity: "hard",
-    description: "A room or stair reachable from an entrance only by passing through an outdoor space.",
+    description: RULE_WORDS.H6,
     check(graph, ctx) {
       if (!ctx.hasEntrance) return [];
       const full = ctx.reachableFrom(ctx.entryIds);
@@ -742,7 +759,7 @@ export const RULES: Rule[] = [
     // outdoor), which is soft; the two were inconsistent before this tier fix.
     id: "C1",
     severity: "soft",
-    description: "Orphaned corridor — a circulation space connected to nothing (dead space).",
+    description: RULE_WORDS.C1,
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => ctx.is.circulation(n) && ctx.degree(n.id) === 0)
@@ -753,7 +770,7 @@ export const RULES: Rule[] = [
   {
     id: "C2",
     severity: "soft",
-    description: "Under-used corridor — connects to only one space, so it doesn't circulate.",
+    description: RULE_WORDS.C2,
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => ctx.is.circulation(n) && ctx.degree(n.id) === 1)
@@ -775,7 +792,7 @@ export const RULES: Rule[] = [
     // circulation clusters — rooms have preset dimensions, outdoor is excluded.
     id: "A1",
     severity: "soft",
-    description: "Circulation narrower than 1.2 m (below accessible width).",
+    description: RULE_WORDS.A1,
     check(graph, ctx) {
       const out: Violation[] = [];
       for (const n of graph.nodes) {
@@ -785,7 +802,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "A1",
             severity: "soft",
-            description: `Circulation narrower than 1.2 m (below accessible width) — ${narrow.length} narrow cell${narrow.length === 1 ? "" : "s"}.`,
+            description: narrowCirculation(narrow.length),
             nodeIds: [n.id],
           });
       }
@@ -799,7 +816,7 @@ export const RULES: Rule[] = [
     // the OVER-connected outdoor smell).
     id: "O1",
     severity: "soft",
-    description: "Outdoor space is unconnected — nothing opens onto it.",
+    description: RULE_WORDS.O1,
     check(graph, ctx) {
       // GATED on there being no entrance yet: once the dwelling has an entry
       // root, OD1 (hard) owns "the balcony can't be reached", and firing both
@@ -823,7 +840,7 @@ export const RULES: Rule[] = [
     // touches are themselves unreachable from the entrance.
     id: "OD1",
     severity: "hard",
-    description: "Outdoor space is not reachable from the dwelling.",
+    description: RULE_WORDS.OD1,
     check(graph, ctx) {
       if (!ctx.hasEntrance) return []; // E1 owns the no-entrance gate
       const reach = ctx.reachableFrom(ctx.entryIds);
@@ -844,7 +861,7 @@ export const RULES: Rule[] = [
     // width is true whether or not anyone can reach it.
     id: "ST3",
     severity: "hard",
-    description: "A floor is not reachable by stairs from the entrance floor.",
+    description: RULE_WORDS.ST3,
     check(graph, ctx) {
       if (ctx.disconnectedFloors.size === 0) return [];
       const floors = [...ctx.disconnectedFloors].sort((a, b) => a - b);
@@ -853,9 +870,7 @@ export const RULES: Rule[] = [
         {
           ruleId: "ST3",
           severity: "hard" as const,
-          description:
-            `${list} ${floors.length === 1 ? "is" : "are"} not reachable by stairs from the ` +
-            `entrance floor. Every space there is cut off for this one reason.`,
+          description: floorsNotReachable(list, floors.length !== 1),
           nodeIds: graph.nodes.filter((n) => ctx.disconnectedFloors.has(n.floor)).map((n) => n.id),
           layout: true,
         },
@@ -865,7 +880,7 @@ export const RULES: Rule[] = [
   {
     id: "ST1",
     severity: "soft",
-    description: "Stair connects to nothing on one or both floors it should link.",
+    description: RULE_WORDS.ST1,
     check(graph, ctx) {
       const out: Violation[] = [];
       for (const n of graph.nodes) {
@@ -879,7 +894,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "ST1",
             severity: "soft",
-            description: `Stair connects to nothing at the ${missing.join(" and ")}.`,
+            description: stairReachesNothing(missing.join(" and ")),
             nodeIds: [n.id],
           });
       }
@@ -889,7 +904,7 @@ export const RULES: Rule[] = [
   {
     id: "ST2",
     severity: "hard",
-    description: "Stair not reachable from any entrance.",
+    description: RULE_WORDS.ST2,
     check(graph, ctx) {
       if (!ctx.hasEntrance) return [];
       const reach = ctx.reachableFrom(ctx.entryIds);
@@ -903,7 +918,7 @@ export const RULES: Rule[] = [
   {
     id: "D1",
     severity: "hard",
-    description: "Room has no exterior wall — no daylight possible.",
+    description: RULE_WORDS.D1,
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => ctx.is.habitable(n) && !n.hasExteriorEdge)
@@ -913,7 +928,7 @@ export const RULES: Rule[] = [
   {
     id: "D2",
     severity: "soft",
-    description: "Kitchen has no exterior wall — no natural ventilation.",
+    description: RULE_WORDS.D2,
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => ctx.is.kitchen(n) && !n.hasExteriorEdge)
@@ -930,7 +945,7 @@ export const RULES: Rule[] = [
     // which stops void edges from counting as exterior in the first place).
     id: "W1",
     severity: "soft",
-    description: "Room's glazing is below its daylight target.",
+    description: RULE_WORDS.W1,
     check(graph) {
       return graph.nodes
         .filter((n) => n.hasExteriorEdge && n.glazing?.belowTarget)
@@ -948,7 +963,7 @@ export const RULES: Rule[] = [
     // for winter gain), not a code failure — some north-lit rooms are fine.
     id: "OR1",
     severity: "soft",
-    description: "Room is lit only from the north (no direct sun).",
+    description: RULE_WORDS.OR1,
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => (ctx.is.habitable(n) || ctx.is.kitchen(n)) && n.glazing?.northLit === true)
@@ -976,7 +991,7 @@ export const RULES: Rule[] = [
     // for every other sector.
     id: "OR2",
     severity: "soft",
-    description: "Room's glazing faces only the orientation this project asks to avoid.",
+    description: RULE_WORDS.OR2,
     check(graph, ctx) {
       const avoid = ctx.orientationPreference.avoid;
       if (!avoid) return []; // no preference stated — nothing to measure against
@@ -988,7 +1003,7 @@ export const RULES: Rule[] = [
         out.push({
           ruleId: "OR2",
           severity: "soft" as const,
-          description: `Room's glazing faces ${sectors.join(" + ")}, which this project asks to avoid.`,
+          description: glazingFaces(sectors.join(" + ")),
           nodeIds: [n.id],
         });
       }
@@ -1000,7 +1015,7 @@ export const RULES: Rule[] = [
   {
     id: "G1",
     severity: "soft",
-    description: "No bathroom is reachable without passing through a bedroom (guest access).",
+    description: RULE_WORDS.G1,
     check(graph, ctx) {
       if (!ctx.hasEntrance) return [];
       const bathrooms = graph.nodes.filter(ctx.is.bathroom);
@@ -1014,7 +1029,7 @@ export const RULES: Rule[] = [
   {
     id: "G2",
     severity: "soft",
-    description: "Entrance opens directly into a private room.",
+    description: RULE_WORDS.G2,
     check(graph, ctx) {
       const out: Violation[] = [];
       for (const e of graph.entrances) {
@@ -1052,7 +1067,7 @@ export const RULES: Rule[] = [
     // a french window IS connected, so it is not orphaned.
     id: "S1",
     severity: "soft",
-    description: "Outdoor / balcony over-connected (more than two doors) — usually a leaf space.",
+    description: RULE_WORDS.S1,
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => ctx.is.outdoor(n) && ctx.doorDegree(n.id) > 2)
@@ -1062,7 +1077,7 @@ export const RULES: Rule[] = [
   {
     id: "S2",
     severity: "soft",
-    description: "Living room under-connected (one or no doors) — typically a social hub.",
+    description: RULE_WORDS.S2,
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => ctx.is.living(n) && ctx.degree(n.id) <= 1)
@@ -1072,8 +1087,7 @@ export const RULES: Rule[] = [
   {
     id: "S3",
     severity: "soft",
-    description:
-      "Bedroom directly adjacent to a kitchen, living room, or recreation room (privacy — prefer mediated access).",
+    description: RULE_WORDS.S3,
     check(graph, ctx) {
       return edgeViolations(graph, ctx, "S3", "soft", (a, b) =>
         pair(ctx.is.bedroom, (n) => ctx.is.kitchen(n) || ctx.is.public(n), a, b)
@@ -1091,7 +1105,7 @@ export const RULES: Rule[] = [
     // no-double-fire principle.
     id: "AC1",
     severity: "soft",
-    description: "Bedroom shares a wall with a stair — stair noise against a sleeping room.",
+    description: RULE_WORDS.AC1,
     check(graph, ctx) {
       return edgeViolations(graph, ctx, "AC1", "soft", (a, b) =>
         pair(ctx.is.bedroom, ctx.is.stair, a, b)
@@ -1104,7 +1118,7 @@ export const RULES: Rule[] = [
     // open-plan, so it earns no note.
     id: "S5",
     severity: "note",
-    description: "Kitchen and living room connected by a door — open-plan. Perfectly fine, noted for confirmation.",
+    description: RULE_WORDS.S5,
     check(graph, ctx) {
       return edgeViolations(graph, ctx, "S5", "note", (a, b) =>
         pair(ctx.is.kitchen, ctx.is.living, a, b), true
@@ -1119,7 +1133,7 @@ export const RULES: Rule[] = [
     // reach ANY bathroom", is the dwelling-level G1, soft.)
     id: "S7",
     severity: "note",
-    description: "En-suite bathroom (accessed via bedroom).",
+    description: RULE_WORDS.S7,
     check(graph, ctx) {
       if (!ctx.hasEntrance) return [];
       const full = ctx.reachableFrom(ctx.entryIds);
@@ -1134,7 +1148,7 @@ export const RULES: Rule[] = [
   {
     id: "DP1",
     severity: "soft",
-    description: `Room is unusually deep in the layout (≥${DEEP_ROOM_THRESHOLD_HOPS} hops from the entrance).`,
+    description: roomIsDeep(DEEP_ROOM_THRESHOLD_HOPS),
     check(graph, ctx) {
       if (!ctx.hasEntrance) return [];
       const depths = computeEntranceDepths(graph);
@@ -1146,7 +1160,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "DP1",
             severity: "soft",
-            description: `Room is unusually deep in the layout (${d} hops from the entrance).`,
+            description: roomIsThisDeep(d),
             nodeIds: [n.id],
           });
       }
@@ -1168,7 +1182,7 @@ export const RULES: Rule[] = [
     // would just duplicate) the whole-dwelling one.
     id: "N1",
     severity: "soft",
-    description: "Circulation-heavy layout — too much of the interior is circulation.",
+    description: RULE_WORDS.N1,
     check(graph) {
       const out: Violation[] = [];
       const f = computeCirculationFraction(graph);
@@ -1176,7 +1190,7 @@ export const RULES: Rule[] = [
         out.push({
           ruleId: "N1",
           severity: "soft",
-          description: `Circulation-heavy layout (${Math.round(f * 100)}% of interior area).`,
+          description: circulationHeavy(Math.round(f * 100)),
           nodeIds: [],
           layout: true,
         });
@@ -1193,7 +1207,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "N1",
             severity: "soft",
-            description: `Floor ${floor} is circulation-heavy (${Math.round(frac * 100)}% of interior area).`,
+            description: floorCirculationHeavy(floor, Math.round(frac * 100)),
             nodeIds: offenders.map((n) => n.id),
           });
         }
@@ -1209,7 +1223,7 @@ export const RULES: Rule[] = [
     // returns null) and gated on an entrance existing, like all depth rules.
     id: "PG1",
     severity: "soft",
-    description: "Inverted privacy gradient — bedrooms are shallower than living spaces.",
+    description: RULE_WORDS.PG1,
     check(graph, ctx) {
       if (!ctx.hasEntrance) return [];
       const means = publicVsBedroomDepth(graph, computeEntranceDepths(graph));
@@ -1239,7 +1253,7 @@ export const RULES: Rule[] = [
     // which is exactly F1's value.
     id: "F1",
     severity: "soft",
-    description: `Room is far from any exit (more than ${ESCAPE_DEPTH_MAX} hops from the nearest entrance or stair).`,
+    description: roomIsFarFromAWayOut(ESCAPE_DEPTH_MAX),
     check(graph, ctx) {
       if (!ctx.hasEntrance) return []; // gated on entrance existence, like all egress/reachability rules
       const stairIds = graph.nodes.filter(ctx.is.stair).map((n) => n.id);
@@ -1252,7 +1266,7 @@ export const RULES: Rule[] = [
           out.push({
             ruleId: "F1",
             severity: "soft",
-            description: `Room is far from any exit (${d} hops from the nearest entrance or stair).`,
+            description: roomIsThisFar(d),
             nodeIds: [n.id],
           });
       }
@@ -1271,9 +1285,7 @@ export const RULES: Rule[] = [
   {
     id: "WET1",
     severity: "soft",
-    description:
-      "Wet rooms (bathrooms, kitchen) are split across separate groups on a floor. " +
-      "Split wet areas mean long installation runs and shafts that cannot bundle to the next storey.",
+    description: RULE_WORDS.WET1,
     check(graph) {
       const out: Violation[] = [];
       // Per floor: whether wet cells form one connected group. Deliberately one
@@ -1302,9 +1314,7 @@ export const RULES: Rule[] = [
         out.push({
           ruleId: "WET1",
           severity: "soft",
-          description:
-            `Floor ${floor}: wet rooms form ${groups.length} separate groups, at ${where}. ` +
-            `Split wet areas mean long installation runs and shafts that cannot bundle to the next storey.`,
+          description: wetRoomsSplit(floor, groups.length, where),
           nodeIds: nodes.map((n) => n.id),
         });
       }
@@ -1314,18 +1324,14 @@ export const RULES: Rule[] = [
   {
     id: "FAC1",
     severity: "hard",
-    description:
-      "Habitable room has no facade — it touches neither open sky nor a balcony. " +
-      "(PBG LS 700.1 § 302: every habitable room needs a facade window)",
+    description: RULE_WORDS.FAC1,
     check(graph, ctx) {
       return graph.nodes
         .filter((n) => ctx.is.habitable(n) && !n.hasFacadeEdge)
         .map((n) => ({
           ruleId: "FAC1",
           severity: "hard" as const,
-          description:
-            `${n.label} has no facade — it touches neither open sky nor a balcony. ` +
-            `(PBG LS 700.1 § 302: every habitable room needs a facade window)`,
+          description: roomHasNoFacade(n.label),
           nodeIds: [n.id],
         }));
     },

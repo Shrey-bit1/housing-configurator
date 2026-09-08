@@ -5,6 +5,11 @@ import {
   type ModuleType,
   type ModuleDef,
 } from "../core/modules";
+import * as W from "../core/words";
+
+/** One palette tool: what it is called, and where it goes. */
+const tool = (name: string, where: string) =>
+  `<span class="pt-name">${name}</span><span class="pt-size">${where}</span>`;
 
 export interface FloorState {
   floors: { label: string; visible: boolean }[];
@@ -56,19 +61,19 @@ export function buildPalette(
   // thing rather than five lists.
   const scroll = document.createElement("div");
   scroll.id = "palette-scroll";
-  scroll.appendChild(sectionHeading("Place"));
+  scroll.appendChild(sectionHeading(W.PALETTE_PLACE));
   // The one thing the old viewport hint line said that nothing else did. It sits
   // here, above the tiles it is about, instead of across the bottom of the
   // viewport where it was clipped and where it competed with undo/redo. The rest
   // of what it listed is in the shortcuts panel behind the ? button.
-  scroll.appendChild(caption("Drag a tile onto the grid to place it. Press ? for every shortcut."));
-  scroll.appendChild(buildGroup("Rooms", ROOM_LIST.filter((d) => !d.cluster), cb));
+  scroll.appendChild(caption(W.PALETTE_CAPTION));
+  scroll.appendChild(buildGroup(W.PALETTE_ROOMS, ROOM_LIST.filter((d) => !d.cluster), cb));
   scroll.appendChild(
-    buildGroup("Circulation & Outdoor", ROOM_LIST.filter((d) => !!d.cluster), cb)
+    buildGroup(W.PALETTE_CIRCULATION, ROOM_LIST.filter((d) => !!d.cluster), cb)
   );
   scroll.appendChild(buildStructureGroup(cb));
   scroll.appendChild(buildFloorsPanel(cb, state));
-  scroll.appendChild(sectionHeading("Brief"));
+  scroll.appendChild(sectionHeading(W.PALETTE_BRIEF));
   scroll.appendChild(buildOrientationPanel(state, cb));
   scroll.appendChild(buildGridControls(state, cb));
   root.appendChild(scroll);
@@ -103,7 +108,7 @@ function buildStructureGroup(cb: PaletteCallbacks): HTMLElement {
   wrap.className = "palette-group";
   const h = document.createElement("p");
   h.className = "group-title";
-  h.textContent = "Structure & Access";
+  h.textContent = W.PALETTE_STRUCTURE;
   wrap.appendChild(h);
 
   const grid = document.createElement("div");
@@ -116,18 +121,18 @@ function buildStructureGroup(cb: PaletteCallbacks): HTMLElement {
   const entrance = document.createElement("button");
   entrance.type = "button";
   entrance.className = "palette-tool tool-entrance";
-  entrance.innerHTML = '<span class="pt-name">Entrance</span><span class="pt-size">exterior edge</span>';
+  entrance.innerHTML = tool(W.TOOL_ENTRANCE, W.TOOL_ENTRANCE_WHERE);
   entrance.addEventListener("click", () => cb.onPlaceEntrance());
   const doorway = document.createElement("button");
   doorway.type = "button";
   doorway.className = "palette-tool tool-doorway";
-  doorway.innerHTML = '<span class="pt-name">Doorway</span><span class="pt-size">interior wall</span>';
+  doorway.innerHTML = tool(W.TOOL_DOORWAY, W.TOOL_DOORWAY_WHERE);
   doorway.addEventListener("click", () => cb.onPlaceDoor());
   const doubleHeight = document.createElement("button");
   doubleHeight.type = "button";
   doubleHeight.className = "palette-tool tool-double-height";
   doubleHeight.innerHTML =
-    '<span class="pt-name">Double height</span><span class="pt-size">room into the storey above</span>';
+    tool(W.TOOL_DOUBLE_HEIGHT, W.TOOL_DOUBLE_HEIGHT_WHERE);
   doubleHeight.addEventListener("click", () => cb.onMarkDoubleHeight());
   grid.appendChild(entrance);
   grid.appendChild(doorway);
@@ -189,7 +194,7 @@ function buildResizeHandle(root: HTMLElement): HTMLElement {
 
 function buildFloorsPanel(cb: PaletteCallbacks, state: FloorState): HTMLElement {
   const section = document.createElement("div");
-  section.appendChild(sectionHeading("Floors"));
+  section.appendChild(sectionHeading(W.PALETTE_FLOORS));
 
   const tabs = document.createElement("div");
   tabs.className = "floor-tabs";
