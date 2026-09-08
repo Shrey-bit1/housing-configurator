@@ -309,6 +309,22 @@ its own time, while `votes` keeps its meaning and shape so anything counting
 from it sees no change. Nothing about the repo's shape moved: no new directory,
 entry point, dependency or run step. PROJECT_STATE new §21.
 
+Run 0041 added the second half of the fill command.
+`node scripts/vote-group.mjs <store> <code>` reads whichever round is open and
+has the same twenty cast one vote per person per pair, so a walked vote has a
+real count instead of "1 of 1". It writes through the store's public calls
+only. The pick comes from one pure rule over the fixed table: a pair names one
+dial, and a person whose top two cares include that dial picks the challenger
+and ticks it, otherwise they keep the building they had and tick their own
+first care. Over the twenty that splits every pair 8 to 12, and which eight it
+is changes with the dial. The table gained a `cares` column for it, because a
+ballot ranks the five kinds of shared space while a pair's dial is one of the
+five reasons, so a ballot cannot answer the rule's question. Four named people
+change their mind once on the first pair, so a round of five pairs ends with
+104 votes cast, 100 current and 4 in run 0040's `replaced`. That is one new run
+step and one new script; nothing else about the repo's shape changed.
+PROJECT_STATE new §22.
+
 **Last updated:** 2026-09-08
 
 ## What this project is
@@ -360,7 +376,11 @@ rules engine and the export format are the mature parts, the UI is not.
   the session store (run 0022). Netlify finds the folder by default; there is
   still no `netlify.toml`. `.netlify/` (created by `netlify dev`) is gitignored.
 - `scripts/` — shell-run scripts. `store-roundtrip.mjs` drives the session store
-  against a base URL and exits 1 on any failed check. `gen-flat.mjs` plus
+  against a base URL and exits 1 on any failed check. `fill-group.mjs` (run
+  0038) fills a group with twenty residents and `vote-group.mjs` (run 0041) has
+  them vote on the open round, both over the fixed table in
+  `fillGroupTable.mjs`, which `fillGroupTable.test.ts` checks in the fast suite
+  without running either. `gen-flat.mjs` plus
   `flatLayout.ts` are the flat generator added in run 0028: they take a bubble
   diagram from `scripts/flats/*.flat.json` and write a `dwelling-unit` file,
   then load it through a real FloorManager and run the app's own `validate()`,

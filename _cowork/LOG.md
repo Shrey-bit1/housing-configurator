@@ -49,3 +49,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0038 | 2026-09-07 | A full group in one command, and the faults under the button | complete | 0038-a-full-group-in-one-command.report.md |
 | 0039 | 2026-09-08 | The store holds a vote | complete | 0039-the-store-holds-a-vote.report.md |
 | 0040 | 2026-09-08 | Starting again, and the vote a person changed | complete | 0040-starting-again-and-the-changed-vote.report.md |
+| 0041 | 2026-09-08 | The group votes in one command | complete | 0041-the-group-votes-in-one-command.report.md |

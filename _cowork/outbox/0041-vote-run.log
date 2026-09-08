@@ -1,0 +1,118 @@
+voting in "walk-0041" at http://localhost:8888 as 20 residents
+  before: round 1, 0 vote(s), 0 replaced, 5 pair(s), 20 expected
+  pairs: p1/privacy, p2/shared space, p3/cost, p4/light, p5/short walks
+  ok    201 Ana     p1   b  privacy      
+  ok    201 Ana     p2   b  shared space 
+  ok    201 Ana     p3   a  privacy      
+  ok    201 Ana     p4   a  privacy      
+  ok    201 Ana     p5   a  privacy      
+  ok    201 Bruno   p1   b  privacy        then changes their mind
+  ok    201 Bruno   p1   a  shared space 
+  ok    201 Bruno   p2   b  shared space 
+  ok    201 Bruno   p3   b  cost         
+  ok    201 Bruno   p4   a  shared space 
+  ok    201 Bruno   p5   a  shared space 
+  ok    201 Mina    p1   a  cost         
+  ok    201 Mina    p2   a  cost         
+  ok    201 Mina    p3   b  cost         
+  ok    201 Mina    p4   b  light        
+  ok    201 Mina    p5   a  cost         
+  ok    201 Leo     p1   a  light        
+  ok    201 Leo     p2   a  light        
+  ok    201 Leo     p3   a  light        
+  ok    201 Leo     p4   b  light        
+  ok    201 Leo     p5   b  short walks  
+  ok    201 Sofia   p1   b  privacy      
+  ok    201 Sofia   p2   a  short walks  
+  ok    201 Sofia   p3   a  short walks  
+  ok    201 Sofia   p4   a  short walks  
+  ok    201 Sofia   p5   b  short walks  
+  ok    201 Tomas   p1   b  privacy      
+  ok    201 Tomas   p2   a  privacy      
+  ok    201 Tomas   p3   b  cost         
+  ok    201 Tomas   p4   a  privacy      
+  ok    201 Tomas   p5   a  privacy      
+  ok    201 Nadia   p1   a  shared space 
+  ok    201 Nadia   p2   b  shared space 
+  ok    201 Nadia   p3   a  shared space 
+  ok    201 Nadia   p4   b  light        
+  ok    201 Nadia   p5   a  shared space 
+  ok    201 Karim   p1   a  cost         
+  ok    201 Karim   p2   a  cost         
+  ok    201 Karim   p3   b  cost         
+  ok    201 Karim   p4   a  cost         
+  ok    201 Karim   p5   b  short walks  
+  ok    201 Elin    p1   a  light          then changes their mind
+  ok    201 Elin    p1   b  privacy      
+  ok    201 Elin    p2   a  light        
+  ok    201 Elin    p3   a  light        
+  ok    201 Elin    p4   b  light        
+  ok    201 Elin    p5   a  light        
+  ok    201 Pavel   p1   a  short walks  
+  ok    201 Pavel   p2   b  shared space 
+  ok    201 Pavel   p3   a  short walks  
+  ok    201 Pavel   p4   a  short walks  
+  ok    201 Pavel   p5   b  short walks  
+  ok    201 Rosa    p1   a  privacy        then changes their mind
+  ok    201 Rosa    p1   b  privacy      
+  ok    201 Rosa    p2   a  privacy      
+  ok    201 Rosa    p3   a  privacy      
+  ok    201 Rosa    p4   b  light        
+  ok    201 Rosa    p5   a  privacy      
+  ok    201 Jonas   p1   a  shared space 
+  ok    201 Jonas   p2   b  shared space 
+  ok    201 Jonas   p3   a  shared space 
+  ok    201 Jonas   p4   a  shared space 
+  ok    201 Jonas   p5   b  short walks  
+  ok    201 Yuki    p1   b  privacy      
+  ok    201 Yuki    p2   a  cost         
+  ok    201 Yuki    p3   b  cost         
+  ok    201 Yuki    p4   a  cost         
+  ok    201 Yuki    p5   a  cost         
+  ok    201 Milos   p1   a  light        
+  ok    201 Milos   p2   b  shared space 
+  ok    201 Milos   p3   a  light        
+  ok    201 Milos   p4   b  light        
+  ok    201 Milos   p5   a  light        
+  ok    201 Freya   p1   a  short walks  
+  ok    201 Freya   p2   a  short walks  
+  ok    201 Freya   p3   b  cost         
+  ok    201 Freya   p4   a  short walks  
+  ok    201 Freya   p5   b  short walks  
+  ok    201 Idris   p1   b  privacy      
+  ok    201 Idris   p2   a  privacy      
+  ok    201 Idris   p3   a  privacy      
+  ok    201 Idris   p4   a  privacy      
+  ok    201 Idris   p5   b  short walks  
+  ok    201 Lena    p1   b  privacy      
+  ok    201 Lena    p2   b  shared space 
+  ok    201 Lena    p3   a  shared space 
+  ok    201 Lena    p4   a  shared space 
+  ok    201 Lena    p5   a  shared space 
+  ok    201 Omar    p1   a  cost         
+  ok    201 Omar    p2   b  shared space 
+  ok    201 Omar    p3   b  cost         
+  ok    201 Omar    p4   a  cost         
+  ok    201 Omar    p5   a  cost         
+  ok    201 Greta   p1   a  light        
+  ok    201 Greta   p2   a  light        
+  ok    201 Greta   p3   b  cost         
+  ok    201 Greta   p4   b  light        
+  ok    201 Greta   p5   a  light        
+  ok    201 Viktor  p1   b  privacy        then changes their mind
+  ok    201 Viktor  p1   a  short walks  
+  ok    201 Viktor  p2   a  short walks  
+  ok    201 Viktor  p3   a  short walks  
+  ok    201 Viktor  p4   b  light        
+  ok    201 Viktor  p5   b  short walks      CLOSED THE ROUND
+
+round 1: 100 vote(s), 4 replaced, 20 expected
+  p1   privacy       20 of 20 voted, 8 for the challenger
+  p2   shared space  20 of 20 voted, 8 for the challenger
+  p3   cost          20 of 20 voted, 8 for the challenger
+  p4   light         20 of 20 voted, 8 for the challenger
+  p5   short walks   20 of 20 voted, 8 for the challenger
+  closedAt: 2026-09-08T13:11:10.558Z
+  the last vote closed it, at 2026-09-08T13:11:10.558Z
+
+voted.
