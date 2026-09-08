@@ -335,3 +335,68 @@ repository's run to make, and this run does not reach into it.
 | `src/session/store.ts:769` | 403, **person** | `"{who}" is not in session "{code}"` |
 | `src/session/store.ts:773` | 409, **person** | `round {n} in session "{code}" is closed`, `no open round {n} in session "{code}"` |
 | various | 405 | `GET or POST only`, `PUT only`, `POST only`, `GET or PUT only`, `PUT, DELETE or POST .../rename only` |
+
+## 11. What the finishing pass found
+
+Four families of string were not in the first inventory. They were found by
+opening the app at 1440 by 900 and reading it, which is what the pass is for.
+Three are rewritten. One is left, and the reason is a constraint rather than a
+choice.
+
+**The import parser's four messages**, `src/core/projectIO.ts:148-161`. A person
+reads them after `Could not open that project.` They named JSON, a format
+identifier and a voxel prop, and one of them was a contrast construction of the
+shape the guide strikes out.
+
+| Where | Before | After |
+|---|---|---|
+| `words.ts` `FILE_NOT_READABLE` | This file isn't valid JSON. | This file cannot be read. It may be damaged. |
+| `words.ts` `FILE_NOT_OURS` | This file isn't a recognised project file. | This file is not one this app wrote. |
+| `words.ts` `FILE_IS_A_PROP` | That's a voxel-prop file (a single furniture prop), not a project file. | That is a single piece of furniture. A project file holds a whole flat. |
+| `words.ts` `FILE_WRONG_FORMAT` | This file isn't a flat-configurator project file (wrong or missing format identifier). | This file is not one this app wrote. It may have come from another program. |
+
+**Nine lines a rule builds about one room**, rather than showing its own. The
+layout report on screen still said what they used to.
+
+| Where | Before | After |
+|---|---|---|
+| `words.ts` `narrowCirculation` | Circulation narrower than 1.2 m (below accessible width) — {n} narrow cells. | This circulation is narrower than 1.2 m across {n} cells. A wheelchair needs 1.2 m. |
+| `words.ts` `stairReachesNothing` | Stair connects to nothing at the {where}. | This stair reaches nothing at the {where}. |
+| `words.ts` `floorsNotReachable` | {list} is not reachable by stairs from the entrance floor. Every space there is cut off for this one reason. | {list} is not reachable by stairs from the floor the entrance is on. Every space there is cut off for this one reason. |
+| `words.ts` `glazingFaces` | Room's glazing faces {sectors}, which this project asks to avoid. | All of this room's glazing faces {sectors}, which this project asks to avoid. |
+| `words.ts` `roomIsThisDeep` | Room is unusually deep in the layout ({n} hops from the entrance). | This room is deep in the flat. Getting to it from the entrance passes through {n} rooms. |
+| `words.ts` `roomIsThisFar` | Room is far from any exit ({n} hops from the nearest entrance or stair). | This room is far from a way out. Getting to the nearest entrance or stair passes through {n} rooms. |
+| `words.ts` `circulationHeavy` | Circulation-heavy layout ({n}% of interior area). | {n}% of the floor area is circulation, so less of it is left to live in. |
+| `words.ts` `floorCirculationHeavy` | Floor {f} is circulation-heavy ({n}% of interior area). | On floor {f}, {n}% of the area is circulation, so less of it is left to live in. |
+| `words.ts` `wetRoomsSplit` | Floor {f}: wet rooms form {n} separate groups, at {where}. Split wet areas mean long installation runs and shafts that cannot bundle to the next storey. | On floor {f} the wet rooms form {n} separate groups, at {where}. Pipes then run a long way and cannot bundle into one shaft to the storey above. |
+| `words.ts` `roomHasNoFacade` | {room} has no facade — it touches neither open sky nor a balcony. (PBG LS 700.1 § 302: every habitable room needs a facade window) | {room} has no facade. It touches neither open sky nor a balcony, and PBG LS 700.1 § 302 asks every habitable room for a facade window. |
+
+**The layout report's own furniture**, `src/ui/validationPanel.ts`. The 33 fix
+hints beside each fault were already short imperative sentences in plain words
+and are left alone: "place a kitchen", "widen it by one cell", "put a hall
+between them". Two things were not. The strip of numbers under the heading read
+as a list of measures, and the brief asks that a percentage never stands without
+saying what it is a share of. One chip said dwelling, which is the word this run
+took out of the rules.
+
+| Where | Before | After |
+|---|---|---|
+| `words.ts` `WHOLE_FLAT` | Whole dwelling | The whole flat |
+| `words.ts` `circulationShare` | Circulation 19% of interior (F0 17% · F1 23%) | Circulation is 19% of the inside (17% on floor 0, 23% on floor 1) |
+| `words.ts` `depthSummary` | depth max 4, mean 2.3 | The deepest room is 4 rooms from the entrance, 2.3 on average |
+| `words.ts` `privacyGradient` | public 0.5 vs beds 3.0 | Living spaces sit 0.5 rooms in, bedrooms 3.0 |
+| `words.ts` `CHECKED_JUST_NOW` | checked just now | |
+
+**The twenty room names stay as they are.** `src/core/modules.ts:161-364` holds
+them, sixteen of the twenty carry an em dash, and a resident reads them on the
+palette every time they draw: `Bedroom — Small`, `WC — minimal`, `Hall — Single`,
+`Stair — Dogleg, generous`. They are the clearest breach of the guide left in
+the app.
+
+They stay because `src/core/unitExport.ts:238` writes `def.name` into the unit
+file. The unit file is one of the three downloads this run must leave
+byte-identical, and it is the contract the building app reads. Renaming the
+rooms is a change to a file format, which is a different run from a change to
+what a screen says. The prompt's own constraint says to leave a string that
+cannot be fixed without changing what the screen does, list it, and say so, and
+this is the case it describes.
