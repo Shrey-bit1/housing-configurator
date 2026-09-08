@@ -1,7 +1,7 @@
 import type { Floor } from "./floor";
 import { SIDES, type Side } from "./exteriorEdges";
 import type { DoorSwing } from "./door";
-import { isCompassSector, type OrientationPreference } from "./orientation";
+import { isCompassSector, type OrientationPreference } from "./orientation";
 import { FILE_NOT_READABLE, FILE_NOT_OURS, FILE_IS_A_PROP, FILE_WRONG_FORMAT } from "./words";
 
 /**
