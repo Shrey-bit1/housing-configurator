@@ -184,6 +184,25 @@ check(JSON.stringify(anaExported?.wishes) === JSON.stringify(anaPolled?.wishes),
 console.log(`  Ana, inside GET /export: ${JSON.stringify(anaExported)}`);
 check(JSON.stringify(expJson.messages) === JSON.stringify(state.json?.messages), "the export carries the same two messages");
 console.log(`  messages, inside GET /export: ${JSON.stringify(expJson.messages)}`);
+
+// 5c. The store's own voice has no public door (run 0043). An empty `who`
+// means the store speaking, which is how "Ben left the group." is written, and
+// `POST /messages` refuses it: the line is written INSIDE the store and cannot
+// be posted from outside. `scripts/fill-group.mjs` says its line under a name
+// because of this, so the refusal is pinned here rather than discovered again.
+const voiceless = await call("POST", "/messages", JSON.stringify({ who: "", text: "the store speaking" }));
+check(voiceless.status === 400, "POST /messages refuses an empty who: the store's own voice has no public door");
+console.log(`  an empty who: ${voiceless.status} ${voiceless.text.trim()}`);
+
+const filled = await call("POST", "/messages", JSON.stringify({ who: "The app", text: "This group was filled for a test, with twenty people who are not real." }));
+check(filled.status === 201 && filled.json?.who === "The app", "the line a filled group carries is stored under its name");
+const afterVoice = await call("GET", "");
+const last = (afterVoice.json?.messages ?? []).at(-1);
+check(
+  last?.who === "The app" && last?.text === "This group was filled for a test, with twenty people who are not real.",
+  "it reads back last, so a filled group says what it is"
+);
+console.log(`  what a filled group says: ${JSON.stringify(last)}`);
 const abbreviated = {
   ...expJson,
   bodies: Object.fromEntries(Object.entries(expJson.bodies ?? {}).map(([k, v]) => [k, `<${Buffer.byteLength(String(v))} bytes>`])),
@@ -371,7 +390,10 @@ console.log(`  the line the store wrote: ${JSON.stringify(line)}`);
 check(line?.text === "Ben left the group.", "the store wrote one line saying he left");
 check(line?.who === "", "with `who` empty, so a reader can tell the store's voice from a person's");
 check(typeof line?.at === "string" && !Number.isNaN(Date.parse(line.at)), "and the store's own timestamp on it");
-check(said.length === 3, `the two people said two things and the store said one, so the chat holds three (${said.length})`);
+check(
+  said.length === 4,
+  `the two people said two things, the app said what this group is, and the store said he left, so the chat holds four (${said.length})`
+);
 check(
   said.filter((m) => m.who === "").length === 1,
   "and it is the only message with an empty `who`, because a person's message is refused without one"
