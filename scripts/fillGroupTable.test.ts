@@ -414,7 +414,7 @@ describe("what a filled group says about itself", () => {
  *
  * All of it is pure, so a whole vote can be counted here without a store.
  */
-const SEED = "choose-0045";
+const SEED = "slower-0046";
 const roundPairs = (n: number) =>
   (REASONS as string[]).map((dial, i) => ({ id: `r${n}-p${i + 1}`, dial }));
 const forChallenger = (n: number, seed = SEED) =>
@@ -426,29 +426,47 @@ describe("the group settles", () => {
     expect(forChallenger(1)).toEqual([7, 12, 7, 7, 7]);
   });
 
-  it("has left the disagreement behind by round 2, on every pair", () => {
+  it("is ahead but unsettled in round 2, on every pair", () => {
     // The count is read for whichever side won round 1, so the shared-space
     // pair is counted for its challenger and the other four for the building
-    // the group had.
+    // the group had. Three in ten of the losing side come across in round 2
+    // (run 0046), so a walk still has somewhere to go in round 3.
     for (const [i, dial] of (REASONS as string[]).entries()) {
       const b = forChallenger(2)[i];
+      const forWinner = dial === "shared space" ? b : 20 - b;
+      expect(forWinner, `${dial}: ${b} for the challenger`).toBeGreaterThan(10);
+      expect(forWinner, `${dial}: ${b} for the challenger`).toBeLessThanOrEqual(18);
+    }
+  });
+
+  it("is most of the way there by round 3", () => {
+    for (const [i, dial] of (REASONS as string[]).entries()) {
+      const b = forChallenger(3)[i];
       const forWinner = dial === "shared space" ? b : 20 - b;
       expect(forWinner, `${dial}: ${b} for the challenger`).toBeGreaterThanOrEqual(14);
     }
   });
 
-  it("is settled by round 3, three quarters or more on every pair", () => {
-    for (const [i, dial] of (REASONS as string[]).entries()) {
-      const b = forChallenger(3)[i];
-      const forWinner = dial === "shared space" ? b : 20 - b;
-      expect(forWinner, `${dial}: ${b} for the challenger`).toBeGreaterThanOrEqual(15);
-    }
+  it("rises on the shared-space pair, 12 then about 15 then about 18", () => {
+    // Three in ten and then seven in ten of the eight on the losing side is
+    // 14.4 and 17.6 by design. A particular code lands within a couple of
+    // votes of each.
+    const sharedSpace = (REASONS as string[]).indexOf("shared space");
+    const rise = [1, 2, 3].map((n) => forChallenger(n)[sharedSpace]);
+    expect(rise[0]).toBe(12);
+    expect(rise[1]).toBeGreaterThanOrEqual(13);
+    expect(rise[1]).toBeLessThanOrEqual(16);
+    expect(rise[2]).toBeGreaterThanOrEqual(16);
+    expect(rise[2]).toBeLessThanOrEqual(19);
+    // It only ever goes up, which is what the held draw is for.
+    expect(rise[1]).toBeGreaterThanOrEqual(rise[0]);
+    expect(rise[2]).toBeGreaterThanOrEqual(rise[1]);
   });
 
   it("settles on the shared-space challenger, which is a building the group did not start with", () => {
     const sharedSpace = (REASONS as string[]).indexOf("shared space");
     expect(forChallenger(1)[sharedSpace]).toBe(12);
-    expect(forChallenger(3)[sharedSpace]).toBeGreaterThanOrEqual(15);
+    expect(forChallenger(4)[sharedSpace]).toBeGreaterThanOrEqual(15);
   });
 
   it("only ever grows the winning side, because nobody on it moves", () => {
@@ -479,13 +497,14 @@ describe("the group settles", () => {
     expect(forChallenger(2, "one-group")).not.toEqual(forChallenger(2, "another-group"));
   });
 
-  it("settles any group by round 3, whatever the code", () => {
-    // Round 2 draws against six in ten, so a particular group can sit just
-    // under three quarters on a pair. Round 3 draws against nine in ten and
-    // every one of these codes is at or past it, on whichever side won.
-    for (const seed of ["one-group", "another-group", "hall-14", "walk-08", "choose-0045"]) {
+  it("settles any group by round 4, whatever the code", () => {
+    // The slower rise (run 0046) moves three quarters from round 2 to round
+    // 4. Round 3 is 14 or better on every code measured and round 4 is 17 or
+    // better, so this asserts the round where the claim holds for all of
+    // them rather than the round where it usually does.
+    for (const seed of ["one-group", "another-group", "hall-14", "walk-08", "choose-0045", "settle-0044"]) {
       for (const [i, dial] of (REASONS as string[]).entries()) {
-        const b = forChallenger(3, seed)[i];
+        const b = forChallenger(4, seed)[i];
         const forWinner = dial === "shared space" ? b : 20 - b;
         expect(forWinner, `${seed} ${dial}: ${b} for the challenger`).toBeGreaterThanOrEqual(15);
       }
@@ -513,8 +532,9 @@ describe("the group settles", () => {
 
   it("rises the chance by round and never above nine in ten", () => {
     expect(followChance(1)).toBe(0);
-    expect(followChance(2)).toBe(0.6);
-    expect(followChance(3)).toBe(0.9);
+    expect(followChance(2)).toBe(0.3);
+    expect(followChance(3)).toBe(0.7);
+    expect(followChance(4)).toBe(0.9);
     expect(followChance(9)).toBe(0.9);
   });
 
