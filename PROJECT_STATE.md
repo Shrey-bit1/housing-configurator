@@ -5242,3 +5242,42 @@ Windows path in a Python string as a backslash followed by two noughts. That is
 an octal escape for NUL. Git read the whole file as binary because of it, which
 is why it was the one markdown file with no eol attribute and the one that
 never normalised. One byte out, two characters back in.
+
+---
+
+## 26. The twenty choose a new building (run 0045)
+
+**Run 0044's vote settled on the building it started with, every time.** The
+fill table gave every challenger 8 of 20 on every dial, so no challenger ever
+won a pair, and the following rule then carried the group to the incumbent. On
+stage that is a vote that changed nothing. Shrey settled it on 9 September: the
+twenty favour the challenger with more shared space.
+
+**The `cares` column is rebalanced.** Shared space is one of the two things
+twelve of the twenty care about most; each of the other four reasons is seven.
+Every reason is still somebody's first care exactly four times, and the twenty
+rankings are still all different. Round 1 therefore gives the shared-space
+challenger 12 of 20 and it wins its pair, and every other challenger 7 of 20
+and it does not.
+
+**Twelve and eight does not exist.** Twenty people have forty top-two places
+and 12 + 8 + 8 + 8 + 8 is forty-four. Twelve for shared space leaves seven each
+for the rest, which is what the table holds and what the test counts.
+
+**`roundOneWinner` counts round 1 from the table**, so the following rule
+carries a group toward whichever side won rather than toward the incumbent. Run
+0044 assumed the loser was always the challenger, which held while every dial
+split 8 to 12. It does not hold for shared space, and the old assumption
+carried the group away from the building it had just chosen. The rule is still
+pure: the winner is counted, never remembered.
+
+**A mind changes once.** The four named people change their vote on round 1's
+first pair and in no later round. Four people changing their vote in a round
+where nineteen of twenty already agree reads as noise rather than as a room.
+
+**Walked live on a fresh group** `choose-0045`, three rounds of five pairs,
+read back from `GET /export`. Round 1: privacy 13/7, shared space 8/12, cost
+13/7, light 13/7, short walks 13/7, four replaced. Round 2: 18/2, 1/19, 15/5,
+19/1, 18/2, none replaced. Round 3: 19/1, 0/20, 19/1, 20/0, 20/0, none
+replaced. The group settles on the shared-space challenger, twenty of twenty by
+round 3, and its genome `[3,2,4]` differs from the `[3,1,4]` it started with.
