@@ -260,14 +260,17 @@ export function otherThought(person, pair, round = 1, seed = "") {
  *
  * One per pair, plus one extra at the front for the four who change their
  * mind, marked `replaced: true` because the store supersedes it the moment the
- * next one lands. The change of mind is on the round's FIRST pair only: one
+ * next one lands. The change of mind is on ROUND 1's first pair only (run
+ * 0045): a mind changes while a group is still making it up, and four people
+ * changing their vote in a round where nineteen of twenty already agree reads
+ * as noise. One
  * earlier vote each is enough to fill `replaced`, and changing on every pair
  * would put twenty entries in it and read as a fault rather than as a room.
  */
 export function ballotFor(person, pairs, round = 1, seed = "") {
   const out = [];
   pairs.forEach((pair, i) => {
-    if (i === 0 && CHANGES_MIND.includes(person.name)) {
+    if (i === 0 && round === 1 && CHANGES_MIND.includes(person.name)) {
       out.push({ pair: pair.id, ...otherThought(person, pair, round, seed), replaced: true });
     }
     out.push({ pair: pair.id, ...voteFor(person, pair, round, seed), replaced: false });
