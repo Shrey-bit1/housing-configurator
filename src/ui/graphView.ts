@@ -1,4 +1,4 @@
-import type { DwellingGraph, GraphEdge, GraphNode } from "../core/adjacencyGraph";
+import type { DwellingGraph, GraphEdge, GraphNode } from "../core/adjacencyGraph";
 import * as W from "../core/words";
 import {
   SEVERITY_COLORS,

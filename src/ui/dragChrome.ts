@@ -1,5 +1,5 @@
 import { MODULE_DEFS, type ModuleType } from "../core/modules";
-import type { DragGestureState } from "../interaction/dragDrop";
+import type { DragGestureState } from "../interaction/dragDrop";
 import * as W from "../core/words";
 
 /**
