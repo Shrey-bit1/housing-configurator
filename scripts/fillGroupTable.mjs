@@ -53,29 +53,29 @@ export const RESIDENTS = [
   { name: "Bruno",  file: "unit-9",  shareM2: 4,  extraM2: 0, ballot: ["terrace", "lounge", "hall", "social", "laundry"], wishes: { corner: false, terrace: true,  quiet: false },
     cares: ["shared space", "cost", "privacy", "light", "short walks"] },
   { name: "Mina",   file: "unit-10", shareM2: 11, extraM2: 6, ballot: ["social", "hall", "terrace", "laundry", "lounge"], wishes: { corner: true,  terrace: true,  quiet: false },
-    cares: ["cost", "light", "privacy", "shared space", "short walks"] },
+    cares: ["cost", "shared space", "privacy", "light", "short walks"] },
   { name: "Leo",    file: "unit-11", shareM2: 6,  extraM2: 2, ballot: ["lounge", "laundry", "social", "hall", "terrace"], wishes: { corner: false, terrace: false, quiet: true  },
-    cares: ["light", "short walks", "privacy", "shared space", "cost"] },
+    cares: ["light", "shared space", "privacy", "cost", "short walks"] },
   { name: "Sofia",  file: "unit-12", shareM2: 9,  extraM2: 5, ballot: ["laundry", "hall", "lounge", "terrace", "social"], wishes: { corner: true,  terrace: false, quiet: false },
-    cares: ["short walks", "privacy", "shared space", "cost", "light"] },
+    cares: ["short walks", "shared space", "privacy", "cost", "light"] },
   { name: "Tomas",  file: "unit-13", shareM2: 3,  extraM2: 0, ballot: ["hall", "social", "terrace", "lounge", "laundry"], wishes: { corner: false, terrace: true,  quiet: true  },
-    cares: ["privacy", "cost", "shared space", "light", "short walks"] },
+    cares: ["privacy", "shared space", "light", "short walks", "cost"] },
   { name: "Nadia",  file: "unit-14", shareM2: 12, extraM2: 8, ballot: ["terrace", "hall", "laundry", "social", "lounge"], wishes: { corner: true,  terrace: true,  quiet: true  },
     cares: ["shared space", "light", "privacy", "cost", "short walks"] },
   { name: "Karim",  file: "unit-15", shareM2: 5,  extraM2: 1, ballot: ["lounge", "social", "hall", "laundry", "terrace"], wishes: { corner: false, terrace: false, quiet: false },
-    cares: ["cost", "short walks", "privacy", "shared space", "light"] },
+    cares: ["cost", "shared space", "light", "short walks", "privacy"] },
   { name: "Elin",   file: "unit-16", shareM2: 8,  extraM2: 3, ballot: ["social", "laundry", "lounge", "terrace", "hall"], wishes: { corner: true,  terrace: false, quiet: true  },
-    cares: ["light", "privacy", "shared space", "cost", "short walks"] },
+    cares: ["light", "shared space", "short walks", "privacy", "cost"] },
   { name: "Pavel",  file: "unit-17", shareM2: 10, extraM2: 0, ballot: ["laundry", "terrace", "hall", "lounge", "social"], wishes: { corner: false, terrace: true,  quiet: false },
-    cares: ["short walks", "shared space", "privacy", "cost", "light"] },
+    cares: ["short walks", "shared space", "cost", "light", "privacy"] },
   { name: "Rosa",   file: "unit-18", shareM2: 6,  extraM2: 7, ballot: ["hall", "lounge", "social", "terrace", "laundry"], wishes: { corner: true,  terrace: true,  quiet: false },
     cares: ["privacy", "light", "shared space", "cost", "short walks"] },
   { name: "Jonas",  file: "unit-19", shareM2: 4,  extraM2: 2, ballot: ["terrace", "social", "laundry", "hall", "lounge"], wishes: { corner: false, terrace: false, quiet: true  },
     cares: ["shared space", "short walks", "privacy", "cost", "light"] },
   { name: "Yuki",   file: "unit-20", shareM2: 12, extraM2: 4, ballot: ["lounge", "hall", "terrace", "social", "laundry"], wishes: { corner: true,  terrace: false, quiet: false },
-    cares: ["cost", "privacy", "shared space", "light", "short walks"] },
+    cares: ["cost", "short walks", "privacy", "shared space", "light"] },
   { name: "Milos",  file: "unit-21", shareM2: 7,  extraM2: 0, ballot: ["social", "terrace", "lounge", "laundry", "hall"], wishes: { corner: false, terrace: true,  quiet: true  },
-    cares: ["light", "shared space", "privacy", "cost", "short walks"] },
+    cares: ["light", "privacy", "shared space", "cost", "short walks"] },
   { name: "Freya",  file: "unit-22", shareM2: 9,  extraM2: 6, ballot: ["laundry", "lounge", "hall", "social", "terrace"], wishes: { corner: true,  terrace: true,  quiet: true  },
     cares: ["short walks", "cost", "privacy", "shared space", "light"] },
   { name: "Idris",  file: "unit-23", shareM2: 3,  extraM2: 1, ballot: ["hall", "laundry", "terrace", "lounge", "social"], wishes: { corner: false, terrace: false, quiet: false },
@@ -83,9 +83,9 @@ export const RESIDENTS = [
   { name: "Lena",   file: "unit-24", shareM2: 11, extraM2: 5, ballot: ["terrace", "laundry", "social", "lounge", "hall"], wishes: { corner: true,  terrace: false, quiet: true  },
     cares: ["shared space", "privacy", "cost", "light", "short walks"] },
   { name: "Omar",   file: "unit-25", shareM2: 5,  extraM2: 3, ballot: ["lounge", "terrace", "laundry", "hall", "social"], wishes: { corner: false, terrace: true,  quiet: false },
-    cares: ["cost", "shared space", "privacy", "light", "short walks"] },
+    cares: ["cost", "privacy", "shared space", "light", "short walks"] },
   { name: "Greta",  file: "unit-26", shareM2: 8,  extraM2: 0, ballot: ["social", "lounge", "hall", "terrace", "laundry"], wishes: { corner: true,  terrace: true,  quiet: false },
-    cares: ["light", "cost", "privacy", "shared space", "short walks"] },
+    cares: ["light", "cost", "shared space", "privacy", "short walks"] },
   { name: "Viktor", file: "unit-27", shareM2: 10, extraM2: 2, ballot: ["laundry", "social", "terrace", "hall", "lounge"], wishes: { corner: false, terrace: false, quiet: true  },
     cares: ["short walks", "light", "privacy", "shared space", "cost"] },
 ];
@@ -200,18 +200,33 @@ export function chanceFor(seed, person, dial) {
 }
 
 /**
+ * WHO WINS ROUND 1 ON THIS DIAL, counted over the whole table.
+ *
+ * A property of `RESIDENTS` and the dial, so it needs no votes and no store.
+ * On four of the five dials the challenger takes 7 of 20 and the building the
+ * group has wins. On shared space the challenger takes 12 and wins, which is
+ * what run 0045 rebalanced the `cares` column for: a vote that only ever
+ * confirms the building it started with changes nothing.
+ */
+export function roundOneWinner(pair) {
+  const wantB = RESIDENTS.filter((r) => firstPreference(r, pair).pick === "b").length;
+  return wantB * 2 > RESIDENTS.length ? "b" : "a";
+}
+
+/**
  * THE PICK RULE, with the round in it.
  *
- * Round 1 is `firstPreference` and splits every pair 8 for the challenger and
- * 12 for the building the group has. From round 2 a person who wanted the
- * challenger has watched it lose, and comes across with `followChance(round)`.
- * Nobody on the winning side moves, and the chance only rises, so the winning
- * side only ever grows and a settled group stays settled.
+ * Round 1 is `firstPreference`, which is what a person wants before anybody has
+ * seen a count. From round 2 a person who is on the losing side of round 1 has
+ * watched their pick lose, and comes across with `followChance(round)`. Nobody
+ * on the winning side moves, and the chance only rises, so the winning side
+ * only ever grows and a settled group stays settled.
  *
- * The loser of a round is always the challenger, because the table is fixed and
- * round 1 is a property of it: 8 of 20 is the same on every dial. That is why
- * this needs no history and stays a pure function of the row, the pair, the
- * round and the code.
+ * The winner is counted from the table rather than remembered, which is why
+ * this stays a pure function of the row, the pair, the round and the code. Run
+ * 0044 assumed the loser was always the challenger, which was true while every
+ * dial split 8 to 12. It is not true of shared space any more, and a rule that
+ * assumed it carried the group away from the building it had just chosen.
  *
  * Somebody who comes across keeps their own first care as the reason. They are
  * not saying the dial moved them; they are saying the group has decided and
@@ -219,9 +234,14 @@ export function chanceFor(seed, person, dial) {
  */
 export function voteFor(person, pair, round = 1, seed = "") {
   const first = firstPreference(person, pair);
-  if (round <= 1 || first.pick === "a") return first;
+  if (round <= 1) return first;
+  const winner = roundOneWinner(pair);
+  if (first.pick === winner) return first;
   const follows = chanceFor(seed, person.name, pair.dial) < followChance(round);
-  return follows ? { pick: "a", reasons: [person.cares[0]] } : first;
+  if (!follows) return first;
+  return winner === "b"
+    ? { pick: "b", reasons: [pair.dial] }
+    : { pick: "a", reasons: [person.cares[0]] };
 }
 
 /**
@@ -240,14 +260,17 @@ export function otherThought(person, pair, round = 1, seed = "") {
  *
  * One per pair, plus one extra at the front for the four who change their
  * mind, marked `replaced: true` because the store supersedes it the moment the
- * next one lands. The change of mind is on the round's FIRST pair only: one
+ * next one lands. The change of mind is on ROUND 1's first pair only (run
+ * 0045): a mind changes while a group is still making it up, and four people
+ * changing their vote in a round where nineteen of twenty already agree reads
+ * as noise. One
  * earlier vote each is enough to fill `replaced`, and changing on every pair
  * would put twenty entries in it and read as a fault rather than as a room.
  */
 export function ballotFor(person, pairs, round = 1, seed = "") {
   const out = [];
   pairs.forEach((pair, i) => {
-    if (i === 0 && CHANGES_MIND.includes(person.name)) {
+    if (i === 0 && round === 1 && CHANGES_MIND.includes(person.name)) {
       out.push({ pair: pair.id, ...otherThought(person, pair, round, seed), replaced: true });
     }
     out.push({ pair: pair.id, ...voteFor(person, pair, round, seed), replaced: false });

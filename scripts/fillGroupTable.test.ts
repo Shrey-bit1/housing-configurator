@@ -15,6 +15,7 @@ import {
   firstPreference,
   followChance,
   chanceFor,
+  roundOneWinner,
   otherThought,
   ballotFor,
   flatIdFor,
@@ -211,10 +212,20 @@ describe("what the twenty care about", () => {
     }
   });
 
-  it("puts each reason in a top two exactly eight times, which is what splits a pair 8 to 12", () => {
-    for (const reason of REASONS as string[]) {
-      expect(voters.filter((r) => r.cares.slice(0, 2).includes(reason)).length, `${reason} is top two`).toBe(8);
+  it("puts shared space in a top two twelve times and each of the rest seven", () => {
+    // Run 0045: twelve is what makes the shared-space challenger win its pair
+    // in round 1, so the group settles on a building it did not start with.
+    // Twenty people have forty top-two places, so twelve for one reason leaves
+    // seven each for the other four. Twelve and eight would need forty-four.
+    expect(voters.filter((r) => r.cares.slice(0, 2).includes("shared space")).length).toBe(12);
+    for (const reason of (REASONS as string[]).filter((x) => x !== "shared space")) {
+      expect(voters.filter((r) => r.cares.slice(0, 2).includes(reason)).length, `${reason} is top two`).toBe(7);
     }
+    const places = (REASONS as string[]).reduce(
+      (n, reason) => n + voters.filter((r) => r.cares.slice(0, 2).includes(reason)).length,
+      0
+    );
+    expect(places).toBe(40);
   });
 });
 
@@ -243,11 +254,19 @@ describe("the pick rule", () => {
     }
   });
 
-  it("splits every pair of a five-pair round 8 for the challenger and 12 for the building they had", () => {
+  it("gives the shared-space challenger 12 of 20 in round 1 and every other challenger 7", () => {
     for (const pair of round) {
       const b = voters.filter((r) => voteFor(r, pair).pick === "b").length;
-      expect(b, `${pair.id} (${pair.dial})`).toBe(8);
-      expect(voters.length - b).toBe(12);
+      const want = pair.dial === "shared space" ? 12 : 7;
+      expect(b, `${pair.id} (${pair.dial})`).toBe(want);
+      expect(voters.length - b).toBe(20 - want);
+    }
+  });
+
+  it("lets the shared-space challenger win its pair and no other", () => {
+    for (const pair of round) {
+      const winner = roundOneWinner(pair);
+      expect(winner, `${pair.dial}`).toBe(pair.dial === "shared space" ? "b" : "a");
     }
   });
 
@@ -395,30 +414,41 @@ describe("what a filled group says about itself", () => {
  *
  * All of it is pure, so a whole vote can be counted here without a store.
  */
-const SEED = "settle-0044";
+const SEED = "choose-0045";
 const roundPairs = (n: number) =>
   (REASONS as string[]).map((dial, i) => ({ id: `r${n}-p${i + 1}`, dial }));
 const forChallenger = (n: number, seed = SEED) =>
   roundPairs(n).map((p) => voters.filter((r) => voteFor(r, p, n, seed).pick === "b").length);
 
 describe("the group settles", () => {
-  it("disagrees in round 1, 8 for the challenger on every pair", () => {
-    expect(forChallenger(1)).toEqual([8, 8, 8, 8, 8]);
+  it("disagrees in round 1, and the shared-space challenger is the one that wins", () => {
+    // REASONS order: privacy, shared space, cost, light, short walks.
+    expect(forChallenger(1)).toEqual([7, 12, 7, 7, 7]);
   });
 
-  it("has left the disagreement behind by round 2, and mostly reached three quarters", () => {
-    // Six in ten of the eight come across, so a pair lands between 14 and 18
-    // of 20. On `settle-0044` four of the five pairs are at or past three
-    // quarters in round 2 and the fifth is at 14.
-    const counts = forChallenger(2).map((b) => 20 - b);
-    for (const kept of counts) expect(kept, `${20 - kept} for the challenger`).toBeGreaterThanOrEqual(14);
-    expect(counts.filter((k) => k >= 15).length).toBeGreaterThanOrEqual(4);
+  it("has left the disagreement behind by round 2, on every pair", () => {
+    // The count is read for whichever side won round 1, so the shared-space
+    // pair is counted for its challenger and the other four for the building
+    // the group had.
+    for (const [i, dial] of (REASONS as string[]).entries()) {
+      const b = forChallenger(2)[i];
+      const forWinner = dial === "shared space" ? b : 20 - b;
+      expect(forWinner, `${dial}: ${b} for the challenger`).toBeGreaterThanOrEqual(14);
+    }
   });
 
   it("is settled by round 3, three quarters or more on every pair", () => {
-    for (const b of forChallenger(3)) {
-      expect(20 - b, `${b} for the challenger`).toBeGreaterThanOrEqual(15);
+    for (const [i, dial] of (REASONS as string[]).entries()) {
+      const b = forChallenger(3)[i];
+      const forWinner = dial === "shared space" ? b : 20 - b;
+      expect(forWinner, `${dial}: ${b} for the challenger`).toBeGreaterThanOrEqual(15);
     }
+  });
+
+  it("settles on the shared-space challenger, which is a building the group did not start with", () => {
+    const sharedSpace = (REASONS as string[]).indexOf("shared space");
+    expect(forChallenger(1)[sharedSpace]).toBe(12);
+    expect(forChallenger(3)[sharedSpace]).toBeGreaterThanOrEqual(15);
   });
 
   it("only ever grows the winning side, because nobody on it moves", () => {
@@ -452,19 +482,22 @@ describe("the group settles", () => {
   it("settles any group by round 3, whatever the code", () => {
     // Round 2 draws against six in ten, so a particular group can sit just
     // under three quarters on a pair. Round 3 draws against nine in ten and
-    // every one of these codes is at or past it.
-    for (const seed of ["one-group", "another-group", "hall-14", "walk-08", "settle-0044"]) {
-      for (const b of forChallenger(3, seed)) {
-        expect(20 - b, `${seed}: ${b} for the challenger`).toBeGreaterThanOrEqual(15);
+    // every one of these codes is at or past it, on whichever side won.
+    for (const seed of ["one-group", "another-group", "hall-14", "walk-08", "choose-0045"]) {
+      for (const [i, dial] of (REASONS as string[]).entries()) {
+        const b = forChallenger(3, seed)[i];
+        const forWinner = dial === "shared space" ? b : 20 - b;
+        expect(forWinner, `${seed} ${dial}: ${b} for the challenger`).toBeGreaterThanOrEqual(15);
       }
     }
   });
 
-  it("only moves people who wanted the challenger", () => {
+  it("only moves people who were on the losing side of round 1", () => {
     for (const p of roundPairs(2)) {
+      const winner = roundOneWinner(p);
       for (const r of voters) {
-        if (firstPreference(r, p).pick === "a") {
-          expect(voteFor(r, p, 2, SEED).pick, `${r.name} was already on a`).toBe("a");
+        if (firstPreference(r, p).pick === winner) {
+          expect(voteFor(r, p, 2, SEED).pick, `${r.name} was already on ${winner}`).toBe(winner);
         }
       }
     }
@@ -498,16 +531,28 @@ describe("the group settles", () => {
     expect(chanceFor(SEED, "Ana", "light")).not.toBe(chanceFor(SEED, "Bruno", "light"));
   });
 
-  it("still lets the four change their mind, in every round", () => {
-    for (const n of [1, 2, 3]) {
-      const pairs = roundPairs(n);
-      for (const name of CHANGES_MIND as string[]) {
-        const r = voters.find((v) => v.name === name)!;
-        const ballot = ballotFor(r, pairs, n, SEED) as { pair: string; replaced: boolean }[];
-        expect(ballot, `${name} in round ${n}`).toHaveLength(6);
-        expect(ballot[0].replaced).toBe(true);
-        expect(ballot[0].pair).toBe(pairs[0].id);
+  it("lets the four change their mind in round 1 and in no later round", () => {
+    // Run 0045. A mind changes while a group is still making it up.
+    for (const name of CHANGES_MIND as string[]) {
+      const r = voters.find((v) => v.name === name)!;
+      const first = ballotFor(r, roundPairs(1), 1, SEED) as { pair: string; replaced: boolean }[];
+      expect(first, `${name} in round 1`).toHaveLength(6);
+      expect(first[0].replaced).toBe(true);
+      expect(first[0].pair).toBe(roundPairs(1)[0].id);
+      for (const n of [2, 3, 4]) {
+        const later = ballotFor(r, roundPairs(n), n, SEED) as { replaced: boolean }[];
+        expect(later, `${name} in round ${n}`).toHaveLength(5);
+        expect(later.some((v) => v.replaced), `${name} changes nothing in round ${n}`).toBe(false);
       }
     }
+  });
+
+  it("leaves four replaced votes after round 1 and none after rounds 2 and 3", () => {
+    const replacedIn = (n: number) =>
+      voters.flatMap((r) => ballotFor(r, roundPairs(n), n, SEED) as { replaced: boolean }[])
+        .filter((v) => v.replaced).length;
+    expect(replacedIn(1)).toBe(4);
+    expect(replacedIn(2)).toBe(0);
+    expect(replacedIn(3)).toBe(0);
   });
 });

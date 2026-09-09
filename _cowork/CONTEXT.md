@@ -374,6 +374,20 @@ out with a stray CR per line. Join lines with the ending a file already has;
 never convert twice. PROJECT_STATE.md also held one NUL byte from run 0042,
 which is why git read it as binary, and that is out. PROJECT_STATE new §25.
 
+Run 0045 made the walked vote choose a NEW building. Run 0044's vote settled on
+the building it started with every time, because every challenger took 8 of 20
+on every dial and never won a pair. The `cares` column is rebalanced so shared
+space is a top-two care for twelve of the twenty and each other reason for
+seven, so round 1 gives the shared-space challenger 12 of 20 and it wins its
+pair. Twelve and eight was asked for and does not exist: twenty people have
+forty top-two places and 12+8+8+8+8 is forty-four. The following rule had to
+learn who won, because run 0044 assumed the loser was always the challenger;
+`roundOneWinner` counts round 1 from the table and the losing side follows
+whichever side won. The four who change their mind now do it in round 1 only.
+Walked live: the group settles on the shared-space challenger, 12 of 20 in
+round 1, 19 in round 2 and 20 in round 3, on a genome that differs from the one
+it started with. Nothing outside `scripts/` changed. PROJECT_STATE new §26.
+
 **Last updated:** 2026-09-09
 
 ## What this project is
