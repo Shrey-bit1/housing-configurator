@@ -1,4 +1,5 @@
-import type { DwellingGraph, GraphEdge, GraphNode } from "../core/adjacencyGraph";
+import type { DwellingGraph, GraphEdge, GraphNode } from "../core/adjacencyGraph";
+import * as W from "../core/words";
 import {
   SEVERITY_COLORS,
   worstSeverity,
@@ -580,7 +581,7 @@ export class GraphView {
 
       g.fillStyle = "#1a1a1a";
       g.font = "700 12px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-      g.fillText(shortLabel(node.label), p.x, p.y + r + 12);
+      g.fillText(W.roomName(node.label), p.x, p.y + r + 12);
 
       // Depth-from-entrance badge (space-syntax hop count): a small solid
       // chip with its OWN fixed colours (independent of the node's fill), so
@@ -646,14 +647,11 @@ function nodeRadius(node: GraphNode): number {
   return clamp(16 + Math.sqrt(node.cells.length) * 3.2, 18, 46);
 }
 
-/** Strip a "— Variant" or "(variant)" suffix ("Bedroom — Large" → "Bedroom",
- *  "Stair (dogleg)" → "Stair") so the diagram shows the short type name only;
- *  size (via {@link nodeRadius}'s sqrt-of-cell-count scaling) is what
- *  distinguishes Small/Large instead. A label with neither pattern (e.g.
- *  "Kitchen", "Circulation") passes through unchanged. */
-function shortLabel(label: string): string {
-  return label.replace(/\s*[—(].*$/, "").trim();
-}
+// `shortLabel` stripped a "— Variant" or "(variant)" suffix here until run
+// 0043, so the diagram showed "Bedroom" for both bedrooms and let the node's
+// radius carry the size. The plain names put the variant first, "Small
+// bedroom", so there is no suffix left to strip and the diagram reads the same
+// two words the palette does. The radius still scales with the cell count.
 
 /** Whether edge `e` connects the same unordered pair as `pair` (hover-target
  *  matching — an edge's `a`/`b` order isn't guaranteed to match `Violation.edge`'s). */

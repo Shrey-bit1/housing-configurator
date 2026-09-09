@@ -491,7 +491,7 @@ function updateSelectionReadout(): void {
     const eff = floors.active.effectiveCells.get(inst.id);
     const shown = eff && eff.length ? bbox(eff) : seed;
     const grewNote = shown.n > seed.n ? ` (seed ${seed.w}×${seed.d})` : "";
-    text = `${inst.def.name} · Floor ${floors.activeIndexValue} · ${shown.w}×${shown.d}${grewNote}`;
+    text = `${W.roomName(inst.def.name)} · Floor ${floors.activeIndexValue} · ${shown.w}×${shown.d}${grewNote}`;
   } else if (insts.length > 1) {
     text = `${insts.length} selected`;
   } else if (entId) {
@@ -533,8 +533,8 @@ function toggleDoubleHeight(instanceId: string): { ok: boolean; blockedBy?: Cell
   showToast(
     "info",
     want
-      ? `"${inst.def.name}" is now double height and claims the storey above.`
-      : `"${inst.def.name}" is single height again.`
+      ? `"${W.roomName(inst.def.name)}" is now double height and claims the storey above.`
+      : `"${W.roomName(inst.def.name)}" is single height again.`
   );
   return res;
 }
