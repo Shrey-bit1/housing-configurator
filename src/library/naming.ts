@@ -1,14 +1,25 @@
 /**
- * The naming convention (Shrey's, 10 August): a name is a capitalised word, a
- * space, and a number. Nothing else, no descriptive suffix.
+ * The naming convention (Shrey's, 10 August, amended by run 0035): a name is a
+ * capitalised word, a space, and a number. Nothing else, no descriptive suffix.
  *
  *   a project file is `Flat 1`, `Flat 2`, …
- *   a unit and its library entry are `Unit 1`, `Unit 2`, …
+ *   a unit file is `Unit 1`, `Unit 2`, …
+ *   a library entry READS `Flat 1`, `Flat 2`, … and is filed under `unit-1`,
+ *   `unit-2`, …
  *
- * ONE DESIGN CARRIES ONE NUMBER ACROSS BOTH: saving design 4 writes `Flat 4`
- * and `Unit 4`, so the two files that describe the same dwelling can be paired
- * by eye. Ids follow from the names through `slugifyUnitName` exactly as they
- * already did, giving `flat-4` and `unit-4`.
+ * ONE DESIGN CARRIES ONE NUMBER ACROSS ALL THREE: saving design 4 writes
+ * `Flat 4` and `Unit 4` and files the library entry as `unit-4` reading
+ * `Flat 4`. Ids follow from the unit name through `slugifyUnitName` exactly as
+ * they already did, giving `flat-4` and `unit-4`.
+ *
+ * The library entry's name and its id come apart on purpose (run 0035). A
+ * resident browsing the library reads flats, so every row reads `Flat N`; the
+ * live store links a published flat by id, so every id stays `unit-N` and a
+ * `flat-N` id would collide with the project file's own slug. Before run 0043
+ * only the name was passed to the sink and the id was derived from it, so no
+ * single string could satisfy both rules and every library save wrote a row
+ * reading `Unit N`. {@link libraryNameFor} and {@link libraryIdFor} are the two
+ * answers, and both are given to the sink.
  *
  * The library manifest is the only PERSISTENT record of what has been saved —
  * project and unit files are downloads that leave no trace the app can read —
@@ -25,9 +36,28 @@ export function projectNameFor(n: number): string {
   return `Flat ${n}`;
 }
 
-/** The unit file's and library entry's name for design `n`. */
+/** The unit file's name for design `n`. */
 export function unitNameFor(n: number): string {
   return `Unit ${n}`;
+}
+
+/**
+ * What a library entry for design `n` READS, which is what a person browsing
+ * the library sees. `Flat N`, the same as the project file, because a resident
+ * browsing flats should read flats (run 0035, pinned by
+ * `src/library/libraryNames.test.ts`).
+ */
+export function libraryNameFor(n: number): string {
+  return projectNameFor(n);
+}
+
+/**
+ * What a library entry for design `n` is FILED under. `unit-N`, never
+ * `flat-N`: the live store links a published flat by this id, and `flat-N` is
+ * already the project file's own slug.
+ */
+export function libraryIdFor(n: number): string {
+  return slugifyUnitName(unitNameFor(n));
 }
 
 /** The design number a `Unit N` name or a `unit-N` id carries, or null when
@@ -82,8 +112,8 @@ export function nextFreeNumber(...lists: readonly (readonly { id: string; name: 
  */
 export function findLibraryEntry<T extends { id: string; name: string }>(
   entries: readonly T[],
-  name: string
+  name: string,
+  id = slugifyUnitName(name)
 ): T | undefined {
-  const id = slugifyUnitName(name);
   return entries.find((e) => e.id === id || e.name === name);
 }

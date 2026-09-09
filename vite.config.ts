@@ -110,8 +110,9 @@ function librarySink(root: string): Plugin {
         req.on("data", (c) => (body += c));
         req.on("end", () => {
           try {
-            const { name, color, unit, preview, replace } = JSON.parse(body) as {
+            const { name, id: givenId, color, unit, preview, replace } = JSON.parse(body) as {
               name?: string;
+              id?: string;
               color?: string;
               unit?: { format?: string; cellSize?: number; storeys?: { cells: unknown[] }[] };
               preview?: string;
@@ -154,7 +155,12 @@ function librarySink(root: string): Plugin {
               for (const f of existsSync(unitsDir) ? readdirSync(unitsDir) : [])
                 taken.add(f.replace(/\.(json|jpg)$/, ""));
               taken.delete("index");
-              id = assignUnitId(name, taken);
+              // The caller names the entry and files it separately (run
+              // 0043). A library row READS `Flat N` and is filed under
+              // `unit-N`, and deriving the id from the name could only ever
+              // give one of the two. `assignUnitId` stays the fallback for a
+              // caller that sends no id, and still resolves a collision.
+              id = assignUnitId(typeof givenId === "string" && givenId ? givenId : name, taken);
             }
 
             const cellSize = typeof unit.cellSize === "number" ? unit.cellSize : 0.6;
