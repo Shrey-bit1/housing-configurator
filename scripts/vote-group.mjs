@@ -21,6 +21,15 @@
  * named people change their mind once on the round's first pair. Two runs on
  * the same round give the same count.
  *
+ * THE GROUP SETTLES (run 0044). Round 1 is what each person wants before
+ * anybody has seen a count, and splits every pair 8 to 12. From round 2 a
+ * person who wanted the challenger has watched it lose and comes across, six
+ * times in ten in round 2 and nine in round 3, so the group passes three
+ * quarters in round 2. The chance is seeded by the GROUP CODE, so the same
+ * group votes the same way every time and a screenshot can be taken twice.
+ * Before this the split was 8 to 12 in every round and four rounds settled
+ * nothing, which the building app's run 0069 found by walking it.
+ *
  * Without `--round` it votes on whatever round is open. `--round n` says which
  * round is expected and refuses if the open one is not it, which is what to
  * pass when a round has just been closed and its successor opened.
@@ -138,7 +147,7 @@ async function main() {
   let closedAt = null;
   const strangers = [];
   for (const r of RESIDENTS) {
-    for (const v of ballotFor(r, open.pairs)) {
+    for (const v of ballotFor(r, open.pairs, open.n, code)) {
       const res = await call(
         "POST",
         `/rounds/${open.n}/votes`,
