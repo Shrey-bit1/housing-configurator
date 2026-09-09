@@ -5043,7 +5043,7 @@ by different sessions and did not sound like one app.
 **The measure is two documents.** `_cowork/design/DESIGN-BRIEF-3sep.md`, section
 "How the app talks", and `_cowork/design/WRITING-GUIDE.md`, which arrived in
 this repository with run 0041 and is the actual file from
-`Context -start\`. Short natural sentences that explain rather than announce.
+`Context\00-start\`. Short natural sentences that explain rather than announce.
 Plain words. No slogans, no punchlines, no metaphors, nothing that sells, no
 contrast constructions of the "x, not y" shape, no em dashes gluing clauses
 together. Every number in something a person can picture.
