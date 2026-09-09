@@ -160,13 +160,16 @@ export function firstPreference(person, pair) {
 /**
  * How likely somebody on the losing side is to come across, by round.
  *
- * Six in ten in round 2, nine in ten in round 3 and after. Over the eight who
- * want the challenger that is about three left in round 2 and about one in
- * round 3, so a group reaches three quarters in round 2 and stays there.
- * Settled with the building app on 9 September: a vote that never settles is a
- * vote the brief cannot use.
+ * Three in ten in round 2, seven in ten in round 3, nine in ten after that
+ * (run 0046). Over the eight on the losing side of the shared-space pair that
+ * leaves about six against in round 2 and about two in round 3, so the count
+ * rises 12, about 15, about 18 across the three rounds a walk shows.
+ *
+ * Run 0045 had six and nine in ten, which took the same pair to 19 of 20 in
+ * round 2 and 20 in round 3: one interesting round and two flat ones. A group
+ * that is still moving in round 3 is what a walk has something to show.
  */
-export const FOLLOWS_THE_WINNER = { 2: 0.6 };
+export const FOLLOWS_THE_WINNER = { 2: 0.3, 3: 0.7 };
 export const FOLLOWS_THE_WINNER_LATER = 0.9;
 export function followChance(round) {
   if (round <= 1) return 0;

@@ -54,3 +54,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0043 | 2026-09-09 | Flat 31, the plain room names, and the test group says so | complete | 0043-flat-31-and-the-plain-room-names.report.md |
 | 0044 | 2026-09-09 | The twenty settle, and the line endings stay put | complete | 0044-the-twenty-settle.report.md |
 | 0045 | 2026-09-09 | The twenty choose a new building | complete | 0045-the-twenty-choose-a-new-building.report.md |
+| 0046 | 2026-09-09 | A slower rise | complete | 0046-a-slower-rise.report.md |
