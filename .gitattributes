@@ -1,0 +1,39 @@
+# Line endings, decided by the repository rather than by each clone (run 0044).
+#
+# Measured before writing this, with `git ls-files --eol`:
+#
+#   308 files  i/lf w/crlf   every text file: LF in git, CRLF on disk
+#     2 files  i/lf w/lf     the two Context copies under _cowork/design/landing
+#    45 files  i/-text       32 .jpg, 12 .png, and PROJECT_STATE.md, which held
+#                            a NUL byte until the commit before this one
+#    15 files  i/none        empty files, nothing to convert
+#     0 files  i/crlf        no blob in this repository holds CRLF
+#
+# So the repository already stores LF and checks out CRLF, which is what
+# `core.autocrlf=true` on this machine has been doing. `text=auto eol=crlf`
+# writes that down, and the working tree does not move: it is what the 308
+# already have.
+#
+# The point is that it stops depending on a setting each clone makes for
+# itself. A machine with `core.autocrlf=false` would commit CRLF blobs and the
+# next diff would be the whole file.
+
+* text=auto eol=crlf
+
+# The two files above that are LF on disk today. They are byte copies of the
+# shared landing fragment in the Context folder, fingerprinted by
+# `src/landingShared.test.ts` against a hash the brief records, and keeping them
+# as they arrived is what makes a byte comparison mean anything. The test
+# normalises CRLF to LF before hashing, so this is about the copy rather than
+# about the test.
+_cowork/design/landing/landing.html text eol=lf
+_cowork/design/landing/README.md    text eol=lf
+
+# Pictures and other bytes git must never touch.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.pdf  binary
+*.zip  binary
+*.woff  binary
+*.woff2 binary

@@ -5043,7 +5043,7 @@ by different sessions and did not sound like one app.
 **The measure is two documents.** `_cowork/design/DESIGN-BRIEF-3sep.md`, section
 "How the app talks", and `_cowork/design/WRITING-GUIDE.md`, which arrived in
 this repository with run 0041 and is the actual file from
-`Context -start\`. Short natural sentences that explain rather than announce.
+`Context\00-start\`. Short natural sentences that explain rather than announce.
 Plain words. No slogans, no punchlines, no metaphors, nothing that sells, no
 contrast constructions of the "x, not y" shape, no em dashes gluing clauses
 together. Every number in something a person can picture.
@@ -5176,3 +5176,69 @@ units with `Flat 31` at y 764 and the words "Unit 31" nowhere on the page. The
 fill script's last line landing as `The app` and reading back as the last
 message in the group. Three pictures at `_cowork/outbox/0043-*.png`, all 1440
 by 900.
+
+---
+
+## 25. The twenty settle, and the line endings stay put (run 0044)
+
+**A vote that never settles is a vote the brief cannot use.** The building
+app's run 0069 walked four rounds with `scripts/vote-group.mjs` and every pair
+of every round came out 8 for the challenger and 12 for the building the group
+had. Sixty percent, four times, and nothing decided. The rule had no round in
+it, so it answered the same question every time.
+
+**The rule takes the round now.** `firstPreference` in
+`scripts/fillGroupTable.mjs:128` is what a person wants before anybody has
+seen a count, and round 1 is that and nothing else, so the first tally is a
+real disagreement and still splits 8 to 12. From round 2 a person who wanted
+the challenger has watched it lose and comes across, six times in ten in round
+2 and nine in round 3 and after (`followChance`).
+
+**It needs no history.** The table is fixed, so round 1 is a property of it and
+the loser is always the challenger, 8 of 20 on every dial. `voteFor` stays a
+pure function of the row, the pair, the round and the group code, which is what
+lets a whole vote be counted in a test without a store.
+
+**One draw per person per dial, held for the whole vote.** Drawing again each
+round let a settled group come apart: 2 for the challenger on a pair in round 3
+and 4 in round 4. The rule's own test caught it. The draw is FNV-1a over the
+group code, the person and the dial, compared against a chance that rises, so
+somebody who has come across stays across and the winning side only ever grows.
+The dial rather than the pair id, because a pair is built fresh every round
+with a new id and what a person decides about is the dial.
+
+**Seeded by the group code**, so the same group votes the same way every time
+and a screenshot taken today and one taken next week show the same count. That
+is the same reason the twenty are a fixed table at all.
+
+**Walked live on a fresh group** `settled-0044`, three rounds, read back from
+`GET /export`. Round 1 was 12 to 8 on all five pairs. Round 2 was 17, 18, 17,
+14 and 18 of 20 for the building the group had. Round 3 was 19, 20, 18, 19 and
+20. Four replaced votes in every round, which is the four who change their mind
+still doing it. Round 2 clears three quarters on four pairs of five and round 3
+clears it on all five, which is what settling in two or three rounds means
+here.
+
+**The line endings were not what two runs said they were.** Runs 0042 and 0043
+each reported rewriting an LF file as CRLF and each committed a repair.
+`git ls-files --eol` says no blob in this repository has ever held CRLF: 308
+text files are LF in git and CRLF on disk, which is `core.autocrlf=true` doing
+its job. What actually happened is that the edit scripts converted newlines in
+text that already carried CRLF, so every line ended CR CR LF, and the
+normalisation stripped only the last pair. The blobs came out with a stray CR
+on every line, which is why the diffs were whole-file. Every blob at HEAD is
+clean. The cure is to join lines with the ending a file already has rather
+than to convert text twice.
+
+**`.gitattributes` says `* text=auto eol=crlf`**, which is what the census
+already showed, so no file moved: `git status` reports nothing modified and
+`git add --renormalize .` stages no blob. It takes the convention out of each
+clone's own `core.autocrlf`, where a machine set to false would commit CRLF
+blobs. The two Context copies under `_cowork/design/landing/` keep LF, because
+they are byte copies of the shared fragment.
+
+**PROJECT_STATE.md held a NUL byte** at line 5046 from run 0042, which wrote a
+Windows path in a Python string as a backslash followed by two noughts. That is
+an octal escape for NUL. Git read the whole file as binary because of it, which
+is why it was the one markdown file with no eol attribute and the one that
+never normalised. One byte out, two characters back in.

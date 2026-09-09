@@ -146,7 +146,11 @@ export const CHANGES_MIND = ["Bruno", "Elin", "Rosa", "Viktor"];
  * would split every pair 4 to 16 and "top three" 12 to 8; two gives 8 to 12,
  * and which eight it is changes with the dial.
  */
-export function voteFor(person, pair) {
+/**
+ * WHAT A PERSON WANTS, before anybody has seen a count. Round 1 is this and
+ * nothing else, so the first tally is a real disagreement.
+ */
+export function firstPreference(person, pair) {
   const rank = person.cares.indexOf(pair.dial);
   return rank === 0 || rank === 1
     ? { pick: "b", reasons: [pair.dial] }
@@ -154,12 +158,79 @@ export function voteFor(person, pair) {
 }
 
 /**
+ * How likely somebody on the losing side is to come across, by round.
+ *
+ * Six in ten in round 2, nine in ten in round 3 and after. Over the eight who
+ * want the challenger that is about three left in round 2 and about one in
+ * round 3, so a group reaches three quarters in round 2 and stays there.
+ * Settled with the building app on 9 September: a vote that never settles is a
+ * vote the brief cannot use.
+ */
+export const FOLLOWS_THE_WINNER = { 2: 0.6 };
+export const FOLLOWS_THE_WINNER_LATER = 0.9;
+export function followChance(round) {
+  if (round <= 1) return 0;
+  return FOLLOWS_THE_WINNER[round] ?? FOLLOWS_THE_WINNER_LATER;
+}
+
+/**
+ * One number in [0, 1) for this person and this dial, from the group code.
+ *
+ * FNV-1a over the three, which is a few lines and no dependency. Seeded by the
+ * code so the same group votes the same way every time: a screenshot taken
+ * today and one taken next week show the same count, which is the whole reason
+ * the twenty are a fixed table.
+ *
+ * NO ROUND IN IT, on purpose. One number per person per dial, held for the
+ * whole vote and compared against a chance that rises, is what makes somebody
+ * who has come across STAY across. Drawing again each round let a settled
+ * group come apart again: 2 for the challenger in round 3 and 4 in round 4,
+ * which is not how a room behaves and which run 0044’s own test caught.
+ *
+ * The dial rather than the pair id, because a pair is built fresh every round
+ * and carries a new id, and what a person is deciding about is the dial.
+ */
+export function chanceFor(seed, person, dial) {
+  let h = 2166136261;
+  for (const ch of `${seed}|${person}|${dial}`) {
+    h ^= ch.codePointAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967296;
+}
+
+/**
+ * THE PICK RULE, with the round in it.
+ *
+ * Round 1 is `firstPreference` and splits every pair 8 for the challenger and
+ * 12 for the building the group has. From round 2 a person who wanted the
+ * challenger has watched it lose, and comes across with `followChance(round)`.
+ * Nobody on the winning side moves, and the chance only rises, so the winning
+ * side only ever grows and a settled group stays settled.
+ *
+ * The loser of a round is always the challenger, because the table is fixed and
+ * round 1 is a property of it: 8 of 20 is the same on every dial. That is why
+ * this needs no history and stays a pure function of the row, the pair, the
+ * round and the code.
+ *
+ * Somebody who comes across keeps their own first care as the reason. They are
+ * not saying the dial moved them; they are saying the group has decided and
+ * they still care about what they came for.
+ */
+export function voteFor(person, pair, round = 1, seed = "") {
+  const first = firstPreference(person, pair);
+  if (round <= 1 || first.pick === "a") return first;
+  const follows = chanceFor(seed, person.name, pair.dial) < followChance(round);
+  return follows ? { pick: "a", reasons: [person.cares[0]] } : first;
+}
+
+/**
  * What one of the four says before they change their mind: the answer the rule
  * gives to somebody who cares the other way round. So a change of mind is a
  * real change of pick, never the same pick twice with a different reason.
  */
-export function otherThought(person, pair) {
-  return voteFor(person, pair).pick === "b"
+export function otherThought(person, pair, round = 1, seed = "") {
+  return voteFor(person, pair, round, seed).pick === "b"
     ? { pick: "a", reasons: [person.cares[0]] }
     : { pick: "b", reasons: [pair.dial] };
 }
@@ -173,13 +244,13 @@ export function otherThought(person, pair) {
  * earlier vote each is enough to fill `replaced`, and changing on every pair
  * would put twenty entries in it and read as a fault rather than as a room.
  */
-export function ballotFor(person, pairs) {
+export function ballotFor(person, pairs, round = 1, seed = "") {
   const out = [];
   pairs.forEach((pair, i) => {
     if (i === 0 && CHANGES_MIND.includes(person.name)) {
-      out.push({ pair: pair.id, ...otherThought(person, pair), replaced: true });
+      out.push({ pair: pair.id, ...otherThought(person, pair, round, seed), replaced: true });
     }
-    out.push({ pair: pair.id, ...voteFor(person, pair), replaced: false });
+    out.push({ pair: pair.id, ...voteFor(person, pair, round, seed), replaced: false });
   });
   return out;
 }

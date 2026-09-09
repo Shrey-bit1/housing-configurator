@@ -354,6 +354,26 @@ to copy, and that app has not had it yet. A group filled by
 app" rather than in the store's own voice, because `POST /messages` refuses an
 empty `who`. Nothing about the repo's shape changed. PROJECT_STATE new §24.
 
+Run 0044 made the walked vote settle and wrote the line-ending convention
+down. `scripts/vote-group.mjs` gave 8 of 20 for the challenger on every pair of
+every round, so four rounds decided nothing; the pick rule takes the round now.
+Round 1 is what people want and still splits 8 to 12, and from round 2 whoever
+wanted the challenger comes across, six times in ten in round 2 and nine in
+round 3. One draw per person per dial, seeded by the group code and held for
+the whole vote, so a settled group stays settled and the same group votes the
+same way every time. Walked live: 12/8 in round 1, 14 to 18 of 20 in round 2,
+18 to 20 in round 3.
+
+A `.gitattributes` now says `* text=auto eol=crlf`, which is what
+`git ls-files --eol` already showed, so no file moved. It matters because the
+convention stopped depending on each clone's `core.autocrlf`. The line-ending
+damage runs 0042 and 0043 reported was NOT what those runs said: no blob in
+this repository has ever held CRLF. Their edit scripts converted newlines in
+text that already carried CRLF, so each line ended CR CR LF and the blob came
+out with a stray CR per line. Join lines with the ending a file already has;
+never convert twice. PROJECT_STATE.md also held one NUL byte from run 0042,
+which is why git read it as binary, and that is out. PROJECT_STATE new §25.
+
 **Last updated:** 2026-09-09
 
 ## What this project is
