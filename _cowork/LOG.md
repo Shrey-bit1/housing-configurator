@@ -51,3 +51,4 @@ reports with no originating prompt. See `.claude/bridge/PROTOCOL.md`.
 | 0040 | 2026-09-08 | Starting again, and the vote a person changed | complete | 0040-starting-again-and-the-changed-vote.report.md |
 | 0041 | 2026-09-08 | The group votes in one command | complete | 0041-the-group-votes-in-one-command.report.md |
 | 0042 | 2026-09-08 | Every word on screen, rewritten against the guide | complete | 0042-every-word-on-screen.report.md |
+| 0043 | 2026-09-09 | Flat 31, the plain room names, and the test group says so | complete | 0043-flat-31-and-the-plain-room-names.report.md |

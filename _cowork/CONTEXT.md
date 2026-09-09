@@ -340,7 +340,21 @@ named: the twenty room names carry em dashes and cannot change while
 and one new document; nothing else about the repo's shape changed.
 PROJECT_STATE new §23.
 
-**Last updated:** 2026-09-08
+Run 0043 did three small things from runs 0041 and 0042's questions. The library
+entry saved from the app on 8 September read "Unit 31" and now reads "Flat 31";
+the path that let it through is closed by naming a library entry and filing it
+separately, `Flat N` to read and `unit-N` to file, because deriving the id from
+the name made the two rules unsatisfiable. Every screen now shows a plain room
+name, "Small bedroom" for the stored "Bedroom — Small", through one table in
+`src/core/words.ts` that no file ever reads; the stored names cannot change
+because they travel into every flat file's `roomTypes`, which the building app
+reads. `_cowork/design/room-names.md` holds the same table for the building app
+to copy, and that app has not had it yet. A group filled by
+`scripts/fill-group.mjs` now says so in its last message, under the name "The
+app" rather than in the store's own voice, because `POST /messages` refuses an
+empty `who`. Nothing about the repo's shape changed. PROJECT_STATE new §24.
+
+**Last updated:** 2026-09-09
 
 ## What this project is
 
