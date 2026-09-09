@@ -12,6 +12,9 @@ import {
   FILLED_BY,
   FILLED_FOR_A_TEST,
   voteFor,
+  firstPreference,
+  followChance,
+  chanceFor,
   otherThought,
   ballotFor,
   flatIdFor,
@@ -379,5 +382,132 @@ describe("what a filled group says about itself", () => {
     expect(FILLED_FOR_A_TEST.trim().endsWith(".")).toBe(true);
     // Within what the store accepts for a message.
     expect(FILLED_FOR_A_TEST.length).toBeLessThanOrEqual(500);
+  });
+});
+
+/**
+ * The group settles (run 0044).
+ *
+ * Before this run the split was 8 to 12 on every pair of every round, so four
+ * rounds ran and none reached the three quarters the brief needs. The rule now
+ * takes the round: round 1 is what people want, and from round 2 whoever
+ * wanted the challenger has watched it lose and comes across.
+ *
+ * All of it is pure, so a whole vote can be counted here without a store.
+ */
+const SEED = "settle-0044";
+const roundPairs = (n: number) =>
+  (REASONS as string[]).map((dial, i) => ({ id: `r${n}-p${i + 1}`, dial }));
+const forChallenger = (n: number, seed = SEED) =>
+  roundPairs(n).map((p) => voters.filter((r) => voteFor(r, p, n, seed).pick === "b").length);
+
+describe("the group settles", () => {
+  it("disagrees in round 1, 8 for the challenger on every pair", () => {
+    expect(forChallenger(1)).toEqual([8, 8, 8, 8, 8]);
+  });
+
+  it("has left the disagreement behind by round 2, and mostly reached three quarters", () => {
+    // Six in ten of the eight come across, so a pair lands between 14 and 18
+    // of 20. On `settle-0044` four of the five pairs are at or past three
+    // quarters in round 2 and the fifth is at 14.
+    const counts = forChallenger(2).map((b) => 20 - b);
+    for (const kept of counts) expect(kept, `${20 - kept} for the challenger`).toBeGreaterThanOrEqual(14);
+    expect(counts.filter((k) => k >= 15).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("is settled by round 3, three quarters or more on every pair", () => {
+    for (const b of forChallenger(3)) {
+      expect(20 - b, `${b} for the challenger`).toBeGreaterThanOrEqual(15);
+    }
+  });
+
+  it("only ever grows the winning side, because nobody on it moves", () => {
+    for (let n = 2; n <= 5; n++) {
+      const before = forChallenger(n - 1).reduce((a, b) => a + b, 0);
+      const after = forChallenger(n).reduce((a, b) => a + b, 0);
+      expect(after, `round ${n} against round ${n - 1}`).toBeLessThanOrEqual(before);
+    }
+  });
+
+  it("keeps round 1 exactly what it was, so the first count is a real disagreement", () => {
+    for (const p of roundPairs(1)) {
+      for (const r of voters) {
+        expect(voteFor(r, p, 1, SEED)).toEqual(firstPreference(r, p));
+        // No round given at all means round 1 too, which is what every test
+        // written before this run relies on.
+        expect(voteFor(r, p)).toEqual(firstPreference(r, p));
+      }
+    }
+  });
+
+  it("gives the same group the same votes every time", () => {
+    expect(forChallenger(2)).toEqual(forChallenger(2));
+    expect(forChallenger(3)).toEqual(forChallenger(3));
+  });
+
+  it("gives two different groups different votes, so the seed is doing something", () => {
+    expect(forChallenger(2, "one-group")).not.toEqual(forChallenger(2, "another-group"));
+  });
+
+  it("settles any group by round 3, whatever the code", () => {
+    // Round 2 draws against six in ten, so a particular group can sit just
+    // under three quarters on a pair. Round 3 draws against nine in ten and
+    // every one of these codes is at or past it.
+    for (const seed of ["one-group", "another-group", "hall-14", "walk-08", "settle-0044"]) {
+      for (const b of forChallenger(3, seed)) {
+        expect(20 - b, `${seed}: ${b} for the challenger`).toBeGreaterThanOrEqual(15);
+      }
+    }
+  });
+
+  it("only moves people who wanted the challenger", () => {
+    for (const p of roundPairs(2)) {
+      for (const r of voters) {
+        if (firstPreference(r, p).pick === "a") {
+          expect(voteFor(r, p, 2, SEED).pick, `${r.name} was already on a`).toBe("a");
+        }
+      }
+    }
+  });
+
+  it("lets somebody who comes across keep their own reason", () => {
+    const moved = roundPairs(2)
+      .flatMap((p) => voters.map((r) => ({ r, p })))
+      .find(({ r, p }) => firstPreference(r, p).pick === "b" && voteFor(r, p, 2, SEED).pick === "a");
+    expect(moved, "somebody comes across in round 2").toBeDefined();
+    expect(voteFor(moved!.r, moved!.p, 2, SEED).reasons).toEqual([moved!.r.cares[0]]);
+  });
+
+  it("rises the chance by round and never above nine in ten", () => {
+    expect(followChance(1)).toBe(0);
+    expect(followChance(2)).toBe(0.6);
+    expect(followChance(3)).toBe(0.9);
+    expect(followChance(9)).toBe(0.9);
+  });
+
+  it("draws a number in [0, 1), one per person per dial", () => {
+    const draws = (REASONS as string[]).map((dial) => chanceFor(SEED, "Ana", dial));
+    for (const d of draws) {
+      expect(d).toBeGreaterThanOrEqual(0);
+      expect(d).toBeLessThan(1);
+    }
+    expect(new Set(draws).size).toBe(5);
+    // One draw per person per dial, held for the whole vote. That is what
+    // makes somebody who has come across stay across.
+    expect(chanceFor(SEED, "Ana", "light")).toBe(chanceFor(SEED, "Ana", "light"));
+    expect(chanceFor(SEED, "Ana", "light")).not.toBe(chanceFor(SEED, "Bruno", "light"));
+  });
+
+  it("still lets the four change their mind, in every round", () => {
+    for (const n of [1, 2, 3]) {
+      const pairs = roundPairs(n);
+      for (const name of CHANGES_MIND as string[]) {
+        const r = voters.find((v) => v.name === name)!;
+        const ballot = ballotFor(r, pairs, n, SEED) as { pair: string; replaced: boolean }[];
+        expect(ballot, `${name} in round ${n}`).toHaveLength(6);
+        expect(ballot[0].replaced).toBe(true);
+        expect(ballot[0].pair).toBe(pairs[0].id);
+      }
+    }
   });
 });
