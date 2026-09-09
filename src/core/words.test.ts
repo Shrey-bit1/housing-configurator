@@ -1,6 +1,17 @@
 import { describe, it, expect } from "vitest";
 import * as W from "./words";
 import { RULES } from "./rules";
+import { readFileSync } from "node:fs";
+import { ROOM_LIST, STAIR_LIST } from "./modules";
+
+/** Every preset the palette can place. */
+const ALL_MODULES = [...STAIR_LIST, ...ROOM_LIST];
+
+/** The retired dogleg stair (`src/core/modules.ts:220`) is kept in MODULE_DEFS
+ *  so an old flat holding one still renders, and nothing new can be created
+ *  from it. It is therefore a name the table has to cover and a preset the
+ *  palette never offers. */
+const RETIRED = "Stair (dogleg, retired)";
 
 /**
  * The guide's tells, read over every word the app says (run 0042).
@@ -102,7 +113,9 @@ const SHORTCUTS: [string, string][] = W.SHORTCUT_ROWS.map((r): [string, string] 
   r.what,
 ]);
 
-const EVERY = [...PLAIN, ...RULE_LINES, ...BUILT, ...SHORTCUTS];
+const ROOMS: [string, string][] = Object.entries(W.ROOM_NAMES).map(([k, v]) => [`ROOM_NAMES.${k}`, v]);
+
+const EVERY = [...PLAIN, ...RULE_LINES, ...BUILT, ...SHORTCUTS, ...ROOMS];
 
 describe("every word the app says", () => {
   it("is there, and there are a lot of them", () => {
@@ -298,5 +311,76 @@ describe("the rules keep their thresholds", () => {
       expect(r.description.trim().endsWith("."), `${r.id} ends without a full stop`).toBe(true);
       expect(/^[A-Z]/.test(r.description), `${r.id} starts lowercase`).toBe(true);
     }
+  });
+});
+
+/**
+ * The rooms, by their plain names (run 0043).
+ *
+ * The stored names cannot change: `src/core/adjacencyGraph.ts:170` and `:202`
+ * copy `def.name` into every graph node's label, and
+ * `src/core/unitExport.ts:238` copies it into the exported unit's `roomTypes`,
+ * which the building app reads. So the table has to cover every one of them,
+ * and nothing may write a display name into a file.
+ */
+describe("the rooms by their plain names", () => {
+  it("has a row for every room the app can place", () => {
+    for (const def of ALL_MODULES) {
+      expect(W.ROOM_NAMES[def.name], `${def.name} has no plain name`).toBeTypeOf("string");
+    }
+  });
+
+  it("has no row for a name no file can carry, so the table cannot drift", () => {
+    const stored = new Set([...ALL_MODULES.map((d) => d.name), RETIRED]);
+    for (const name of Object.keys(W.ROOM_NAMES)) {
+      expect(stored.has(name), `${name} is in the table and in no preset`).toBe(true);
+    }
+  });
+
+  it("covers the nineteen the palette offers and the one it does not", () => {
+    expect(ALL_MODULES).toHaveLength(19);
+    expect(ALL_MODULES.some((d) => d.name === RETIRED)).toBe(false);
+    expect(W.ROOM_NAMES[RETIRED]).toBe("Dogleg stair, retired");
+    expect(Object.keys(W.ROOM_NAMES)).toHaveLength(20);
+  });
+
+  it("says the plain name the guide asks for", () => {
+    expect(W.roomName("Bedroom — Small")).toBe("Small bedroom");
+    expect(W.roomName("Bathroom — Full, compact")).toBe("Compact full bathroom");
+    expect(W.roomName("Living Room")).toBe("Living room");
+    expect(W.roomName("Kitchen")).toBe("Kitchen");
+  });
+
+  it("says Hall for circulation on every screen, which the palette alone used to", () => {
+    expect(W.roomName("Circulation — Single")).toBe("Single hall");
+    expect(W.roomName("Circulation — Double")).toBe("Double hall");
+  });
+
+  it("falls back to the stored name, so a preset added later still reads", () => {
+    expect(W.roomName("Winter garden — Large")).toBe("Winter garden — Large");
+    expect(W.roomName("")).toBe("");
+  });
+
+  it("carries no em dash and no capital in the middle", () => {
+    for (const [stored, shown] of Object.entries(W.ROOM_NAMES)) {
+      expect(shown.includes("—"), `${stored} → ${shown}`).toBe(false);
+      // One capital, at the front. "WC" is the exception a person actually
+      // writes that way.
+      expect(shown.slice(1).replace("WC", ""), `${stored} → ${shown}`).toBe(
+        shown.slice(1).replace("WC", "").toLowerCase()
+      );
+    }
+  });
+
+  it("never reaches a file: the export carries the stored name", () => {
+    // `unitExport.ts:238` writes `def.name`, and nothing in this run changed
+    // it. If a display name ever reached it, every flat already in a group
+    // would disagree with every flat saved afterwards.
+    const source = readFileSync(new URL("./unitExport.ts", import.meta.url), "utf8");
+    expect(source).toContain("name: def.name");
+    expect(source).not.toContain("roomName");
+    const graph = readFileSync(new URL("./adjacencyGraph.ts", import.meta.url), "utf8");
+    expect(graph).toContain("label: def.name");
+    expect(graph).not.toContain("roomName");
   });
 });

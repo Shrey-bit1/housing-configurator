@@ -9,6 +9,8 @@ import {
   SHARE_MAX,
   REASONS,
   CHANGES_MIND,
+  FILLED_BY,
+  FILLED_FOR_A_TEST,
   voteFor,
   otherThought,
   ballotFor,
@@ -338,5 +340,44 @@ describe("the vote script itself", () => {
     expect(source).toContain("const notInTheGroup = (status) => status === 403 || status === 404;");
     expect(source).toContain("the store's own 403");
     expect(source).toContain("404, which is how `netlify dev` delivers the store's 403");
+  });
+});
+
+describe("what a filled group says about itself", () => {
+  it("says it in one sentence, naming what is not real", () => {
+    expect(FILLED_FOR_A_TEST).toBe(
+      "This group was filled for a test, with twenty people who are not real."
+    );
+  });
+
+  it("is said by a name no resident can be confused with", () => {
+    expect(FILLED_BY).toBe("The app");
+    expect(people.some((r) => r.name === FILLED_BY)).toBe(false);
+    // The store refuses an empty `who`, which is what its own voice is
+    // (`residentName` in src/session/store.ts:402 answers 400). Giving that
+    // voice a public door is a change to the store, which run 0043 was told
+    // not to make, so the line is said by a name instead.
+    expect(FILLED_BY.trim().length).toBeGreaterThan(0);
+    expect(FILLED_BY.length).toBeLessThanOrEqual(64);
+  });
+
+  it("is the last thing the fill script writes", () => {
+    const source = readFileSync(new URL("./fill-group.mjs", import.meta.url), "utf8");
+    // `lastIndexOf`, because the first mention is the import at the top.
+    const said = source.lastIndexOf("FILLED_FOR_A_TEST");
+    const messages = source.indexOf('call("POST", "/messages", JSON.stringify(m)');
+    expect(said, "the line is in the script").toBeGreaterThan(0);
+    expect(said, "and it comes after the three the twenty say").toBeGreaterThan(messages);
+    // Nothing writes after it: what follows is the read-back.
+    expect(source.slice(said)).not.toContain('call("PUT"');
+    expect(source.slice(said)).not.toContain('call("POST", "/messages"');
+  });
+
+  it("reads as the app speaking, in the guide's voice", () => {
+    expect(FILLED_FOR_A_TEST.includes("—")).toBe(false);
+    expect(FILLED_FOR_A_TEST.includes("!")).toBe(false);
+    expect(FILLED_FOR_A_TEST.trim().endsWith(".")).toBe(true);
+    // Within what the store accepts for a message.
+    expect(FILLED_FOR_A_TEST.length).toBeLessThanOrEqual(500);
   });
 });

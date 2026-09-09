@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   projectNameFor,
   unitNameFor,
+  libraryNameFor,
+  libraryIdFor,
   numberFromName,
   nextFreeNumber,
   findLibraryEntry,
@@ -138,5 +140,63 @@ describe("findLibraryEntry — what a save would collide with", () => {
 
   it("returns undefined when nothing collides, which is the new-entry path", () => {
     expect(findLibraryEntry(units, "Unit 9")).toBeUndefined();
+  });
+});
+
+/**
+ * What a library entry is called and what it is filed under (run 0043).
+ *
+ * These came apart on purpose in run 0035: a person browsing the library reads
+ * flats, and the live store links a published flat by id. Before run 0043 only
+ * the name reached the sink and the id was derived from it, so no one string
+ * could be both, and every library save wrote a row reading "Unit N". The entry
+ * saved on 8 September at 12:47 is the one that caught it.
+ */
+describe("what a library entry is called, and what it is filed under", () => {
+  it("reads Flat N, the same as the project file", () => {
+    expect(libraryNameFor(1)).toBe("Flat 1");
+    expect(libraryNameFor(31)).toBe("Flat 31");
+    expect(libraryNameFor(31)).toBe(projectNameFor(31));
+  });
+
+  it("is filed under unit-N, which is what the live store links by", () => {
+    expect(libraryIdFor(1)).toBe("unit-1");
+    expect(libraryIdFor(31)).toBe("unit-31");
+  });
+
+  it("never files under flat-N, which is the project file's own slug", () => {
+    for (let n = 1; n <= 40; n++) {
+      expect(libraryIdFor(n), `design ${n}`).not.toMatch(/^flat-\d+$/);
+    }
+  });
+
+  it("proposes no name a library row may not carry", () => {
+    // `src/library/libraryNames.test.ts` requires every row to match this.
+    for (let n = 1; n <= 40; n++) expect(libraryNameFor(n)).toMatch(/^Flat \d+$/);
+  });
+
+  it("still names the unit FILE Unit N, so the pair can be told apart by eye", () => {
+    expect(unitNameFor(31)).toBe("Unit 31");
+    expect(projectNameFor(31)).toBe("Flat 31");
+  });
+
+  it("finds a renamed entry by the id it was filed under", () => {
+    // A row renamed to "Studio A" still owns design 31. Its name no longer
+    // matches, and slugging the proposed name gives `flat-31`, which is
+    // nothing, so without the id a second entry would appear under the same
+    // number.
+    const renamed = [{ id: "unit-31", name: "Studio A" }];
+    expect(findLibraryEntry(renamed, libraryNameFor(31))).toBeUndefined();
+    expect(findLibraryEntry(renamed, libraryNameFor(31), libraryIdFor(31))).toBe(renamed[0]);
+  });
+
+  it("finds an unrenamed entry either way", () => {
+    const entries = [{ id: "unit-31", name: "Flat 31" }];
+    expect(findLibraryEntry(entries, "Flat 31")).toBe(entries[0]);
+    expect(findLibraryEntry(entries, "Flat 31", "unit-31")).toBe(entries[0]);
+  });
+
+  it("counts a Flat N row and a unit-N id as the same design number", () => {
+    expect(nextFreeNumber([{ id: "unit-1", name: "Flat 1" }, { id: "unit-2", name: "Flat 2" }])).toBe(3);
   });
 });
