@@ -98,6 +98,27 @@ export const MESSAGES = [
 ];
 
 /**
+ * What the group is told about itself, as the LAST write of a fill (run 0043).
+ *
+ * A filled group is otherwise indistinguishable from a real one, which is the
+ * point of filling through the store's public calls only. A recording of the
+ * journey should still not be mistakable for twenty real people, so the group
+ * says which it is. It is last so that a group half way through a fill never
+ * carries the line.
+ *
+ * `FILLED_BY` is a name rather than the store's own voice, which is what an
+ * empty `who` means (run 0036's "Ben left the group."). The store REFUSES an
+ * empty `who` on `POST /messages`: `residentName` in src/session/store.ts:402
+ * answers 400 for it, and the leave line is written inside the store rather
+ * than posted. Verified live in run 0043 and pinned by
+ * `scripts/store-roundtrip.mjs`. So the line is said by a name no resident can
+ * be confused with, and giving the store's own voice a public door is a change
+ * to the store, which run 0043 was told not to make.
+ */
+export const FILLED_BY = "The app";
+export const FILLED_FOR_A_TEST = "This group was filled for a test, with twenty people who are not real.";
+
+/**
  * The four who always change their mind once, on the round's first pair.
  *
  * Named here rather than picked at random so that two runs leave the same four

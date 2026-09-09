@@ -28,7 +28,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { RESIDENTS, MESSAGES, flatIdFor } from "./fillGroupTable.mjs";
+import { RESIDENTS, MESSAGES, FILLED_BY, FILLED_FOR_A_TEST, flatIdFor } from "./fillGroupTable.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const unitsDir = resolve(here, "..", "public", "units");
@@ -143,7 +143,13 @@ for (const m of MESSAGES) {
   line(`${m.who.padEnd(7)} said`, res.status, JSON.stringify(m.text));
 }
 
-// 5. What the room looks like now, from the call the building app polls.
+// 5. The group says what it is, as the last write, so a recording cannot be
+//    mistaken for twenty real people. Said by a name, because the store
+//    refuses an empty `who` on this call.
+const saidSo = await call("POST", "/messages", JSON.stringify({ who: FILLED_BY, text: FILLED_FOR_A_TEST }), JSON_H);
+line(`${FILLED_BY.padEnd(7)} said what this group is`, saidSo.status, JSON.stringify(FILLED_FOR_A_TEST));
+
+// 6. What the room looks like now, from the call the building app polls.
 const after = await call("GET", "");
 const flats = after.json?.flats ?? [];
 const residents = after.json?.residents ?? [];

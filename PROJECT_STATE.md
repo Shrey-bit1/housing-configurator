@@ -5097,3 +5097,82 @@ from the floor the entrance is on." and A1 as "This circulation is narrower than
 1 thing to look at" with the fault named under it, and after the press
 "Sent to walk-0041. Your group sees it as Unit 33." Five pictures at
 `_cowork/outbox/0042-*.png`, all 1440 by 900.
+---
+
+## 24. Flat 31, the plain room names, and a group that says it was filled (run 0043)
+
+**A library entry saved from the app read "Unit 31"**, and every other row
+reads `Flat N`. Three tests in `src/library/libraryNames.test.ts` were red for
+two days because of it.
+
+**The path.** `src/library/naming.ts:29` still returned `Unit N` for the
+library entry, from the convention of 10 August, and run 0035 renamed the rows
+to `Flat N` without moving it. The sink at `vite.config.ts:102` derived the
+entry's id from its name, so no one string could be both the name a person
+reads, `Flat 31`, and the id the live store links by, `unit-31`. A `flat-31` id
+would collide with the project file's own slug, which
+`src/library/libraryNames.test.ts:67` forbids.
+
+**Closed by naming the two separately.** `libraryNameFor` gives `Flat N` and
+`libraryIdFor` gives `unit-N`; both are sent to the sink, and the sink files
+under the id it is given. The library's own copy of the file carries the
+library's name, so a row and the file it points at agree. The unit file a
+person downloads is built beside it with `unitNameFor` and is unchanged.
+
+**Two of the three red tests could not go green untouched.** `ORDER` in that
+file is a hand-written list of ids and the `unit-` count is a literal, so no
+31st entry can pass either. The file's own note says a change to the list has
+to be a deliberate edit there, and `LATER` already held `unit-29` for exactly
+this case, a row saved from the app after run 0035's prompt was written.
+`unit-31` joined it and the count went from 28 to 29.
+
+**The twenty room names stay in the files and change on the screen.**
+`src/core/adjacencyGraph.ts:170` and `:202` copy `def.name` into every graph
+node's label, and `src/core/unitExport.ts:238` copies it into the exported
+unit's `roomTypes`, which the building app reads. So `ROOM_NAMES` in
+`src/core/words.ts` maps every stored name to a plain one and `roomName()`
+reads it with the stored name as the fallback. "Bedroom — Small" is how a parts
+list writes it; "Small bedroom" is how a person says it. The palette, the drag
+ghost, the selection read-out, the double-height message, the diagram's node
+labels, the layout report's room chips and its depth list all go through it.
+
+It absorbed the Circulation-to-Hall rename that lived in `src/ui/palette.ts`
+from run 0027 and applied to the palette alone. The diagram's `shortLabel` went
+with it: the plain names put the variant first, so there is no suffix left to
+strip, and the node radius still carries the size.
+
+**The table is 22 rows for 19 presets.** The retired dogleg stair
+(`src/core/modules.ts:220`) is a twentieth name no palette offers and an old
+file can still carry. The last two are group labels: circulation and outdoor
+cells that touch become ONE node, labelled with the preset's group rather than
+its name, so the report said "Circulation" where the palette said "Single
+hall". Run 0043's finishing pass found that on screen.
+`_cowork/design/room-names.md` holds the same table for the building app.
+
+**A filled group now says so.** The last write of
+`scripts/fill-group.mjs` is one line: "This group was filled for a test, with
+twenty people who are not real." A filled group is otherwise indistinguishable
+from a real one, which is the point of filling through the store's public calls
+only, and a recording of the journey should not be mistakable for twenty real
+people.
+
+**It is said under a name, because the store has no public door for its own
+voice.** An empty `who` is what the store speaking means, which is how "Ben
+left the group." reads, and `POST /messages` refuses it: `residentName` at
+`src/session/store.ts:402` answers 400 for an empty name, and the leave line is
+written inside the store. Run 0043 was told not to change the store, so the
+line is said by "The app", which is no resident's name.
+`scripts/store-roundtrip.mjs` pins both halves and is now 100 checks.
+
+**Verified live (run 0043)** against `netlify dev` on 8888, at 1440 by 900,
+through headless Chrome driven over its debugging protocol. The palette reading
+`Living room | Kitchen | Small bedroom | Large bedroom | Minimal WC | Full
+bathroom | Compact full bathroom | Small bathroom | Large bathroom | Recreation
+room | Single hall | Double hall | Single outdoor space | Double outdoor space |
+Straight stair | Dogleg stair | Generous dogleg stair | Spiral stair | C stair,
+three flights`. The layout report reading `Hall (F1, 8,14)` beside `This
+circulation is narrower than 1.2 m across 2 cells.` The library reading 31
+units with `Flat 31` at y 764 and the words "Unit 31" nowhere on the page. The
+fill script's last line landing as `The app` and reading back as the last
+message in the group. Three pictures at `_cowork/outbox/0043-*.png`, all 1440
+by 900.

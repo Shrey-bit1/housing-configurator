@@ -34,9 +34,15 @@ const OLDER = [
   "unit-6",
   "unit-7",
 ];
-/** Saved from the app on 6 September, after run 0035's prompt was written. It
- *  belongs to neither group, so it takes the number after the last of them. */
-const LATER = ["unit-29"];
+/** Saved from the app after run 0035's prompt was written. Neither belongs to
+ *  a group above, so each takes the number after the last of them: `unit-29` on
+ *  6 September and `unit-31` on 8 September, during Shrey's walkthrough.
+ *
+ *  This list is the deliberate edit the file's own note asks for. A row saved
+ *  from the app is a real save and belongs here; what run 0043 fixed is the
+ *  name it arrived under, which read `Unit 31` because the sink derived the id
+ *  from the name and no one string could be both `Flat 31` and `unit-31`. */
+const LATER = ["unit-29", "unit-31"];
 const ORDER = [...DESIGNED, ...OLDER, ...LATER];
 
 const nameOf = new Map(manifest.units.map((u) => [u.id, u.name]));
@@ -66,7 +72,7 @@ describe("the library's names", () => {
       expect(u.preview).toBe(`${u.id}.jpg`);
       expect(u.id).not.toMatch(/^flat-\d+$/);
     }
-    expect(manifest.units.filter((u) => u.id.startsWith("unit-"))).toHaveLength(28);
+    expect(manifest.units.filter((u) => u.id.startsWith("unit-"))).toHaveLength(29);
   });
 
   it("says the same name inside each file as in the manifest", () => {

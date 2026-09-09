@@ -76,7 +76,7 @@ import {
 import landingMarkup from "../_cowork/design/landing/landing.html?raw";
 import "../_cowork/design/landing/landing.css";
 import { slugifyUnitName } from "./library/ids";
-import { unitNameFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
+import { unitNameFor, libraryNameFor, libraryIdFor, nextFreeNumber, findLibraryEntry } from "./library/naming";
 import { parseUnitLibraryIndex, type UnitManifestEntry } from "./library/manifest";
 import {
   outputLabel,
@@ -491,7 +491,7 @@ function updateSelectionReadout(): void {
     const eff = floors.active.effectiveCells.get(inst.id);
     const shown = eff && eff.length ? bbox(eff) : seed;
     const grewNote = shown.n > seed.n ? ` (seed ${seed.w}×${seed.d})` : "";
-    text = `${inst.def.name} · Floor ${floors.activeIndexValue} · ${shown.w}×${shown.d}${grewNote}`;
+    text = `${W.roomName(inst.def.name)} · Floor ${floors.activeIndexValue} · ${shown.w}×${shown.d}${grewNote}`;
   } else if (insts.length > 1) {
     text = `${insts.length} selected`;
   } else if (entId) {
@@ -533,8 +533,8 @@ function toggleDoubleHeight(instanceId: string): { ok: boolean; blockedBy?: Cell
   showToast(
     "info",
     want
-      ? `"${inst.def.name}" is now double height and claims the storey above.`
-      : `"${inst.def.name}" is single height again.`
+      ? `"${W.roomName(inst.def.name)}" is now double height and claims the storey above.`
+      : `"${W.roomName(inst.def.name)}" is single height again.`
   );
   return res;
 }
@@ -1945,6 +1945,7 @@ async function runSend(): Promise<void> {
  */
 async function saveLibraryEntry(
   name: string,
+  id: string,
   color: string,
   unitFile: DwellingUnitFile
 ): Promise<void> {
@@ -1968,7 +1969,6 @@ async function saveLibraryEntry(
     // No sink in a production build. Download the pair the sink would have
     // written, named by the name's slug alone — collision suffixes need the
     // manifest, and only the dev server owns that.
-    const id = slugifyUnitName(name);
     downloadAs(
       URL.createObjectURL(new Blob([unitFileText(unitFile)], { type: "application/json" })),
       `${id}.json`,
@@ -1983,7 +1983,7 @@ async function saveLibraryEntry(
     return;
   }
 
-  const existing = findLibraryEntry(await readManifestEntries(), name);
+  const existing = findLibraryEntry(await readManifestEntries(), name, id);
   let replace = false;
   if (existing) {
     replace = window.confirm(
@@ -1995,7 +1995,7 @@ async function saveLibraryEntry(
     const res = await fetch("/__library/save", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, color, unit: unitFile, preview, replace }),
+      body: JSON.stringify({ name, id, color, unit: unitFile, preview, replace }),
     });
     const r = (await res.json()) as {
       ok: boolean;
@@ -2051,12 +2051,16 @@ saveUnitFileBtn.addEventListener("click", () => {
 saveLibraryBtn.addEventListener("click", () => {
   const n = saveDesignNumber();
   const color = saveColorInput.value;
-  const built = buildUnitExport(floors, unitNameFor(n), color);
+  // The library's own copy carries the library's name, so the row and the file
+  // it points at read the same (run 0043; `src/library/libraryNames.test.ts`
+  // checks that pair). The unit file a person DOWNLOADS is built beside this
+  // one with `unitNameFor` and is unchanged.
+  const built = buildUnitExport(floors, libraryNameFor(n), color);
   if (!built.ok) {
     setSaveResult("library", "failed", `not written — ${built.reason}`);
     return;
   }
-  void saveLibraryEntry(unitNameFor(n), color, built.file);
+  void saveLibraryEntry(libraryNameFor(n), libraryIdFor(n), color, built.file);
 });
 saveGoBtn.addEventListener("click", () => {
   if (sendState === "sent") {

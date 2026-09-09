@@ -262,7 +262,7 @@ function createPaletteItem(def: ModuleDef, cb: PaletteCallbacks): HTMLElement {
   // footprint is what someone choosing a room actually reads.
   const w = Math.max(...def.cells.map((c) => c.cx)) + 1;
   const d = Math.max(...def.cells.map((c) => c.cz)) + 1;
-  label.innerHTML = `<span class="name">${paletteName(def)}</span><span class="desc">${w}×${d}</span>`;
+  label.innerHTML = `<span class="name">${W.roomName(def.name)}</span><span class="desc">${w}×${d}</span>`;
 
   item.appendChild(swatch);
   item.appendChild(label);
@@ -276,21 +276,12 @@ function createPaletteItem(def: ModuleDef, cb: PaletteCallbacks): HTMLElement {
   return item;
 }
 
-/**
- * The name a palette entry shows, which is `def.name` for everything except
- * circulation, where it reads "Hall".
- *
- * The rename is confined to this one function ON PURPOSE. `def.name` is not
- * only a caption: `adjacencyGraph.ts:170` and `:202` copy it into every graph
- * node's `label`, and `unitExport.ts:213` copies it into the exported unit's
- * `roomTypes`, which is a bridge-format payload another repository reads.
- * Renaming the preset itself would therefore change a file format, so the word
- * changes where it is read and nowhere else. The type id stays `circulation`,
- * as does every rule that reasons about it.
- */
-function paletteName(def: ModuleDef): string {
-  return def.name.replace(/^Circulation/, "Hall");
-}
+// The palette's own Circulation-to-Hall rename lived here until run 0043. It
+// is `W.roomName` now, one table in `src/core/words.ts` read by every screen, so
+// the palette and the diagram and the layout report say the same word about the
+// same room. The reason it was confined to a display function has not changed:
+// `def.name` travels into a graph node's `label` and into the exported unit's
+// `roomTypes`, so renaming the preset would change a file format.
 
 
 /**

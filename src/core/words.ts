@@ -528,3 +528,70 @@ export function depthSummary(max: number, mean: string): string {
 export function privacyGradient(publicMean: string, bedroomMean: string): string {
   return `Living spaces sit ${publicMean} rooms in, bedrooms ${bedroomMean}`;
 }
+
+// ---- The rooms, by their plain names ----------------------------------------
+//
+// Every room carries a stored name, `def.name` in `src/core/modules.ts`, and
+// that name travels: `src/core/adjacencyGraph.ts:170` and `:202` copy it into
+// every graph node's `label`, and `src/core/unitExport.ts:213` copies it into
+// the exported unit's `roomTypes`, which is a bridge-format payload the
+// building app reads. Renaming a preset would therefore change a file format
+// and break every flat already sitting in a group.
+//
+// So the stored name stays and the screen shows a plain one instead. Sixteen of
+// the twenty stored names glue two words with an em dash, which is the guide's
+// first rule, and they read as a catalogue rather than as rooms: "Bedroom —
+// Small" is how a parts list writes it and "Small bedroom" is how a person says
+// it.
+//
+// The same table is in `_cowork/design/room-names.md`, byte for byte, so the
+// building app can copy it and the two apps say the same words about the same
+// room (run 0043).
+//
+// This absorbs the one-line rename `paletteName` did in `src/ui/palette.ts`
+// before this run, which turned Circulation into Hall on the palette alone.
+// Every screen now reads the same word.
+
+export const ROOM_NAMES: Record<string, string> = {
+  "Stair — Straight": "Straight stair",
+  "Stair — Dogleg": "Dogleg stair",
+  "Stair — Dogleg, generous": "Generous dogleg stair",
+  "Stair — Spiral": "Spiral stair",
+  "Stair — C, three flights": "C stair, three flights",
+  "Stair (dogleg, retired)": "Dogleg stair, retired",
+  "Living Room": "Living room",
+  Kitchen: "Kitchen",
+  "Bedroom — Small": "Small bedroom",
+  "Bedroom — Large": "Large bedroom",
+  "Bathroom — Small": "Small bathroom",
+  "Bathroom — Large": "Large bathroom",
+  "WC — minimal": "Minimal WC",
+  "Bathroom — Full": "Full bathroom",
+  "Bathroom — Full, compact": "Compact full bathroom",
+  "Recreation Room": "Recreation room",
+  "Circulation — Single": "Single hall",
+  "Circulation — Double": "Double hall",
+  "Outdoor — Single": "Single outdoor space",
+  "Outdoor — Double": "Double outdoor space",
+  // Two more names a person reads, found by run 0043's finishing pass in the
+  // layout report. Circulation and outdoor cells that touch become ONE node in
+  // the adjacency graph, and `src/core/adjacencyGraph.ts:192` labels that node
+  // with the preset's GROUP rather than its name. So the report and the diagram
+  // said "Circulation" where the palette says "Single hall". These two rows are
+  // what make every screen say the same word.
+  Circulation: "Hall",
+  Outdoor: "Outdoor space",
+};
+
+/**
+ * What a person reads for a room, given the name the file stores.
+ *
+ * The stored name is the fallback, so a preset added later shows something
+ * rather than nothing, and a name that has already travelled into a flat file
+ * still reads. `src/core/words.test.ts` checks that every name in
+ * `src/core/modules.ts` has a row here, so the fallback is a safety net rather
+ * than a way of quietly skipping one.
+ */
+export function roomName(stored: string): string {
+  return ROOM_NAMES[stored] ?? stored;
+}

@@ -1,5 +1,6 @@
 import { MODULE_DEFS, type ModuleType } from "../core/modules";
 import type { DragGestureState } from "../interaction/dragDrop";
+import * as W from "../core/words";
 
 /**
  * The DOM half of the drag-to-place gesture: the cursor chip that follows the
@@ -88,7 +89,7 @@ export function renderDragChrome(state: DragGestureState | null): void {
     swatch.style.background = `#${def.color.toString(16).padStart(6, "0")}`;
     const name = document.createElement("span");
     name.className = "dc-name";
-    name.textContent = def.name;
+    name.textContent = W.roomName(def.name);
     const dims = document.createElement("span");
     dims.className = "dc-size";
     dims.textContent = size;
@@ -113,7 +114,7 @@ export function renderDragChrome(state: DragGestureState | null): void {
     l.classList.remove("on");
   } else {
     l.textContent = state.valid
-      ? `${def.name} · ${size} · CELL ${state.cell.cx},${state.cell.cz}`
+      ? `${W.roomName(def.name)} · ${size} · CELL ${state.cell.cx},${state.cell.cz}`
       : "BLOCKED — OVERLAPS A PLACED ROOM";
     l.classList.toggle("invalid", !state.valid);
     l.classList.add("on");

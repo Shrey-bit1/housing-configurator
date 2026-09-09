@@ -365,7 +365,7 @@ function depthCard(
 
   const card = infoCard(`Depth from entrance · ${rooms.length} rooms`);
   const list = el("div", "vs-list");
-  for (const r of rooms) list.appendChild(listRow(r.label, String(r.depth)));
+  for (const r of rooms) list.appendChild(listRow(W.roomName(r.label), String(r.depth)));
   card.appendChild(list);
   return card;
 }
@@ -436,7 +436,7 @@ function bindWheelToScroll(rail: HTMLElement): void {
 function makeLabeller(graph: DwellingGraph): (n: DwellingGraph["nodes"][number]) => string {
   const multi = graph.floorCount > 1;
   const base = (n: DwellingGraph["nodes"][number]) =>
-    multi ? `${n.label} (F${n.floor})` : n.label;
+    multi ? `${W.roomName(n.label)} (F${n.floor})` : W.roomName(n.label);
   const counts = new Map<string, number>();
   for (const n of graph.nodes) counts.set(base(n), (counts.get(base(n)) ?? 0) + 1);
   return (n) => {
@@ -444,7 +444,8 @@ function makeLabeller(graph: DwellingGraph): (n: DwellingGraph["nodes"][number])
     if ((counts.get(b) ?? 0) < 2) return b;
     const cx = Math.min(...n.cells.map((c) => c.cx));
     const cz = Math.min(...n.cells.map((c) => c.cz));
-    return multi ? `${n.label} (F${n.floor}, ${cx},${cz})` : `${n.label} (${cx},${cz})`;
+    const room = W.roomName(n.label);
+    return multi ? `${room} (F${n.floor}, ${cx},${cz})` : `${room} (${cx},${cz})`;
   };
 }
 
