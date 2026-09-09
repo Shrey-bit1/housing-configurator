@@ -573,6 +573,14 @@ export const ROOM_NAMES: Record<string, string> = {
   "Circulation — Double": "Double hall",
   "Outdoor — Single": "Single outdoor space",
   "Outdoor — Double": "Double outdoor space",
+  // Two more names a person reads, found by run 0043's finishing pass in the
+  // layout report. Circulation and outdoor cells that touch become ONE node in
+  // the adjacency graph, and `src/core/adjacencyGraph.ts:192` labels that node
+  // with the preset's GROUP rather than its name. So the report and the diagram
+  // said "Circulation" where the palette says "Single hall". These two rows are
+  // what make every screen say the same word.
+  Circulation: "Hall",
+  Outdoor: "Outdoor space",
 };
 
 /**

@@ -13,6 +13,12 @@ const ALL_MODULES = [...STAIR_LIST, ...ROOM_LIST];
  *  palette never offers. */
 const RETIRED = "Stair (dogleg, retired)";
 
+/** Circulation and outdoor cells that touch become ONE graph node, labelled
+ *  with the preset's GROUP (`src/core/adjacencyGraph.ts:192`). A person reads
+ *  those two words in the layout report and on the diagram, so they need rows
+ *  too. Run 0043's finishing pass found them on screen. */
+const CLUSTER_GROUPS = ["Circulation", "Outdoor"];
+
 /**
  * The guide's tells, read over every word the app says (run 0042).
  *
@@ -331,17 +337,24 @@ describe("the rooms by their plain names", () => {
   });
 
   it("has no row for a name no file can carry, so the table cannot drift", () => {
-    const stored = new Set([...ALL_MODULES.map((d) => d.name), RETIRED]);
+    const stored = new Set([...ALL_MODULES.map((d) => d.name), RETIRED, ...CLUSTER_GROUPS]);
     for (const name of Object.keys(W.ROOM_NAMES)) {
       expect(stored.has(name), `${name} is in the table and in no preset`).toBe(true);
     }
   });
 
-  it("covers the nineteen the palette offers and the one it does not", () => {
+  it("covers the nineteen the palette offers, the retired one, and the two group labels", () => {
     expect(ALL_MODULES).toHaveLength(19);
     expect(ALL_MODULES.some((d) => d.name === RETIRED)).toBe(false);
     expect(W.ROOM_NAMES[RETIRED]).toBe("Dogleg stair, retired");
-    expect(Object.keys(W.ROOM_NAMES)).toHaveLength(20);
+    expect(Object.keys(W.ROOM_NAMES)).toHaveLength(22);
+  });
+
+  it("says the same word for a cluster as for the tiles it is made of", () => {
+    // The palette places "Single hall"; two of them touching become one node
+    // the report calls "Hall". Before run 0043 the report said "Circulation".
+    expect(W.roomName("Circulation")).toBe("Hall");
+    expect(W.roomName("Outdoor")).toBe("Outdoor space");
   });
 
   it("says the plain name the guide asks for", () => {

@@ -41,6 +41,17 @@ Never write a display name into a file.
 | `Outdoor — Single` | Single outdoor space |
 | `Outdoor — Double` | Double outdoor space |
 
+Two more names a person reads. Circulation and outdoor cells that touch become
+ONE node in the adjacency graph, and the node is labelled with the preset's
+GROUP rather than its name. In the flat app that is
+`src/core/adjacencyGraph.ts:192`. So the layout report and the diagram name the
+group, and these two rows are what make every screen say the same word.
+
+| Stored | On screen |
+|---|---|
+| `Circulation` | Hall |
+| `Outdoor` | Outdoor space |
+
 Circulation reads Hall on screen and stays `circulation` in the data. The flat
 app renamed it on the palette alone from run 0027 until run 0043; every screen
 says Hall now, and every rule still reasons about `circulation`.
